@@ -177,13 +177,16 @@ class Queue
   #   + `STATISTICS`, Redis hash, tracks basic statistics for the queue.
   key: (key) -> "#{prefix}:#{key}:#{@name}"
 
-  # ### Configurable Parameters:
+  # ### Configurable Parameters
 
-  # + Polling interval in milliseconds
-  # + Retry interval in milliseconds
-  # + Maximum times of retries
-  # + Storage capacity for newly finished tasks 
-  # + Storage capacity for slowest tasks
+  # Prototypal inherited parameters which can be overriden by instance
+  # properties include:
+  #
+  #   + Polling interval in milliseconds
+  #   + Retry interval in milliseconds
+  #   + Maximum times of retries
+  #   + Storage capacity for newly finished tasks 
+  #   + Storage capacity for slowest tasks
   polling_interval : 5
   retry_delay      : 0.1 * 1000
   retry_limit      : 2
