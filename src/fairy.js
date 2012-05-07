@@ -124,18 +124,13 @@
     Queue.prototype.regist = function(handler) {
       var _this = this;
       this.handler = handler;
-      this.retry_count = null;
-      this.queued_time = null;
-      this.current_task = null;
-      this.processing = null;
-      this.errors = [];
       global.process.on('SIGINT', function() {
         return global.process.exit();
       });
       global.process.on('exit', function() {
         console.log('exit');
-        if (_this.current_task) {
-          return _this.redis.sadd(_this.key('BLOCKED'), _this.current_task[0]);
+        if (_this.task) {
+          return _this.redis.sadd(_this.key('BLOCKED'), _this.task[0]);
         }
       });
       return this.poll();
@@ -145,16 +140,15 @@
       var _this = this;
       this.redis.watch(this.key('SOURCE'));
       return this.redis.lindex(this.key('SOURCE'), 0, function(err, res) {
-        var multi, queued, task;
+        var multi, task;
         if (res) {
           task = JSON.parse(res);
-          queued = "" + (_this.key('QUEUED')) + ":" + task[0];
           multi = _this.redis.multi();
           multi.lpop(_this.key('SOURCE'));
-          multi.rpush(queued, res);
+          multi.rpush("" + (_this.key('QUEUED')) + ":" + task[0], res);
           return multi.exec(function(multi_err, multi_res) {
             if (multi_res && multi_res[1] === 1) {
-              return _this.process(queued, task, true);
+              return _this.process(task, true);
             }
             return _this.poll();
           });
@@ -165,12 +159,12 @@
       });
     };
 
-    Queue.prototype.process = function(queued, task, is_new_task) {
+    Queue.prototype.process = function(task, is_new_task) {
       var start_time,
         _this = this;
+      this.task = task;
       start_time = Date.now();
       if (is_new_task) {
-        this.current_task = task;
         this.processing = uuid.v4();
         this.queued_time = task.pop();
         this.redis.hset(this.key('PROCESSING'), this.processing, JSON.stringify(__slice.call(task).concat([start_time])));
@@ -187,13 +181,13 @@
             return _this.redis.rpush(_this.key('FAILED'), JSON.stringify(__slice.call(task).concat([_this.queued_time], [Date.now()], [_this.errors])));
           };
           push_blocked = function() {
-            _this.current_task = null;
+            _this.task = null;
             _this.redis.hdel(_this.key('PROCESSING'), _this.processing);
             return _this.redis.sadd(_this.key('BLOCKED'), task[0]);
           };
           retry = function() {
             return setTimeout((function() {
-              return _this.process(queued, task);
+              return _this.process(task);
             }), _this.retry_delay);
           };
           switch (err["do"]) {
@@ -219,12 +213,12 @@
         }
         return (next = function() {
           var multi;
-          _this.current_task = null;
+          _this.task = null;
           _this.redis.hdel(_this.key('PROCESSING'), _this.processing);
-          _this.redis.watch(queued);
+          _this.redis.watch("" + (_this.key('QUEUED')) + ":" + task[0]);
           multi = _this.redis.multi();
-          multi.lpop(queued);
-          multi.lindex(queued, 0);
+          multi.lpop("" + (_this.key('QUEUED')) + ":" + task[0]);
+          multi.lindex("" + (_this.key('QUEUED')) + ":" + task[0], 0);
           return multi.exec(function(multi_err, multi_res) {
             if (multi_res) {
               if (!err) {
@@ -237,7 +231,7 @@
                 _this.redis.zremrangebyrank(_this.key('SLOWEST'), 0, -_this.slowest_size - 1);
               }
               if (multi_res[1]) {
-                return _this.process(queued, JSON.parse(multi_res[1]), true);
+                return _this.process(JSON.parse(multi_res[1]), true);
               } else {
                 return _this.poll();
               }
