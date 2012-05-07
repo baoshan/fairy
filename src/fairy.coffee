@@ -97,7 +97,7 @@ class Fairy
   # client and the name of the queue, add the queue name into the `QUEUES` set
   # for listing purpose. **Usage:**
   #
-  #   foo = fairy.queue 'foo'
+  #     foo = fairy.queue 'foo'
   #
   queue: (name) ->
     return @queue_pool[name] if @queue_pool[name]
@@ -108,9 +108,9 @@ class Fairy
   
   # Return named queues whose names are stored in the `QUEUES` set. **Usage:**
   #
-  #   queues = fairy.queues()
-  #   console.log "#{queues.length} queues: ", queues.map (queue) ->
-  #     queue.name
+  #     queues = fairy.queues()
+  #     console.log "#{queues.length} queues: ", queues.map (queue) ->
+  #       queue.name
   #
   queues: (callback) ->
     @redis.smembers @key('QUEUES'), (err, res) =>
@@ -121,8 +121,8 @@ class Fairy
   # `statistics` is an asynchronous method. The only arg of the callback
   # function is an array containing statistics of all queues. **Usage:**
   #
-  #   fairy.statistics (stats) ->
-  #     console.log "Stats of #{stats.length} queues: ", stats
+  #     fairy.statistics (stats) ->
+  #       console.log "Stats of #{stats.length} queues: ", stats
   statistics: (callback) ->
     result = []
     @queues (queues) ->
