@@ -91,13 +91,13 @@ class Fairy
   key: (key) -> "#{prefix}:#{key}"
 
   # ### Get a Named Queue
-  #
+  
   # **Usage:**
   #
-  #     foo = fairy.queue 'foo'
-
+  #   foo = fairy.queue 'foo'
+  #
   # If the named queue can be found in the `queue_pool` hashtable, return the
-  # cached queue. Otherwise, initiate an object of class `Queue` using the Redis
+  # cached queue. Otherwise, create an object of class `Queue` using the Redis
   # client and the name of the queue, add the queue name into the `QUEUES` set
   # for listing purpose.
   queue: (name) ->
@@ -106,13 +106,13 @@ class Fairy
     @queue_pool[name] = new Queue @redis, name
 
   # ### Get All Queues Asynchronously
-  #
+  
   # **Usage:**
   #
-  #     queues = fairy.queues()
-  #     console.log "#{queues.length} queues: ", queues.map (queue) ->
-  #       queue.name
-
+  #   queues = fairy.queues()
+  #   console.log "#{queues.length} queues: ", queues.map (queue) ->
+  #     queue.name
+  #
   # Return named queues whose names are stored in the `QUEUES` set.
   queues: (callback) ->
     @redis.smembers @key('QUEUES'), (err, res) =>
