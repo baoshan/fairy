@@ -30,6 +30,22 @@
 
 # ## Fairy Explained
 
+# ### CommonJS Module Definition
+#
+# The only exposed object of module `fairy` is a `connect` method, which returns
+# a `fairy` client on invocation.
+#
+# **Usage:**
+#
+#     fairy = require('fairy').connect()
+
+# `connect` method use the passed in option to create a Redis client. Then use
+# the Redis client to initiate a new object of class `Fairy`.
+exports.connect = (options = {}) ->
+  client = redis.createClient options.port, options.host
+  client.auth options.password if options.password?
+  new Fairy client
+
 # `Fairy` relies on `node-uuid` to generate unique identifiers for tasks and
 # `redis` driver, of course!
 #
@@ -561,18 +577,3 @@ class Queue
         result.pending_tasks = result.total_tasks - result.finished_tasks - result.blocked.tasks - result.failed_tasks
         callback result
 
-# ### CommonJS Module Definition
-#
-# The only exposed object of module `fairy` is a `connect` method, which returns
-# a `fairy` client on invocation.
-#
-# **Usage:**
-#
-#     fairy = require('fairy').connect()
-
-# `connect` method use the passed in option to create a Redis client. Then use
-# the Redis client to initiate a new object of class `Fairy`.
-exports.connect = (options = {}) ->
-  client = redis.createClient options.port, options.host
-  client.auth options.password if options.password?
-  new Fairy client
