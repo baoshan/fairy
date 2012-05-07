@@ -287,8 +287,7 @@ class Queue
       @errors = []
 
     @handler task..., (err, res) =>
-      finish_time  = Date.now()
-      process_time = finish_time - start_time
+
       if err
 
         # Keep the error message for further inspection.
@@ -311,7 +310,7 @@ class Queue
 
         retry = => setTimeout (=> @process task), @retry_delay
 
-        # Different error handling approaches:
+        # Different error handling strategies:
         #
         #   + `block`: block the group immediately.
         #   + `block-after-retry`: retry n times, block the group if still
@@ -361,6 +360,8 @@ class Queue
             # track tasks take the longest time processing in
             # `longest:task_name` sorted set.
             if not err
+              finish_time  = Date.now()
+              process_time = finish_time - start_time
               @redis.hincrby @key('STATISTICS'), 'finished', 1
               @redis.hincrby @key('STATISTICS'), 'total_pending_time', start_time - @queued_time
               @redis.hincrby @key('STATISTICS'), 'total_processing_time', process_time
@@ -558,12 +559,10 @@ class Queue
       # Process the result of the transaction.
       #
       # 1. Process `STATISTICS` hash:
-      #
-      #     + Convert:
-      #       - `total_pending_time`, and `total_processing_time` into:
-      #       - `average_pending_time`, and `average_processing_time`
-      #     + Calibrate initial condition (in case of no task is finished).
-      #
+      #   + Convert:
+      #     - `total_pending_time`, and `total_processing_time` into:
+      #     - `average_pending_time`, and `average_processing_time`
+      #   + Calibrate initial condition (in case of no task is finished).
       # 2. Set `failed` key of returned object.
       statistics = multi_res[0] or {}
       result =
