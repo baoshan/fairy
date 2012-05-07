@@ -31,7 +31,7 @@
 # ## Fairy Explained
 
 # `Fairy` depends on:
-#
+
 #   + **[node-uuid]**, generate unique identifiers for tasks, and
 #   + **[redis]** node.js driver, of course!
 #
