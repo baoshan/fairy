@@ -178,10 +178,10 @@ class Queue
   key: (key) -> "#{prefix}:#{key}:#{@name}"
 
   # ### Configurable Parameters
-
+  #
   # Prototypal inherited parameters which can be overriden by instance
   # properties include:
-  #
+
   #   + Polling interval in milliseconds
   #   + Retry interval in milliseconds
   #   + Maximum times of retries
