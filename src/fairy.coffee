@@ -141,11 +141,11 @@ class Fairy
 
 # Objects of class `Queue` handles:
 #
-#   + Placing tasks (`enqueue`)
-#   + Regist handlers (`regist`)
-#   + Reschedule tasks (`reschedule`)
-#   + Query status (`recently_finished_tasks`, `failed_tasks`,
-#   `blocked_groups`, `slowest_tasks`, `processing_tasks`, `statistics`, etc.)
+#   + Placing tasks -- `enqueue`
+#   + Regist handlers -- `regist`
+#   + Reschedule tasks -- `reschedule`
+#   + Query status -- `recently_finished_tasks`, `failed_tasks`,
+#   `blocked_groups`, `slowest_tasks`, `processing_tasks`, `statistics`, etc.
 #
 # Class `Queue` is not exposed outside the commonjs module. To get an object of
 # class `Queue`, use the `queue` or `queues` method of an object of class
