@@ -82,9 +82,9 @@ class Fairy
   constructor: (@redis) ->
     @queue_pool = {}
 
-  # ### Keys
+  # ### Keys Function
 
-  # Method for generating prefixed keys. Keys used by objects of class `Fairy` include:
+  # Method to generate prefixed keys. Keys used by objects of class `Fairy` include:
   #
   #   + `QUEUES`, Redis set, containing names of all registered queues.
   #
