@@ -119,7 +119,8 @@ class Fairy
   
   # `statistics` is an asynchronous method. The only arg of the callback
   # function is an array containing statistics of all queues. The actual
-  # dirty-work is delegated to objects of class `Queue`.
+  # dirty work is handed to objects of class `Queue`'s `statistics`
+  # method.
   #
   #     fairy.statistics (stats) ->
   #       console.log "Stats of #{stats.length} queues: ", stats
@@ -147,8 +148,6 @@ class Fairy
 # Class `Queue` is not exposed outside the commonjs module. To get an object of
 # class `Queue`, use the `queue` or `queues` method of an object of class
 # `Fairy`.
-#
-# **Usage:**
 #
 #     foo    = fairy.queue 'foo'
 #     queues = fairy.queues()
