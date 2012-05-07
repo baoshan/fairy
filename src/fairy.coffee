@@ -161,8 +161,8 @@ class Queue
 
   # ### Function to Resolve Key Name
 
-  # Method to generate `FAIRY` prefixed and queue name suffixed keys. Keys used
-  # by objects of class `Queue` include:
+  # Method to generate (`FAIRY`) prefixed and (queue name) suffixed keys. Keys
+  # used by objects of class `Queue` include:
   #
   #   + `SOURCE`, Redis list, tasks reside in `SOURCE` when enqueued.
   #   + `QUEUED`, Redis lists, each group has a separate `QUEUED` list, tasks
