@@ -34,9 +34,11 @@
 #
 #   + **[node-uuid]**, generate unique identifiers for tasks, and
 #   + **[redis]** node.js driver, of course!
+#   + **[express]**, only if you need the web-front-end!
 #
 # [node-uuid]: https://github.com/broofa/node-uuid
 # [redis]:     https://github.com/mranney/node_redis
+# [express]:   https://github.com/visionmedia/express
 uuid  = require 'node-uuid'
 redis = require 'redis'
 
