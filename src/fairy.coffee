@@ -31,7 +31,7 @@
 # ## Fairy Explained
 
 # `Fairy` depends on:
-
+#
 #   + **[node-uuid]**, generate unique identifiers for tasks, and
 #   + **[redis]** node.js driver, of course!
 #
@@ -45,8 +45,8 @@ prefix = 'FAIRY'
 
 # ### CommonJS Module Definition
 #
-# The only exposed object of module `fairy` is a `connect` method, which returns
-# a `fairy` client on invocation.
+# The only exposed object is a `connect` method, which returns a `fairy` client
+# on invocation.
 #
 # **Usage:**
 #
