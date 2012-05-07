@@ -79,9 +79,9 @@ class Fairy
 
   # ### Keys
 
-  # Keys used by class `Fairy` include:
+  # Keys used by objects of class `Fairy` include:
   #
-  #   + `QUEUES`, a Redis set, containing names of all registered queues.
+  #   + `QUEUES`, Redis set, containing names of all registered queues.
   key: (key) -> "#{prefix}:#{key}"
 
   # ### Get a Named Queue
@@ -115,8 +115,8 @@ class Fairy
   #
   # **Usage:**
   #
-  #     fairy.statistics (statistics) ->
-  #       console.log "Statistics of #{statistics.length} queues: ", statistics
+  #     fairy.statistics (stats) ->
+  #       console.log "Stats of #{stats.length} queues: ", stats
 
   # `statistics` is an asynchronous method. The only arg of the callback
   # function is an array containing statistics of all queues.
