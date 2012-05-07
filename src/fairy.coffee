@@ -82,7 +82,7 @@ class Fairy
   constructor: (@redis) ->
     @queue_pool = {}
 
-  # ### Function to Get Key Name
+  # ### Function to Resolve Key Name
 
   # Method to generate prefixed keys. Keys used by objects of class `Fairy` include:
   #
