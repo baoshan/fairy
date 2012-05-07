@@ -32,8 +32,11 @@
 
 # `Fairy` depends on:
 #
-#   + `node-uuid`, generate unique identifiers for tasks, and
+#   + `[node-uuid]`, generate unique identifiers for tasks, and
 #   + `redis` driver, of course!
+#
+# [node-uuid]: https://github.com/broofa/node-uuid
+# [redis]: https://github.com/mranney/node_redis
 #
 # Prefix `FAIRY` is applied to all Redis keys for safety and ease-of-management.
 uuid   = require 'node-uuid'
@@ -50,7 +53,7 @@ prefix = 'FAIRY'
 #     fairy = require('fairy').connect()
 
 # `connect` method use the passed in option to create a Redis client. Then use
-# the Redis client to initiate a new object of class `Fairy`.
+# that Redis client to initiate a new object of class `Fairy`.
 exports.connect = (options = {}) ->
   client = redis.createClient options.port, options.host
   client.auth options.password if options.password?
