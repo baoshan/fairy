@@ -84,7 +84,8 @@ class Fairy
 
   # ### Function to Resolve Key Name
 
-  # Method to generate prefixed keys. Keys used by objects of class `Fairy` include:
+  # Method to generate prefixed keys. Keys used by objects of class `Fairy`
+  # include:
   #
   #   + `QUEUES`, Redis set, containing names of all registered queues.
   #
@@ -158,8 +159,11 @@ class Queue
   # of the queue as instance properties.
   constructor: (@redis, @name) ->
 
-  # ### Names of different data structures' keys.
+  # ### Function to Resolve Key Name
 
+  # Method to generate `FAIRY` prefixed and queue name suffixed keys. Keys used
+  # by objects of class `Queue` include:
+  #
   #   + `SOURCE`, Redis list, tasks reside in `SOURCE` when enqueued.
   #   + `QUEUED`, Redis lists, each group has a separate `QUEUED` list, tasks
   #   enter `QUEUED` lists are prepared for processing in a first-come-first-
