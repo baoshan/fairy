@@ -62,11 +62,10 @@ exports.connect = (options = {}) ->
 
 # Class `Fairy` is not exposed outside the commonjs module. To get an object
 # of class `Fairy`, use the `connect` method to connect to the Redis server.
-#
 # **Usage:**
 #
 #     fairy = require('fairy').connect()
-
+#
 # Object of class `Fairy` keeps a Redis connection as well as many named queues
 # (objects of class `Queue`) responsible for enqueuing and dispatching tasks,
 # etc.
