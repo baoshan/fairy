@@ -32,8 +32,8 @@
 
 # `Fairy` depends on:
 #
-#   + `[node-uuid]`, generate unique identifiers for tasks, and
-#   + `[redis]` driver, of course!
+#   + **[node-uuid]**, generate unique identifiers for tasks, and
+#   + **[redis]** driver, of course!
 #
 # [node-uuid]: https://github.com/broofa/node-uuid
 # [redis]: https://github.com/mranney/node_redis
