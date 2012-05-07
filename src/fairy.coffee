@@ -131,7 +131,7 @@ class Fairy
             statistics.name = queue.name
             result[i] = statistics
             callback result if callback unless --total_queues
-       else callback [] if callback
+      else callback [] if callback
 
 # ## Class Queue
 
