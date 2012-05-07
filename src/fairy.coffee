@@ -85,9 +85,11 @@ class Fairy
 
   # ### Keys
 
-  # Keys used by objects of class `Fairy` include:
+  # Method for generating prefixed keys. Keys used by objects of class `Fairy` include:
   #
   #   + `QUEUES`, Redis set, containing names of all registered queues.
+  #
+  # The method is intended to be used internally.
   key: (key) -> "#{prefix}:#{key}"
 
   # ### Get a Named Queue
