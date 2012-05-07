@@ -282,7 +282,7 @@ class Queue
           #   + `block`: block the group immediately.
           #   + `block-after-retry`: retry n times, block the group if still
           #   fails (blocking).
-          #   +. or: retry n times, skip the task if still
+          #   + or: retry n times, skip the task if still
           #   fails (non-blocking).
           switch err.do
             when 'block'
