@@ -15,19 +15,24 @@ group to a same worker, which can lead to unwanted waiting time when:
   4. Worker `B` is still idling because of 1.
 
 **Fairy** will route the task of group `Y` to worker `B` in this scenario.
+
+**Fairy** takes a different approach than Message Groups. Instead of making
+all tasks of a same group be routed to the same consumer, **Fairy** route a
+task to any worker when there's no **processing** tasks of the same group.
+
 The design philosophy makes **Fairy** ideal for the following requirements:
 
-  1. Tasks of a same groups need be processed in order.
-  2. Each worker processes tasks sequentially.
+  1. Tasks of a same groups need be processed in sequence.
+  2. Each worker processes tasks in serial.
   3. Worker spawns child process (e.g., a shell script) to handle the real job.
 
 **Fairy** takes a different approach than Message Groups. Instead of making all
 tasks of a same group be routed to the same consumer, **Fairy** route a task to
 any worker when there's no **processing** tasks of the same group.
 
-**[Resque]** cannot guarantee the processing order of the tasks, although the task
+**[Resque]** cannot guarantee the processing order of the tasks although the task
 queue is FIFO. The more workers you have, the more possible you'll encountering
-concurrency lead to broken order.
+concurrency which breaks the processing order of tasks in the same group.
 
 [Resque]: https://github.com/defunkt/resque
 

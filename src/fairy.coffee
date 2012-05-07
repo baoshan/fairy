@@ -15,6 +15,11 @@
 #   4. Worker `B` is still idling because of 1.
 #
 # **Fairy** will route the task of group `Y` to worker `B` in this scenario.
+#
+# **Fairy** takes a different approach than Message Groups. Instead of making
+# all tasks of a same group be routed to the same consumer, **Fairy** route a
+# task to any worker when there's no **processing** tasks of the same group.
+#
 # The design philosophy makes **Fairy** ideal for the following requirements:
 #
 #   1. Tasks of a same groups need be processed in order.
