@@ -104,7 +104,8 @@ class Fairy
   # **Usage:**
   #
   #     queues = fairy.queues()
-  #     console.log "#{queues.length} queues: ", queues.map (queue) -> queue.name
+  #     console.log "#{queues.length} queues: ", queues.map (queue) ->
+  #       queue.name
 
   # Return named queues whose names are stored in the `QUEUES` set.
   queues: (callback) ->
