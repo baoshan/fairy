@@ -45,7 +45,7 @@ npm install fairy
 ## Enqueue Tasks
 
 ```coffee-script
-queue = require('yamg').connect().queue('foo')
+queue = require('fairy').connect().queue('foo')
 # Provide as many parameters as you needed, the last parameter should be a
 # callback.
 queue.enqueue 'param_1', 'param_2', 'param_3', -> console.log 'queued'
@@ -56,7 +56,7 @@ The first element of the 2nd parameter will be used as the group key.
 ## Register Task Handler
 
 ```coffee-script
-queue = require('yamg').connect().queue('foo')
+queue = require('fairy').connect().queue('foo')
 # The registered handler function should keep the same signature as you just
 # enqueued, plus the last two argument should be 2 callbacks for success and
 # fail. Calling them is your responsibility!
