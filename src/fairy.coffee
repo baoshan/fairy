@@ -33,12 +33,12 @@
 # `Fairy` depends on:
 #
 #   + **[node-uuid]**, generate unique identifiers for tasks, and
-#   + **[redis]** driver, of course!
+#   + **[redis]** node.js driver, of course!
 #
 # [node-uuid]: https://github.com/broofa/node-uuid
 # [redis]:     https://github.com/mranney/node_redis
-uuid   = require 'node-uuid'
-redis  = require 'redis'
+uuid  = require 'node-uuid'
+redis = require 'redis'
 
 # Prefix `FAIRY` is applied to all Redis keys for safety and ease-of-management.
 prefix = 'FAIRY'
