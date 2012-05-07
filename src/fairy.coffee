@@ -40,7 +40,8 @@
 uuid  = require 'node-uuid'
 redis = require 'redis'
 
-# Prefix `FAIRY` is applied to all Redis keys for safety and ease-of-management.
+# A constant prefix is applied to all Redis keys for safety and
+# ease-of-management.
 prefix = 'FAIRY'
 
 # ### CommonJS Module Definition
