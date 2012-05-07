@@ -30,8 +30,11 @@
 
 # ## Fairy Explained
 
-# `Fairy` relies on `node-uuid` to generate unique identifiers for tasks and
-# `redis` driver, of course!
+# `Fairy` depends on:
+#
+#   + `node-uuid`, generate unique identifiers for tasks, and
+#   + `redis` driver, of course!
+#
 # Prefix `FAIRY` is applied to all Redis keys for safety and ease-of-management.
 uuid   = require 'node-uuid'
 redis  = require 'redis'
