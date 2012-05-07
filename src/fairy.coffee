@@ -44,14 +44,12 @@ redis = require 'redis'
 prefix = 'FAIRY'
 
 # ### CommonJS Module Definition
-#
+
 # The only exposed object is a `connect` method, which returns a `fairy` client
-# on invocation.
-#
-# **Usage:**
+# on invocation. **Usage:**
 #
 #     fairy = require('fairy').connect()
-
+#
 # `connect` method use the passed in option to create a Redis client. Then use
 # that Redis client to initiate a new object of class `Fairy`.
 exports.connect = (options = {}) ->
