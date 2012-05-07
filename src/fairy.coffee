@@ -30,6 +30,11 @@
 
 # ## Fairy Explained
 
+# `Fairy` relies on `node-uuid` to generate unique identifiers for tasks and
+# `redis` driver, of course!
+uuid       = require 'node-uuid'
+redis      = require 'redis'
+
 # ### CommonJS Module Definition
 #
 # The only exposed object of module `fairy` is a `connect` method, which returns
@@ -46,14 +51,9 @@ exports.connect = (options = {}) ->
   client.auth options.password if options.password?
   new Fairy client
 
-# `Fairy` relies on `node-uuid` to generate unique identifiers for tasks and
-# `redis` driver, of course!
-#
 # Prefix `FAIRY` is applied to all Redis keys for safety and ease-of-management.
 #
 # `QUEUES` is a Redis set containing names of all registered queues.
-uuid       = require 'node-uuid'
-redis      = require 'redis'
 prefix     = 'FAIRY'
 key_queues = "#{prefix}:QUEUES"
 
