@@ -46,6 +46,8 @@ redis = require 'redis'
 # ease-of-management.
 prefix = 'FAIRY'
 
+_process = process
+
 # ### CommonJS Module Definition
 
 # The only exposed object is a `connect` method, which returns a `fairy` client
@@ -147,7 +149,7 @@ class Fairy
 #
 # Class `Queue` is not exposed outside the commonjs module. To get an object of
 # class `Queue`, use the `queue` or `queues` method of an object of class
-# `Fairy`.
+# `Fairy`:
 #
 #     foo    = fairy.queue 'foo'
 #     queues = fairy.queues()
@@ -215,17 +217,27 @@ class Queue
       args.push Date.now()
       @redis.rpush @key('SOURCE'), JSON.stringify(args)
 
-  # ### Register Handlers
+  # ### Register Handler
 
   # When registered a processing handler function, `Fairy` will immediately
-  # start processing tasks when present.
+  # start processing tasks on present.
   regist: (handler) =>
 
-    # Variables storing current task's extra meta information.
-    retry_count = null
-    queued_time = null
-    processing  = null
-    errors      = []
+    # Local variables keep current task's extra meta information.
+    retry_count  = null
+    queued_time  = null
+    current_task = null
+    processing   = null
+    errors       = []
+
+    # Gracefully shutting down on SIGINT `(Crtl-C)`. When the process exits, if
+    # there's un-finished task, the `QUEUED` list will be blocked. Don't forget
+    # to add the group identifier into the `BLOCKED` set.
+    _process.on 'SIGINT', =>
+      _process.exit()
+    _process.on 'exit', =>
+      console.log 'exit'
+      @redis.sadd @key('BLOCKED'), current_task[0] if current_task
 
     # #### Poll New Task
 
@@ -276,6 +288,7 @@ class Queue
       start_time  = Date.now()
 
       if is_new_task
+        current_task = task
         processing = uuid.v4()
         queued_time = task.pop()
         @redis.hset @key('PROCESSING'), processing, JSON.stringify [task..., start_time]
@@ -301,6 +314,7 @@ class Queue
 
           # Maintain a blocked set of groups.
           push_blocked = =>
+            current_task = null
             @redis.hdel @key('PROCESSING'), processing
             @redis.sadd @key('BLOCKED'), task[0]
 
@@ -332,6 +346,7 @@ class Queue
         do next = =>
          
           # Remove last task from processing hash.
+          current_task = null
           @redis.hdel @key('PROCESSING'), processing
 
           # `lpop` the current task from `queued` list, and then check if
