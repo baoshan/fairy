@@ -49,7 +49,7 @@ prefix = 'FAIRY'
 # ### CommonJS Module Definition
 
 # The only exposed object is a `connect` method, which returns a `fairy` client
-# on invocation. **Usage:**
+# on invocation.
 #
 #     fairy = require('fairy').connect()
 #
@@ -64,7 +64,6 @@ exports.connect = (options = {}) ->
 
 # Class `Fairy` is not exposed outside the commonjs module. To get an object
 # of class `Fairy`, use the `connect` method to connect to the Redis server.
-# **Usage:**
 #
 #     fairy = require('fairy').connect()
 #
@@ -97,7 +96,7 @@ class Fairy
   # If the named queue can be found in the `queue_pool` cache, return the cached
   # queue. Otherwise, create an object of class `Queue` using the Redis client
   # and the name of the queue. Add the queue name into the `QUEUES` set for
-  # listing purpose. **Usage:**
+  # listing purpose.
   #
   #     foo = fairy.queue 'foo'
   queue: (name) ->
