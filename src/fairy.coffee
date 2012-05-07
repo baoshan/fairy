@@ -261,6 +261,23 @@ class Queue
         @redis.unwatch()
         setTimeout @poll, @polling_interval
 
+  # Push the original arguments along with:
+  #
+  #   + time of failure
+  #   + error messages for all retries
+  #
+  # into `failed` list.
+  push_failed: =>
+    @redis.rpush @key('FAILED'), JSON.stringify([@task..., @queued_time, Date.now(), @errors])
+
+  # Maintain a blocked set of groups.
+  push_blocked: =>
+    @redis.hdel @key('PROCESSING'), @processing
+    @redis.sadd @key('BLOCKED'), @task[0]
+    delete @task
+
+  retry: => setTimeout (=> @process @task), @retry_delay
+
   # ### Process First Tasks of Each Group
 
   # The real job is done by the passed in `handler` of `regist` method, when
@@ -276,7 +293,8 @@ class Queue
   #
   #  Calling the callback function is the responsibility of you. Otherwise
   #  `Fairy` will stop dispatching tasks.
-  process : (@task, is_new_task) ->
+  process : (@task, is_new_task) =>
+
     start_time  = Date.now()
 
     if is_new_task
@@ -288,27 +306,11 @@ class Queue
 
     @handler task..., (err, res) =>
 
+      # Error handling routine:
       if err
 
         # Keep the error message for further inspection.
         @errors.push err.message or ''
-
-        # Push the original arguments along with:
-        #
-        #   + time of failure
-        #   + error messages for all retries
-        #
-        # into `failed` list.
-        push_failed = =>
-          @redis.rpush @key('FAILED'), JSON.stringify([task..., @queued_time, Date.now(), @errors])
-
-        # Maintain a blocked set of groups.
-        push_blocked = =>
-          @task = null
-          @redis.hdel @key('PROCESSING'), @processing
-          @redis.sadd @key('BLOCKED'), task[0]
-
-        retry = => setTimeout (=> @process task), @retry_delay
 
         # Different error handling strategies:
         #
@@ -319,61 +321,63 @@ class Queue
         #   fails (non-blocking).
         switch err.do
           when 'block'
-            push_failed()
-            push_blocked()
+            @push_failed()
+            @push_blocked()
             return @poll()
           when 'block-after-retry'
             if @retry_count--
-              return retry() 
+              return @retry() 
             else
-              push_failed()
-              push_blocked()
+              @push_failed()
+              @push_blocked()
               return @poll()
           else
-            return retry() if @retry_count--
-            push_failed()
+            return @retry() if @retry_count--
+            @push_failed()
 
-      do next = =>
-       
-        # Remove last task from processing hash.
-        @task = null
-        @redis.hdel @key('PROCESSING'), @processing
+      else
+        # Update statistics hash:
+        #
+        #   1. total number of `finished` tasks;
+        #   2. total `pending` time;
+        #   3. total `processing` time.
+        #
+        # And, track recent finished tasks in `recent:task_name` list,
+        # track tasks take the longest time processing in
+        # `longest:task_name` sorted set.
+        finish_time  = Date.now()
+        process_time = finish_time - start_time
+        @redis.hincrby @key('STATISTICS'), 'finished', 1
+        @redis.hincrby @key('STATISTICS'), 'total_pending_time', start_time - @queued_time
+        @redis.hincrby @key('STATISTICS'), 'total_processing_time', process_time
+        @redis.lpush @key('RECENT'), JSON.stringify([task..., finish_time])
+        @redis.ltrim @key('RECENT'), 0, @recent_size - 1
+        @redis.zadd @key('SLOWEST'), process_time, JSON.stringify(task)
+        @redis.zremrangebyrank @key('SLOWEST'), 0, - @slowest_size - 1
 
-        # `lpop` the current task from `queued` list, and then check if
-        # there're task(s) in the same group waiting to be processed. The 2
-        # steps need be protected by a transaction. Otherwise, it's possible
-        # for 2 workers both processing a same task.
-        @redis.watch "#{@key 'QUEUED'}:#{task[0]}"
-        multi = @redis.multi()
-        multi.lpop "#{@key 'QUEUED'}:#{task[0]}"
-        multi.lindex "#{@key 'QUEUED'}:#{task[0]}", 0
-        multi.exec (multi_err, multi_res) =>
+      @next_task(task[0])
 
-          if multi_res
-            # Update statistics hash:
-            #
-            #   1. total number of `finished` tasks;
-            #   2. total `pending` time;
-            #   3. total `processing` time.
-            #
-            # And, track recent finished tasks in `recent:task_name` list,
-            # track tasks take the longest time processing in
-            # `longest:task_name` sorted set.
-            if not err
-              finish_time  = Date.now()
-              process_time = finish_time - start_time
-              @redis.hincrby @key('STATISTICS'), 'finished', 1
-              @redis.hincrby @key('STATISTICS'), 'total_pending_time', start_time - @queued_time
-              @redis.hincrby @key('STATISTICS'), 'total_processing_time', process_time
-              @redis.lpush @key('RECENT'), JSON.stringify([task..., finish_time])
-              @redis.ltrim @key('RECENT'), 0, @recent_size - 1
-              @redis.zadd @key('SLOWEST'), process_time, JSON.stringify(task)
-              @redis.zremrangebyrank @key('SLOWEST'), 0, - @slowest_size - 1
-            # Process task of the same group when exists or query for other
-            # tasks.
-            if multi_res[1] then @process JSON.parse(multi_res[1]), true
-            else @poll()
-          else next()
+  next_task: (group) =>
+   
+    # Remove last task from processing hash.
+    @task = null
+    @redis.hdel @key('PROCESSING'), @processing
+
+    # `lpop` the current task from `queued` list, and then check if
+    # there're task(s) in the same group waiting to be processed. The 2
+    # steps need be protected by a transaction. Otherwise, it's possible
+    # for 2 workers both processing a same task.
+    @redis.watch "#{@key 'QUEUED'}:#{group}"
+    multi = @redis.multi()
+    multi.lpop "#{@key 'QUEUED'}:#{group}"
+    multi.lindex "#{@key 'QUEUED'}:#{group}", 0
+    multi.exec (multi_err, multi_res) =>
+      if multi_res
+        # Process task of the same group when exists or query for other
+        # tasks.
+        if multi_res[1] then @process JSON.parse(multi_res[1]), true
+        else @poll()
+      else @next_task group
 
   # ### Re-Schedule Failed and Blocked Tasks
 

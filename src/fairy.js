@@ -87,6 +87,16 @@
       this.name = name;
       this.reschedule = __bind(this.reschedule, this);
 
+      this.next_task = __bind(this.next_task, this);
+
+      this.process = __bind(this.process, this);
+
+      this.retry = __bind(this.retry, this);
+
+      this.push_blocked = __bind(this.push_blocked, this);
+
+      this.push_failed = __bind(this.push_failed, this);
+
       this.poll = __bind(this.poll, this);
 
       this.regist = __bind(this.regist, this);
@@ -159,6 +169,23 @@
       });
     };
 
+    Queue.prototype.push_failed = function() {
+      return this.redis.rpush(this.key('FAILED'), JSON.stringify(__slice.call(this.task).concat([this.queued_time], [Date.now()], [this.errors])));
+    };
+
+    Queue.prototype.push_blocked = function() {
+      this.redis.hdel(this.key('PROCESSING'), this.processing);
+      this.redis.sadd(this.key('BLOCKED'), this.task[0]);
+      return delete this.task;
+    };
+
+    Queue.prototype.retry = function() {
+      var _this = this;
+      return setTimeout((function() {
+        return _this.process(_this.task);
+      }), this.retry_delay);
+    };
+
     Queue.prototype.process = function(task, is_new_task) {
       var start_time,
         _this = this;
@@ -172,75 +199,64 @@
         this.errors = [];
       }
       return this.handler.apply(this, __slice.call(task).concat([function(err, res) {
-        var finish_time, next, process_time, push_blocked, push_failed, retry;
-        finish_time = Date.now();
-        process_time = finish_time - start_time;
+        var finish_time, process_time;
         if (err) {
           _this.errors.push(err.message || '');
-          push_failed = function() {
-            return _this.redis.rpush(_this.key('FAILED'), JSON.stringify(__slice.call(task).concat([_this.queued_time], [Date.now()], [_this.errors])));
-          };
-          push_blocked = function() {
-            _this.task = null;
-            _this.redis.hdel(_this.key('PROCESSING'), _this.processing);
-            return _this.redis.sadd(_this.key('BLOCKED'), task[0]);
-          };
-          retry = function() {
-            return setTimeout((function() {
-              return _this.process(task);
-            }), _this.retry_delay);
-          };
           switch (err["do"]) {
             case 'block':
-              push_failed();
-              push_blocked();
+              _this.push_failed();
+              _this.push_blocked();
               return _this.poll();
             case 'block-after-retry':
               if (_this.retry_count--) {
-                return retry();
+                return _this.retry();
               } else {
-                push_failed();
-                push_blocked();
+                _this.push_failed();
+                _this.push_blocked();
                 return _this.poll();
               }
               break;
             default:
               if (_this.retry_count--) {
-                return retry();
+                return _this.retry();
               }
-              push_failed();
+              _this.push_failed();
           }
+        } else {
+          finish_time = Date.now();
+          process_time = finish_time - start_time;
+          _this.redis.hincrby(_this.key('STATISTICS'), 'finished', 1);
+          _this.redis.hincrby(_this.key('STATISTICS'), 'total_pending_time', start_time - _this.queued_time);
+          _this.redis.hincrby(_this.key('STATISTICS'), 'total_processing_time', process_time);
+          _this.redis.lpush(_this.key('RECENT'), JSON.stringify(__slice.call(task).concat([finish_time])));
+          _this.redis.ltrim(_this.key('RECENT'), 0, _this.recent_size - 1);
+          _this.redis.zadd(_this.key('SLOWEST'), process_time, JSON.stringify(task));
+          _this.redis.zremrangebyrank(_this.key('SLOWEST'), 0, -_this.slowest_size - 1);
         }
-        return (next = function() {
-          var multi;
-          _this.task = null;
-          _this.redis.hdel(_this.key('PROCESSING'), _this.processing);
-          _this.redis.watch("" + (_this.key('QUEUED')) + ":" + task[0]);
-          multi = _this.redis.multi();
-          multi.lpop("" + (_this.key('QUEUED')) + ":" + task[0]);
-          multi.lindex("" + (_this.key('QUEUED')) + ":" + task[0], 0);
-          return multi.exec(function(multi_err, multi_res) {
-            if (multi_res) {
-              if (!err) {
-                _this.redis.hincrby(_this.key('STATISTICS'), 'finished', 1);
-                _this.redis.hincrby(_this.key('STATISTICS'), 'total_pending_time', start_time - _this.queued_time);
-                _this.redis.hincrby(_this.key('STATISTICS'), 'total_processing_time', process_time);
-                _this.redis.lpush(_this.key('RECENT'), JSON.stringify(__slice.call(task).concat([finish_time])));
-                _this.redis.ltrim(_this.key('RECENT'), 0, _this.recent_size - 1);
-                _this.redis.zadd(_this.key('SLOWEST'), process_time, JSON.stringify(task));
-                _this.redis.zremrangebyrank(_this.key('SLOWEST'), 0, -_this.slowest_size - 1);
-              }
-              if (multi_res[1]) {
-                return _this.process(JSON.parse(multi_res[1]), true);
-              } else {
-                return _this.poll();
-              }
-            } else {
-              return next();
-            }
-          });
-        })();
+        return _this.next_task(task[0]);
       }]));
+    };
+
+    Queue.prototype.next_task = function(group) {
+      var multi,
+        _this = this;
+      this.task = null;
+      this.redis.hdel(this.key('PROCESSING'), this.processing);
+      this.redis.watch("" + (this.key('QUEUED')) + ":" + group);
+      multi = this.redis.multi();
+      multi.lpop("" + (this.key('QUEUED')) + ":" + group);
+      multi.lindex("" + (this.key('QUEUED')) + ":" + group, 0);
+      return multi.exec(function(multi_err, multi_res) {
+        if (multi_res) {
+          if (multi_res[1]) {
+            return _this.process(JSON.parse(multi_res[1]), true);
+          } else {
+            return _this.poll();
+          }
+        } else {
+          return _this.next_task(group);
+        }
+      });
     };
 
     Queue.prototype.reschedule = function(callback) {
