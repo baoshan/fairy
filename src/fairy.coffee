@@ -88,7 +88,7 @@ class Fairy
   #
   #   + `QUEUES`, Redis set, containing names of all registered queues.
   #
-  # The method is intended to be used internally.
+  # The method is designed to be used internally.
   key: (key) -> "#{prefix}:#{key}"
 
   # ### Get a Named Queue
