@@ -12,7 +12,7 @@
 #   1. Tasks of group `X` and `Y` are appointed to worker `A`.
 #   2. Worker `A` is processing tasks of group `X` **sequentially**.
 #   3. Tasks of group `Y` are pending, while:
-#   4. Worker `B` is still idling because of 1.
+#   4. Worker `B` is snoozing (because of 1)!
 #
 # **Fairy** will route the task of group `Y` to worker `B` in this scenario.
 #
