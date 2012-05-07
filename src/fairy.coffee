@@ -111,7 +111,6 @@ class Fairy
   #     queues = fairy.queues()
   #     console.log "#{queues.length} queues: ", queues.map (queue) ->
   #       queue.name
-  #
   queues: (callback) ->
     @redis.smembers @key('QUEUES'), (err, res) =>
       callback res.map (name) => @queue name
@@ -119,7 +118,7 @@ class Fairy
   # ### Get Statistics for All Queues Asynchronously
   
   # `statistics` is an asynchronous method. The only arg of the callback
-  # function is an array containing statistics of all queues. **Usage:**
+  # function is an array containing statistics of all queues.
   #
   #     fairy.statistics (stats) ->
   #       console.log "Stats of #{stats.length} queues: ", stats
