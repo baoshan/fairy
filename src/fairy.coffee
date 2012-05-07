@@ -521,6 +521,8 @@ class Queue
     multi.smembers @key 'BLOCKED'
     multi.exec (multi_err, multi_res) =>
 
+      # Process the result of the transaction.
+      #
       # 1. Process `STATISTICS` hash:
       #
       #     + Convert:
@@ -539,6 +541,8 @@ class Queue
         result.average_processing_time = '-'
       result.failed_tasks = multi_res[1]
 
+      # Start another transaction to get all `BLOCKED` tasks.
+      #
       # 1. Set `blocked.groups` of returned object.
       # 2. Count blocked tasks. Blocked tasks are tasks in the `QUEUED` list whose
       # group identifier is in the `BLOCKED` set. The first element of each

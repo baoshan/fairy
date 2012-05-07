@@ -69,4 +69,7 @@ queue.regist (param_1, param_2, param_3, callback) ->
   , 5
 ```
 
-See examples folder for demos.
+See [example folder] for demos. And also the [annotated source].
+
+[example folder]: https://github.com/baoshan/fairy/tree/master/example
+[annotated source]: http://baoshan.github.com/fairy/src/fairy.html
