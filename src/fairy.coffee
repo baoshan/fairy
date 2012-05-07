@@ -255,7 +255,8 @@ class Queue
         errors = []
 
       handler task..., (err, res) =>
-        process_time = Date.now() - start_time
+        finish_time  = Date.now()
+        process_time = finish_time - start_time
         if err
 
           # Keep the error message for further inspection.
@@ -329,7 +330,7 @@ class Queue
                 @redis.hincrby @key('STATISTICS'), 'finished', 1
                 @redis.hincrby @key('STATISTICS'), 'total_pending_time', start_time - queued_time
                 @redis.hincrby @key('STATISTICS'), 'total_processing_time', process_time
-                @redis.lpush @key('RECENT'), JSON.stringify([task..., start_time - queued_time, process_time])
+                @redis.lpush @key('RECENT'), JSON.stringify([task..., finish_time])
                 @redis.ltrim @key('RECENT'), 0, @recent_size - 1
                 @redis.zadd @key('SLOWEST'), process_time, JSON.stringify(task)
                 @redis.zremrangebyrank @key('SLOWEST'), 0, - @slowest_size - 1
@@ -348,7 +349,7 @@ class Queue
   #   list.
   #
   # Above commands should be protected by a transaction.
-  reschedule: (callback = (->)) =>
+  reschedule: (callback) =>
    
     # Make sure `FAILED` list and `BLOCKED` set are not touched during the
     # transaction.
@@ -381,7 +382,7 @@ class Queue
           multi.del groups.map((group) => "#{@key('QUEUED')}:#{group}")... if groups.length
           multi.del @key 'BLOCKED'
           multi.exec (multi_err, multi_res) =>
-            if multi_res then callback()
+            if multi_res then callback() if callback
             else @reschedule callback
 
         # If there're blocked task groups, then:

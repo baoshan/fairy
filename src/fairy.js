@@ -141,8 +141,9 @@
           errors = [];
         }
         return handler.apply(null, __slice.call(task).concat([function(err, res) {
-          var next, process_time, push_blocked, push_failed, retry;
-          process_time = Date.now() - start_time;
+          var finish_time, next, process_time, push_blocked, push_failed, retry;
+          finish_time = Date.now();
+          process_time = finish_time - start_time;
           if (err) {
             errors.push(err.message || '');
             push_failed = function() {
@@ -191,7 +192,7 @@
                   _this.redis.hincrby(_this.key('STATISTICS'), 'finished', 1);
                   _this.redis.hincrby(_this.key('STATISTICS'), 'total_pending_time', start_time - queued_time);
                   _this.redis.hincrby(_this.key('STATISTICS'), 'total_processing_time', process_time);
-                  _this.redis.lpush(_this.key('RECENT'), JSON.stringify(__slice.call(task).concat([start_time - queued_time], [process_time])));
+                  _this.redis.lpush(_this.key('RECENT'), JSON.stringify(__slice.call(task).concat([finish_time])));
                   _this.redis.ltrim(_this.key('RECENT'), 0, _this.recent_size - 1);
                   _this.redis.zadd(_this.key('SLOWEST'), process_time, JSON.stringify(task));
                   _this.redis.zremrangebyrank(_this.key('SLOWEST'), 0, -_this.slowest_size - 1);
@@ -212,9 +213,6 @@
 
     Queue.prototype.reschedule = function(callback) {
       var _this = this;
-      if (callback == null) {
-        callback = (function() {});
-      }
       this.redis.watch(this.key('FAILED'));
       this.redis.watch(this.key('BLOCKED'));
       return this.failed_tasks(function(tasks) {
@@ -245,7 +243,9 @@
             multi.del(_this.key('BLOCKED'));
             return multi.exec(function(multi_err, multi_res) {
               if (multi_res) {
-                return callback();
+                if (callback) {
+                  return callback();
+                }
               } else {
                 return _this.reschedule(callback);
               }
