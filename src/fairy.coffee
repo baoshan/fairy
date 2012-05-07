@@ -82,13 +82,13 @@ class Fairy
   constructor: (@redis) ->
     @queue_pool = {}
 
-  # ### Keys Function
+  # ### Function to Get Key Name
 
   # Method to generate prefixed keys. Keys used by objects of class `Fairy` include:
   #
   #   + `QUEUES`, Redis set, containing names of all registered queues.
   #
-  # The method is designed to be used internally.
+  # The method is designed to be invoked internally.
   key: (key) -> "#{prefix}:#{key}"
 
   # ### Get a Named Queue
@@ -554,11 +554,12 @@ class Queue
       #     + Calibrate initial condition (in case of no task is finished).
       #
       # 2. Set `failed` key of returned object.
+      statistics = multi_res[0] or {}
       result =
-        total_tasks : multi_res[0].total or 0
-        finished_tasks : multi_res[0].finished or 0
-        average_pending_time : Math.round(multi_res[0].total_pending_time * 100 / multi_res[0].finished) / 100
-        average_processing_time : Math.round(multi_res[0].total_processing_time * 100 / multi_res[0].finished) / 100
+        total_tasks : statistics.total or 0
+        finished_tasks : statistics.finished or 0
+        average_pending_time : Math.round(statistics.total_pending_time * 100 / statistics.finished) / 100
+        average_processing_time : Math.round(statistics.total_processing_time * 100 / statistics.finished) / 100
       if not result.finished_tasks
         result.average_pending_time = '-'
         result.average_processing_time = '-'
