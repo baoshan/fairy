@@ -92,14 +92,13 @@ class Fairy
 
   # ### Get a Named Queue
   
-  # **Usage:**
-  #
-  #   foo = fairy.queue 'foo'
-  #
   # If the named queue can be found in the `queue_pool` hashtable, return the
   # cached queue. Otherwise, create an object of class `Queue` using the Redis
   # client and the name of the queue, add the queue name into the `QUEUES` set
-  # for listing purpose.
+  # for listing purpose. **Usage:**
+  #
+  #   foo = fairy.queue 'foo'
+  #
   queue: (name) ->
     return @queue_pool[name] if @queue_pool[name]
     @redis.sadd @key('QUEUES'), name
@@ -107,26 +106,23 @@ class Fairy
 
   # ### Get All Queues Asynchronously
   
-  # **Usage:**
+  # Return named queues whose names are stored in the `QUEUES` set. **Usage:**
   #
   #   queues = fairy.queues()
   #   console.log "#{queues.length} queues: ", queues.map (queue) ->
   #     queue.name
   #
-  # Return named queues whose names are stored in the `QUEUES` set.
   queues: (callback) ->
     @redis.smembers @key('QUEUES'), (err, res) =>
       callback res.map (name) => @queue name
 
   # ### Get Statistics for All Queues Asynchronously
-  #
-  # **Usage:**
-  #
-  #     fairy.statistics (stats) ->
-  #       console.log "Stats of #{stats.length} queues: ", stats
-
+  
   # `statistics` is an asynchronous method. The only arg of the callback
-  # function is an array containing statistics of all queues.
+  # function is an array containing statistics of all queues. **Usage:**
+  #
+  #   fairy.statistics (stats) ->
+  #     console.log "Stats of #{stats.length} queues: ", stats
   statistics: (callback) ->
     result = []
     @queues (queues) ->
