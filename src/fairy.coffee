@@ -32,8 +32,10 @@
 
 # `Fairy` relies on `node-uuid` to generate unique identifiers for tasks and
 # `redis` driver, of course!
-uuid       = require 'node-uuid'
-redis      = require 'redis'
+# Prefix `FAIRY` is applied to all Redis keys for safety and ease-of-management.
+uuid   = require 'node-uuid'
+redis  = require 'redis'
+prefix = 'FAIRY'
 
 # ### CommonJS Module Definition
 #
@@ -50,12 +52,6 @@ exports.connect = (options = {}) ->
   client = redis.createClient options.port, options.host
   client.auth options.password if options.password?
   new Fairy client
-
-# Prefix `FAIRY` is applied to all Redis keys for safety and ease-of-management.
-#
-# `QUEUES` is a Redis set containing names of all registered queues.
-prefix     = 'FAIRY'
-key_queues = "#{prefix}:QUEUES"
 
 # ## Class Fairy
 
@@ -81,6 +77,13 @@ class Fairy
   constructor: (@redis) ->
     @queue_pool = {}
 
+  # ### Keys
+
+  # Keys used by class `Fairy` include:
+  #
+  #   + `QUEUES`, a Redis set, containing names of all registered queues.
+  key: (key) -> "#{prefix}:#{key}"
+
   # ### Get a Named Queue
   #
   # **Usage:**
@@ -93,7 +96,7 @@ class Fairy
   # for listing purpose.
   queue: (name) ->
     return @queue_pool[name] if @queue_pool[name]
-    @redis.sadd key_queues, name
+    @redis.sadd @key('QUEUES'), name
     @queue_pool[name] = new Queue @redis, name
 
   # ### Get All Queues Asynchronously
@@ -105,7 +108,7 @@ class Fairy
 
   # Return named queues whose names are stored in the `QUEUES` set.
   queues: (callback) ->
-    @redis.smembers key_queues, (err, res) =>
+    @redis.smembers @key('QUEUES'), (err, res) =>
       callback res.map (name) => @queue name
 
   # ### Get Statistics for All Queues Asynchronously
