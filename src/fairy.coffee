@@ -94,13 +94,12 @@ class Fairy
 
   # ### Get a Named Queue
   
-  # If the named queue can be found in the `queue_pool` hashtable, return the
-  # cached queue. Otherwise, create an object of class `Queue` using the Redis
-  # client and the name of the queue, add the queue name into the `QUEUES` set
-  # for listing purpose. **Usage:**
+  # If the named queue can be found in the `queue_pool` cache, return the cached
+  # queue. Otherwise, create an object of class `Queue` using the Redis client
+  # and the name of the queue. Add the queue name into the `QUEUES` set for
+  # listing purpose. **Usage:**
   #
   #     foo = fairy.queue 'foo'
-  #
   queue: (name) ->
     return @queue_pool[name] if @queue_pool[name]
     @redis.sadd @key('QUEUES'), name
