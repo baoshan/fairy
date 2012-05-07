@@ -118,7 +118,8 @@ class Fairy
   # ### Get Statistics for All Queues Asynchronously
   
   # `statistics` is an asynchronous method. The only arg of the callback
-  # function is an array containing statistics of all queues.
+  # function is an array containing statistics of all queues. The actual
+  # dirty-work is delegated to objects of class `Queue`.
   #
   #     fairy.statistics (stats) ->
   #       console.log "Stats of #{stats.length} queues: ", stats
