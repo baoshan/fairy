@@ -123,14 +123,15 @@ class Fairy
   #     fairy.statistics (stats) ->
   #       console.log "Stats of #{stats.length} queues: ", stats
   statistics: (callback) ->
-    result = []
     @queues (queues) ->
-      total_queues = queues.length
-      queues.forEach (queue, i) ->
-        queue.statistics (statistics) ->
-          statistics.name = queue.name
-          result[i] = statistics
-          callback result unless --total_queues
+      if total_queues = queues.length
+        result = []
+        queues.forEach (queue, i) ->
+          queue.statistics (statistics) ->
+            statistics.name = queue.name
+            result[i] = statistics
+            callback result if callback unless --total_queues
+       else callback [] if callback
 
 # ## Class Queue
 
