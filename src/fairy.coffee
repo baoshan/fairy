@@ -106,7 +106,7 @@ class Fairy
 
   # ### Get All Queues Asynchronously
   
-  # Return named queues whose names are stored in the `QUEUES` set. **Usage:**
+  # Return named queues whose names are stored in the `QUEUES` set.
   #
   #     queues = fairy.queues()
   #     console.log "#{queues.length} queues: ", queues.map (queue) ->
