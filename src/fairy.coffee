@@ -568,6 +568,7 @@ class Queue
         finished_tasks: statistics.finished or 0
         average_pending_time: Math.round(statistics.total_pending_time * 100 / statistics.finished) / 100
         average_processing_time: Math.round(statistics.total_processing_time * 100 / statistics.finished) / 100
+        blocked: {}
       if not result.finished_tasks
         result.average_pending_time = '-'
         result.average_processing_time = '-'
@@ -583,11 +584,10 @@ class Queue
       # tasks is:
       #
       # `pending = total - finished - processing - failed - blocked`
+      result.blocked.groups = multi_res[4].length
       multi2 = @redis.multi()
       multi2.llen "#{@key 'QUEUED'}:#{group}" for group in multi_res[4]
       multi2.exec (multi2_err, multi2_res) ->
-        result.blocked =
-          groups: multi_res[4].length
-          tasks: multi2_res.reduce(((a, b) -> a + b), - multi_res[4].length)
+        result.blocked.tasks = multi2_res.reduce(((a, b) -> a + b), - result.blocked.groups)
         result.pending_tasks = result.total.tasks - result.finished_tasks - result.processing_tasks - result.failed_tasks - result.blocked.tasks
         callback result
