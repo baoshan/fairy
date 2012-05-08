@@ -367,7 +367,8 @@
           },
           finished_tasks: statistics.finished || 0,
           average_pending_time: Math.round(statistics.total_pending_time * 100 / statistics.finished) / 100,
-          average_processing_time: Math.round(statistics.total_processing_time * 100 / statistics.finished) / 100
+          average_processing_time: Math.round(statistics.total_processing_time * 100 / statistics.finished) / 100,
+          blocked: {}
         };
         if (!result.finished_tasks) {
           result.average_pending_time = '-';
@@ -375,6 +376,7 @@
         }
         result.processing_tasks = multi_res[2];
         result.failed_tasks = multi_res[3];
+        result.blocked.groups = multi_res[4].length;
         multi2 = _this.redis.multi();
         _ref = multi_res[4];
         for (_i = 0, _len = _ref.length; _i < _len; _i++) {
@@ -382,12 +384,9 @@
           multi2.llen("" + (_this.key('QUEUED')) + ":" + group);
         }
         return multi2.exec(function(multi2_err, multi2_res) {
-          result.blocked = {
-            groups: multi_res[4].length,
-            tasks: multi2_res.reduce((function(a, b) {
-              return a + b;
-            }), -multi_res[4].length)
-          };
+          result.blocked.tasks = multi2_res.reduce((function(a, b) {
+            return a + b;
+          }), -result.blocked.groups);
           result.pending_tasks = result.total.tasks - result.finished_tasks - result.processing_tasks - result.failed_tasks - result.blocked.tasks;
           return callback(result);
         });

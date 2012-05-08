@@ -575,15 +575,17 @@ class Queue
       result.processing_tasks = multi_res[2]
       result.failed_tasks = multi_res[3]
 
-      # 1. Set `blocked.groups` of returned object.
-      # 2. Initiate a 2nd transaction to get all `BLOCKED` tasks. Blocked tasks
-      # are tasks in the `QUEUED` list whose group identifier is in the
-      # `BLOCKED` set. The first element of each `QUEUED` list will not be
-      # counted, since that's the blocking (failed) task.
-      # 3. Calculate pending tasks. The equation used to calculate pending
-      # tasks is:
+      # Calculate blocked and pending tasks:
+      # 
+      #   1. Set `blocked.groups` of returned object.
+      #   2. Initiate a 2nd transaction to get all `BLOCKED` tasks. Blocked tasks
+      #   are tasks in the `QUEUED` list whose group identifier is in the
+      #   `BLOCKED` set. The first element of each `QUEUED` list will not be
+      #   counted, since that's the blocking (failed) task.
+      #   3. Calculate pending tasks. The equation used to calculate pending
+      #   tasks is:
       #
-      # `pending = total - finished - processing - failed - blocked`
+      #   `pending = total - finished - processing - failed - blocked`
       result.blocked.groups = multi_res[4].length
       multi2 = @redis.multi()
       multi2.llen "#{@key 'QUEUED'}:#{group}" for group in multi_res[4]
