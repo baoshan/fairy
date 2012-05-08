@@ -64,19 +64,19 @@ exports.connect = (options = {}) ->
 
 # ## Class Fairy
 
-# Class `Fairy` is not exposed outside the commonjs module. To get an object
-# of class `Fairy`, use the `connect` method to connect to the Redis server.
-# **Usage:**
-#
-#     fairy = require('fairy').connect()
-#
 # Object of class `Fairy` keeps a Redis connection and a pool of named queues
 # (objects of class `Queue`) responsible for enqueuing and dispatching tasks,
 # etc.
 class Fairy
 
   # ### Constructor
-
+  #
+  # Class `Fairy` is not exposed outside the commonjs module. To get an object
+  # of class `Fairy`, use the `connect` method to connect to the Redis server.
+  # **Usage:**
+  #
+  #     fairy = require('fairy').connect()
+  
   # The constructor of class `Fairy` stores the passed-in Redis client as an
   # instance property.
   #
@@ -90,12 +90,10 @@ class Fairy
   # include:
   #
   #   + `QUEUES`, Redis set, containing names of all registered queues.
-  #
-  # The method is designed to be invoked internally.
   key: (key) -> "#{prefix}:#{key}"
 
   # ### Get a Named Queue
-  
+
   # If the named queue can be found in the `queue_pool` cache, return the cached
   # queue. Otherwise, create an object of class `Queue` using the Redis client
   # and the name of the queue. Add the queue name into the `QUEUES` set for
