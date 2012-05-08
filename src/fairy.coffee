@@ -281,7 +281,6 @@ class Queue
   #     + continue process task of the same group if there's pending job(s) in
   #     the same `QUEUED` list, or
   #     + poll task from the `SOURCE` queue.
-  #
   #   * **failed**, then inspect the passed in argument, retry or block
   #   according to the `do` property of the error object.
   #
