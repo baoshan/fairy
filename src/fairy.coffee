@@ -64,6 +64,7 @@ exports.connect = (options = {}) ->
 
 # Class `Fairy` is not exposed outside the commonjs module. To get an object
 # of class `Fairy`, use the `connect` method to connect to the Redis server.
+# **Usage:**
 #
 #     fairy = require('fairy').connect()
 #
@@ -96,7 +97,7 @@ class Fairy
   # If the named queue can be found in the `queue_pool` cache, return the cached
   # queue. Otherwise, create an object of class `Queue` using the Redis client
   # and the name of the queue. Add the queue name into the `QUEUES` set for
-  # listing purpose.
+  # listing purpose. **Usage:**
   #
   #     foo = fairy.queue 'foo'
   queue: (name) ->
@@ -146,7 +147,7 @@ class Fairy
 #
 # Class `Queue` is not exposed outside the commonjs module. To get an object of
 # class `Queue`, use the `queue` or `queues` method of an object of class
-# `Fairy`:
+# `Fairy`. **Usage:**
 #
 #     foo    = fairy.queue 'foo'
 #     queues = fairy.queues()
@@ -230,7 +231,7 @@ class Queue
   # ### Register Handler
 
   # When registering a processing handler function, **Fairy** will immediately
-  # start polling tasks and process them on present.
+  # start polling tasks and process them on present. **Usage:**
   #
   #     queue.regist (param1, param2, callback) ->
   #       console.log param1, param2
