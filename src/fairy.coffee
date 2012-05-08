@@ -28,7 +28,7 @@
 #
 # Copyright 2012, Baoshan Sheng, Released under the MIT License
 
-# ## Fairy Explained
+# ## Fairy in a Nutshell
 
 # `Fairy` depends on:
 #
