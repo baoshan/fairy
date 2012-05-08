@@ -34,11 +34,13 @@
 #
 #   + **[node-uuid]**, generate an unique identifier for each task.
 #   + **[redis]**, the node.js driver for Redis, of course!
-#   + **[express]**, only if you need the http api or web front-end.
+#   + **[express]**, only if you need the [http api] or [web front-end].
 #
-# [node-uuid]: https://github.com/broofa/node-uuid
-# [redis]:     https://github.com/mranney/node_redis
-# [express]:   https://github.com/visionmedia/express
+# [node-uuid]:     https://github.com/broofa/node-uuid
+# [redis]:         https://github.com/mranney/node_redis
+# [express]:       https://github.com/visionmedia/express
+# [http api]:      fairy_web.html
+# [web front-end]: fairy_web.html
 uuid  = require 'node-uuid'
 redis = require 'redis'
 
