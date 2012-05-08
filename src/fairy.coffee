@@ -22,9 +22,9 @@
 #
 # The design philosophy makes **Fairy** ideal for the following requirements:
 #
-#   1. Tasks of a same groups need be processed in order.
-#   2. Each worker processes tasks sequentially.
-#   3. Worker spawns child process (e.g., a shell script) to handle the real job.
+#   + Tasks of a same groups need be processed in order.
+#   + Each worker processes tasks sequentially.
+#   + Worker spawns child process (e.g., a shell script) to handle the real job.
 #
 # Copyright 2012, Baoshan Sheng, Released under the MIT License
 
