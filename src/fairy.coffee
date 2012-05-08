@@ -560,10 +560,10 @@ class Queue
       # 2. Set `failed` key of returned object.
       statistics = multi_res[0] or {}
       result =
-        total_tasks : statistics.total or 0
-        finished_tasks : statistics.finished or 0
-        average_pending_time : Math.round(statistics.total_pending_time * 100 / statistics.finished) / 100
-        average_processing_time : Math.round(statistics.total_processing_time * 100 / statistics.finished) / 100
+        total_tasks: statistics.total or 0
+        finished_tasks: statistics.finished or 0
+        average_pending_time: Math.round(statistics.total_pending_time * 100 / statistics.finished) / 100
+        average_processing_time: Math.round(statistics.total_processing_time * 100 / statistics.finished) / 100
       if not result.finished_tasks
         result.average_pending_time = '-'
         result.average_processing_time = '-'
@@ -572,13 +572,14 @@ class Queue
 
       # Start another transaction to get all `BLOCKED` tasks.
       #
-      # 1. Set `blocked.groups` of returned object.
-      # 2. Count blocked tasks. Blocked tasks are tasks in the `QUEUED` list whose
-      # group identifier is in the `BLOCKED` set. The first element of each
-      # `QUEUED` list will not be counted, since that's the blocking (already
-      # failed) task.
-      # 3. Calculate the pending tasks. The equation is:
+      #   1. Set `blocked.groups` of returned object.
+      #   2. Count blocked tasks. Blocked tasks are tasks in the `QUEUED` list whose
+      #   group identifier is in the `BLOCKED` set. The first element of each
+      #   `QUEUED` list will not be counted, since that's the blocking (already
+      #   failed) task.
+      #   3. Calculate the pending tasks.
       #
+      # The equation used to calculate pending tasks is:
       #
       #     pending = total - finished - processing - blocked - failed
       multi = @redis.multi()
