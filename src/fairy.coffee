@@ -284,6 +284,7 @@ class Queue
   #   * **failed**, then inspect the passed in argument, retry or block
   #   according to the `do` property of the error object.
   #
+  #
   # Calling the callback function is the responsibility of you. Otherwise
   # `Fairy` will stop dispatching tasks.
   process : (task, is_new_task) =>
