@@ -277,11 +277,11 @@ class Queue
   # **Private** method. The real job is done by the passed in `handler` of
   # `regist`ered method, when the job is:
   #
-  #   * **successed**, pop the finished job from the group queue, and:
-  #     + continue process task of the same group if there's pending job(s) in
+  #   + **successed**, pop the finished job from the group queue, and:
+  #     - continue process task of the same group if there's pending job(s) in
   #     the same `QUEUED` list, or
-  #     + poll task from the `SOURCE` queue.
-  #   * **failed**, then inspect the passed in argument, retry or block
+  #     - poll task from the `SOURCE` queue.
+  #   + **failed**, then inspect the passed in argument, retry or block
   #   according to the `do` property of the error object.
   #
   #
