@@ -514,7 +514,9 @@ class Queue
   #
   # Statistics of a queue include:
   # 
-  #   + `total_tasks`, total tasks placed
+  #   + `total`
+  #     - `tasks`, total tasks placed
+  #     - `groups`, total groups placed
   #   + `finished_tasks`, total tasks finished
   #   + `average_pending_time`, average time spent on waiting for processing the
   #   finished tasks in milliseconds
