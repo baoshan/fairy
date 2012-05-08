@@ -42,7 +42,7 @@
 uuid  = require 'node-uuid'
 redis = require 'redis'
 
-# A constant prefix is applied to all Redis keys for safety and
+# A constant prefix will be applied to all Redis keys for safety and
 # ease-of-management reasons.
 prefix = 'FAIRY'
 
@@ -53,7 +53,7 @@ prefix = 'FAIRY'
 #
 #     fairy = require('fairy').connect()
 #
-# `connect` method use the passed in option to create a Redis client. Then use
+# `connect` method use the passed-in option to create a Redis client. Then use
 # that Redis client to initiate a new object of class `Fairy`.
 exports.connect = (options = {}) ->
   client = redis.createClient options.port, options.host
@@ -67,7 +67,7 @@ exports.connect = (options = {}) ->
 #
 #     fairy = require('fairy').connect()
 #
-# Object of class `Fairy` keeps a Redis connection as well as many named queues
+# Object of class `Fairy` keeps a Redis connection and a pool of named queues
 # (objects of class `Queue`) responsible for enqueuing and dispatching tasks,
 # etc.
 class Fairy
@@ -79,8 +79,7 @@ class Fairy
   #
   # A `queue_pool` caches named queued as a hashtable. Keys are names of queues,
   # values are according objects of class `Queue`.
-  constructor: (@redis) ->
-    @queue_pool = {}
+  constructor: (@redis) -> @queue_pool = {}
 
   # ### Function to Resolve Key Name
 
