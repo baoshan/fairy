@@ -83,24 +83,29 @@
     Queue.name = 'Queue';
 
     function Queue(redis, name) {
+      var _this = this;
       this.redis = redis;
       this.name = name;
       this.reschedule = __bind(this.reschedule, this);
 
-      this.next_task = __bind(this.next_task, this);
+      this.continue_group = __bind(this.continue_group, this);
 
       this.process = __bind(this.process, this);
-
-      this.retry = __bind(this.retry, this);
-
-      this.push_blocked = __bind(this.push_blocked, this);
-
-      this.push_failed = __bind(this.push_failed, this);
 
       this.poll = __bind(this.poll, this);
 
       this.regist = __bind(this.regist, this);
 
+      this.enqueue = __bind(this.enqueue, this);
+
+      global.process.on('exit', function() {
+        if (_this.processing_group) {
+          return _this.redis.sadd(_this.key('BLOCKED'), _this.processing_group);
+        }
+      });
+      global.process.on('SIGINT', function() {
+        return global.process.exit();
+      });
     }
 
     Queue.prototype.key = function(key) {
@@ -132,22 +137,13 @@
     };
 
     Queue.prototype.regist = function(handler) {
-      var _this = this;
       this.handler = handler;
-      global.process.on('SIGINT', function() {
-        return global.process.exit();
-      });
-      global.process.on('exit', function() {
-        console.log('exit');
-        if (_this.task) {
-          return _this.redis.sadd(_this.key('BLOCKED'), _this.task[0]);
-        }
-      });
       return this.poll();
     };
 
     Queue.prototype.poll = function() {
       var _this = this;
+      this.processing_group = null;
       this.redis.watch(this.key('SOURCE'));
       return this.redis.lindex(this.key('SOURCE'), 0, function(err, res) {
         var multi, task;
@@ -158,6 +154,7 @@
           multi.rpush("" + (_this.key('QUEUED')) + ":" + task[0], res);
           return multi.exec(function(multi_err, multi_res) {
             if (multi_res && multi_res[1] === 1) {
+              _this.processing_group = task[0];
               return _this.process(task, true);
             }
             return _this.poll();
@@ -169,79 +166,61 @@
       });
     };
 
-    Queue.prototype.push_failed = function() {
-      return this.redis.rpush(this.key('FAILED'), JSON.stringify(__slice.call(this.task).concat([this.queued_time], [Date.now()], [this.errors])));
-    };
-
-    Queue.prototype.push_blocked = function() {
-      this.redis.hdel(this.key('PROCESSING'), this.processing);
-      this.redis.sadd(this.key('BLOCKED'), this.task[0]);
-      return delete this.task;
-    };
-
-    Queue.prototype.retry = function() {
-      var _this = this;
-      return setTimeout((function() {
-        return _this.process(_this.task);
-      }), this.retry_delay);
-    };
-
     Queue.prototype.process = function(task, is_new_task) {
-      var start_time,
+      var call_handler, errors, processing, retry_count, start_time,
         _this = this;
-      this.task = task;
       start_time = Date.now();
-      if (is_new_task) {
-        this.processing = uuid.v4();
-        this.queued_time = task.pop();
-        this.redis.hset(this.key('PROCESSING'), this.processing, JSON.stringify(__slice.call(task).concat([start_time])));
-        this.retry_count = this.retry_limit;
-        this.errors = [];
-      }
-      return this.handler.apply(this, __slice.call(task).concat([function(err, res) {
-        var finish_time, process_time;
-        if (err) {
-          _this.errors.push(err.message || '');
-          switch (err["do"]) {
-            case 'block':
-              _this.push_failed();
-              _this.push_blocked();
-              return _this.poll();
-            case 'block-after-retry':
-              if (_this.retry_count--) {
-                return _this.retry();
-              } else {
-                _this.push_failed();
-                _this.push_blocked();
+      processing = uuid.v4();
+      this.redis.hset(this.key('PROCESSING'), processing, JSON.stringify(__slice.call(task).concat([start_time])));
+      retry_count = this.retry_limit;
+      errors = [];
+      call_handler = function() {
+        return _this.handler.apply(_this, __slice.call(task.slice(0, -1)).concat([function(err, res) {
+          var finish_time, process_time;
+          if (err) {
+            errors.push(err.message || null);
+            switch (err["do"]) {
+              case 'block':
+                _this.redis.rpush(_this.key('FAILED'), JSON.stringify(__slice.call(task).concat([Date.now()], [errors])));
+                _this.redis.hdel(_this.key('PROCESSING'), processing);
+                _this.redis.sadd(_this.key('BLOCKED'), task[0]);
                 return _this.poll();
-              }
-              break;
-            default:
-              if (_this.retry_count--) {
-                return _this.retry();
-              }
-              _this.push_failed();
+              case 'block-after-retry':
+                if (retry_count--) {
+                  return setTimeout(call_handler, _this.retry_delay);
+                }
+                _this.redis.rpush(_this.key('FAILED'), JSON.stringify(__slice.call(task).concat([Date.now()], [errors])));
+                _this.redis.hdel(_this.key('PROCESSING'), processing);
+                _this.redis.sadd(_this.key('BLOCKED'), task[0]);
+                return _this.poll();
+              default:
+                if (retry_count--) {
+                  return setTimeout(call_handler, _this.retry_delay);
+                }
+                _this.redis.rpush(_this.key('FAILED'), JSON.stringify(__slice.call(task).concat([Date.now()], [errors])));
+                _this.redis.hdel(_this.key('PROCESSING'), processing);
+            }
+          } else {
+            _this.redis.hdel(_this.key('PROCESSING'), processing);
+            finish_time = Date.now();
+            process_time = finish_time - start_time;
+            _this.redis.hincrby(_this.key('STATISTICS'), 'finished', 1);
+            _this.redis.hincrby(_this.key('STATISTICS'), 'total_pending_time', start_time - task[task.length - 1]);
+            _this.redis.hincrby(_this.key('STATISTICS'), 'total_processing_time', process_time);
+            _this.redis.lpush(_this.key('RECENT'), JSON.stringify(__slice.call(task).concat([finish_time])));
+            _this.redis.ltrim(_this.key('RECENT'), 0, _this.recent_size - 1);
+            _this.redis.zadd(_this.key('SLOWEST'), process_time, JSON.stringify(task));
+            _this.redis.zremrangebyrank(_this.key('SLOWEST'), 0, -_this.slowest_size - 1);
           }
-        } else {
-          finish_time = Date.now();
-          process_time = finish_time - start_time;
-          _this.redis.hincrby(_this.key('STATISTICS'), 'finished', 1);
-          _this.redis.hincrby(_this.key('STATISTICS'), 'total_pending_time', start_time - _this.queued_time);
-          _this.redis.hincrby(_this.key('STATISTICS'), 'total_processing_time', process_time);
-          _this.redis.lpush(_this.key('RECENT'), JSON.stringify(__slice.call(task).concat([finish_time])));
-          _this.redis.ltrim(_this.key('RECENT'), 0, _this.recent_size - 1);
-          _this.redis.zadd(_this.key('SLOWEST'), process_time, JSON.stringify(task));
-          _this.redis.zremrangebyrank(_this.key('SLOWEST'), 0, -_this.slowest_size - 1);
-        }
-        return _this.next_task(task[0]);
-      }]));
+          return _this.continue_group(task[0]);
+        }]));
+      };
+      return call_handler();
     };
 
-    Queue.prototype.next_task = function(group) {
+    Queue.prototype.continue_group = function(group) {
       var multi,
         _this = this;
-      this.task = null;
-      this.redis.hdel(this.key('PROCESSING'), this.processing);
       this.redis.watch("" + (this.key('QUEUED')) + ":" + group);
       multi = this.redis.multi();
       multi.lpop("" + (this.key('QUEUED')) + ":" + group);
@@ -254,7 +233,7 @@
             return _this.poll();
           }
         } else {
-          return _this.next_task(group);
+          return _this.continue_group(group);
         }
       });
     };
@@ -289,6 +268,7 @@
               }));
             }
             multi.del(_this.key('BLOCKED'));
+            multi.del(_this.key('PROCESSING'));
             return multi.exec(function(multi_err, multi_res) {
               if (multi_res) {
                 if (callback) {
@@ -372,6 +352,7 @@
         _this = this;
       multi = this.redis.multi();
       multi.hgetall(this.key('STATISTICS'));
+      multi.hlen(this.key('PROCESSING'));
       multi.llen(this.key('FAILED'));
       multi.smembers(this.key('BLOCKED'));
       return multi.exec(function(multi_err, multi_res) {
@@ -387,21 +368,22 @@
           result.average_pending_time = '-';
           result.average_processing_time = '-';
         }
-        result.failed_tasks = multi_res[1];
+        result.processing_tasks = multi_res[1];
+        result.failed_tasks = multi_res[2];
         multi = _this.redis.multi();
-        _ref = multi_res[2];
+        _ref = multi_res[3];
         for (_i = 0, _len = _ref.length; _i < _len; _i++) {
           group = _ref[_i];
           multi.llen("" + (_this.key('QUEUED')) + ":" + group);
         }
         return multi.exec(function(multi_err2, multi_res2) {
           result.blocked = {
-            groups: multi_res[2].length,
+            groups: multi_res[3].length,
             tasks: multi_res2.reduce((function(a, b) {
               return a + b;
-            }), -multi_res[2].length)
+            }), -multi_res[3].length)
           };
-          result.pending_tasks = result.total_tasks - result.finished_tasks - result.blocked.tasks - result.failed_tasks;
+          result.pending_tasks = result.total_tasks - result.finished_tasks - result.processing_tasks - result.blocked.tasks - result.failed_tasks;
           return callback(result);
         });
       });
