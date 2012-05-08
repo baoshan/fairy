@@ -585,7 +585,7 @@ class Queue
       #   3. Calculate pending tasks. The equation used to calculate pending
       #   tasks is:
       #
-      #   `pending = total - finished - processing - failed - blocked`
+      # `pending = total - finished - processing - failed - blocked`
       result.blocked.groups = multi_res[4].length
       multi2 = @redis.multi()
       multi2.llen "#{@key 'QUEUED'}:#{group}" for group in multi_res[4]
