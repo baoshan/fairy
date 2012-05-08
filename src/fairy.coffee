@@ -210,6 +210,8 @@ class Queue
   #   first-come-first-serve). Current time is appended at the argument array
   #   for statistics. A callback is optional.
   #
+  # **Usage:**
+  #
   #     queue.enqueue 'param1', 'param2', -> console.log 'queued!'
   #     queue.enqueue 'param1', 'param2'
   # 
@@ -237,9 +239,9 @@ class Queue
 
   # ### Poll New Task
 
-  # If any task presents in the `SOURCE` list, `lpop` from `SOURCE`
-  # (`rpush`) into `QUEUED`. The `lpop` and `rpush` are protected by a
-  # transaction.
+  # **Private** method. If any task presents in the `SOURCE` list, `lpop` from
+  # `SOURCE` (`rpush`) into `QUEUED`. The `lpop` and `rpush` are protected by
+  # a transaction.
   #
   # Since the task being popped and pushed should be known in prior of the
   # begin of the transaction (aka, the `multi` command), we need to get the
@@ -271,8 +273,8 @@ class Queue
 
   # ### Process First Tasks of Each Group
 
-  # The real job is done by the passed in `handler` of `regist` method, when
-  # the job is:
+  # **Private** method. The real job is done by the passed in `handler` of
+  # `regist`ered method, when the job is:
   #
   #   * **successed**, pop the finished job from the group queue, and:
   #     + continue process task of the same group if there's pending job(s) in
@@ -348,7 +350,7 @@ class Queue
 
   # ### Continue Process a Group
 
-  # **Private Method** Upon successful execution of a task, or skipping a
+  # **Private** method. Upon successful execution of a task, or skipping a
   # failed task:
   #
   #   1. `lpop` the current task from `QUEUED` list.
@@ -370,6 +372,12 @@ class Queue
 
   # ### Re-Schedule Failed and Blocked Tasks
 
+  # Requeue the failed and blocked tasks into `SOURCE` list. Useful for failure
+  # recovery. **Usage:**
+  #
+  #     queue.reschedule () ->
+  #       console.log 'reschedule successed'
+  #
   #   1. Requeue tasks in the `FAILED` list into `SOURCE` list, and,
   #   2. Pop all blocked tasks (`QUEUED` lists listed in the `BLOCKED` set,
   #   without first task of each list, because that's the failed task
@@ -431,9 +439,7 @@ class Queue
   # ### Get Recently Finished Tasks Asynchronously
   #
   # Recently finished tasks (up to a limited size) will be stored in the
-  # `RECENT` list in the reverse order of finished time.
-  #
-  # **Usage:**
+  # `RECENT` list in the reverse order of finished time. **Usage:**
   #
   #     queue.recently_finished_tasks (tasks) ->
   #       console.log "Recently finished tasks are: ", tasks
@@ -447,9 +453,7 @@ class Queue
 
   # ### Get Failed Tasks Asynchronously
   #
-  # Failed tasks are stored in the `FAILED` list.
-  #
-  # **Usage:**
+  # Failed tasks are stored in the `FAILED` list. **Usage:**
   #
   #     queue.failed_tasks (tasks) ->
   #       console.log "#{tasks.length} tasks failed: ", tasks
@@ -462,9 +466,7 @@ class Queue
 
   # ### Get Blocked Groups Asynchronously
   #
-  # Blocked groups' identifiers are stored in the `BLOCKED` set.
-  #
-  # **Usage:**
+  # Blocked groups' identifiers are stored in the `BLOCKED` set. **Usage:**
   #
   #     queue.blocked_groups (groups) ->
   #       console.log "#{groups.length} groups blocked: ", groups
@@ -478,9 +480,7 @@ class Queue
   # ### Get Slowest Tasks Asynchronously
   #
   # Slowest tasks are tasks stored in the `SLOWEST` ordered set, which will be
-  # limited to a maximum size default to 10.
-  #
-  # **Usage:**
+  # limited to a maximum size default to 10. **Usage:**
   #
   #     queue.slowest_tasks (tasks) ->
   #       console.log "Slowest tasks are: ", tasks
@@ -497,9 +497,7 @@ class Queue
   # ### Get Currently Processing Tasks Asynchronously
   #
   # Currently processing tasks are tasks in the `RECENT` list, which will be
-  # limited to a maximum size defaults to 10.
-  #
-  # **Usage:**
+  # limited to a maximum size defaults to 10. **Usage:**
   #
   #     queue.processing_tasks (tasks) ->
   #       console.log "#{tasks.length} tasks being processing: ", tasks
