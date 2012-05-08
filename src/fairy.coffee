@@ -26,7 +26,7 @@
 #   + Each worker processes tasks sequentially.
 #   + Worker spawns child process (e.g., a shell script) to handle the real job.
 #
-# Copyright 2012, Baoshan Sheng, Released under the MIT License
+# Copyright © 2012, Baoshan Sheng, Released under the MIT License
 
 # ## Fairy in a Nutshell
 
