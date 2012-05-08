@@ -125,6 +125,7 @@
     Queue.prototype.enqueue = function() {
       var args, callback, _i;
       args = 2 <= arguments.length ? __slice.call(arguments, 0, _i = arguments.length - 1) : (_i = 0, []), callback = arguments[_i++];
+      this.redis.sadd(this.key('GROUPS'), args[0]);
       this.redis.hincrby(this.key('STATISTICS'), 'total', 1);
       if (typeof callback === 'function') {
         args.push(Date.now());
@@ -351,15 +352,19 @@
       var multi,
         _this = this;
       multi = this.redis.multi();
+      multi.scard(this.key('GROUPS'));
       multi.hgetall(this.key('STATISTICS'));
       multi.hlen(this.key('PROCESSING'));
       multi.llen(this.key('FAILED'));
       multi.smembers(this.key('BLOCKED'));
       return multi.exec(function(multi_err, multi_res) {
-        var group, result, statistics, _i, _len, _ref;
-        statistics = multi_res[0] || {};
+        var group, multi2, result, statistics, _i, _len, _ref;
+        statistics = multi_res[1] || {};
         result = {
-          total_tasks: statistics.total || 0,
+          total: {
+            groups: multi_res[0],
+            tasks: statistics.total || 0
+          },
           finished_tasks: statistics.finished || 0,
           average_pending_time: Math.round(statistics.total_pending_time * 100 / statistics.finished) / 100,
           average_processing_time: Math.round(statistics.total_processing_time * 100 / statistics.finished) / 100
@@ -368,22 +373,22 @@
           result.average_pending_time = '-';
           result.average_processing_time = '-';
         }
-        result.processing_tasks = multi_res[1];
-        result.failed_tasks = multi_res[2];
-        multi = _this.redis.multi();
-        _ref = multi_res[3];
+        result.processing_tasks = multi_res[2];
+        result.failed_tasks = multi_res[3];
+        multi2 = _this.redis.multi();
+        _ref = multi_res[4];
         for (_i = 0, _len = _ref.length; _i < _len; _i++) {
           group = _ref[_i];
-          multi.llen("" + (_this.key('QUEUED')) + ":" + group);
+          multi2.llen("" + (_this.key('QUEUED')) + ":" + group);
         }
-        return multi.exec(function(multi_err2, multi_res2) {
+        return multi2.exec(function(multi2_err, multi2_res) {
           result.blocked = {
-            groups: multi_res[3].length,
-            tasks: multi_res2.reduce((function(a, b) {
+            groups: multi_res[4].length,
+            tasks: multi2_res.reduce((function(a, b) {
               return a + b;
-            }), -multi_res[3].length)
+            }), -multi_res[4].length)
           };
-          result.pending_tasks = result.total_tasks - result.finished_tasks - result.processing_tasks - result.blocked.tasks - result.failed_tasks;
+          result.pending_tasks = result.total.tasks - result.finished_tasks - result.processing_tasks - result.failed_tasks - result.blocked.tasks;
           return callback(result);
         });
       });

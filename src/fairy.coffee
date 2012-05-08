@@ -215,6 +215,7 @@ class Queue
   # 
   # No transactions are needed for enqueuing tasks.
   enqueue: (args..., callback) =>
+    @redis.sadd @key('GROUPS'), args[0]
     @redis.hincrby @key('STATISTICS'), 'total', 1
     if typeof callback is 'function'
       args.push Date.now()
@@ -544,6 +545,7 @@ class Queue
     # 2. Get the length of the `FAILED` list (total failed tasks).
     # 3. Get all the members of the `BLOCKED` set (identifiers of blocked group).
     multi = @redis.multi()
+    multi.scard @key 'GROUPS'
     multi.hgetall @key 'STATISTICS'
     multi.hlen @key 'PROCESSING'
     multi.llen @key 'FAILED'
@@ -558,17 +560,19 @@ class Queue
       #     - `average_pending_time`, and `average_processing_time`
       #   + Calibrate initial condition (in case of no task is finished).
       # 2. Set `failed` key of returned object.
-      statistics = multi_res[0] or {}
+      statistics = multi_res[1] or {}
       result =
-        total_tasks: statistics.total or 0
+        total:
+          groups: multi_res[0]
+          tasks: statistics.total or 0
         finished_tasks: statistics.finished or 0
         average_pending_time: Math.round(statistics.total_pending_time * 100 / statistics.finished) / 100
         average_processing_time: Math.round(statistics.total_processing_time * 100 / statistics.finished) / 100
       if not result.finished_tasks
         result.average_pending_time = '-'
         result.average_processing_time = '-'
-      result.processing_tasks = multi_res[1]
-      result.failed_tasks = multi_res[2]
+      result.processing_tasks = multi_res[2]
+      result.failed_tasks = multi_res[3]
 
       # Start another transaction to get all `BLOCKED` tasks.
       #
@@ -581,13 +585,12 @@ class Queue
       #
       # The equation used to calculate pending tasks is:
       #
-      #     pending = total - finished - processing - blocked - failed
-      multi = @redis.multi()
-      for group in multi_res[3]
-        multi.llen "#{@key 'QUEUED'}:#{group}"
-      multi.exec (multi_err2, multi_res2) ->
+      #     pending = total - finished - processing - failed - blocked
+      multi2 = @redis.multi()
+      multi2.llen "#{@key 'QUEUED'}:#{group}" for group in multi_res[4]
+      multi2.exec (multi2_err, multi2_res) ->
         result.blocked =
-          groups : multi_res[3].length
-          tasks : multi_res2.reduce(((a, b) -> a + b), - multi_res[3].length)
-        result.pending_tasks = result.total_tasks - result.finished_tasks - result.processing_tasks - result.blocked.tasks - result.failed_tasks
+          groups: multi_res[4].length
+          tasks: multi2_res.reduce(((a, b) -> a + b), - multi_res[4].length)
+        result.pending_tasks = result.total.tasks - result.finished_tasks - result.processing_tasks - result.failed_tasks - result.blocked.tasks
         callback result
