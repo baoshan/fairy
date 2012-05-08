@@ -83,7 +83,7 @@ class Fairy
 
   # ### Function to Resolve Key Name
 
-  # Method to generate prefixed keys. Keys used by objects of class `Fairy`
+  # **Private** method to generate prefixed keys. Keys used by objects of class `Fairy`
   # include:
   #
   #   + `QUEUES`, Redis set, containing names of all registered queues.
@@ -167,7 +167,7 @@ class Queue
 
   # ### Function to Resolve Key Name
 
-  # Method to generate (`FAIRY`) prefixed and (queue name) suffixed keys. Keys
+  # **Private** method to generate (`FAIRY`) prefixed and (queue name) suffixed keys. Keys
   # used by objects of class `Queue` include:
   #
   #   + `SOURCE`, Redis list, tasks reside in `SOURCE` when enqueued.
@@ -208,7 +208,10 @@ class Queue
   #   JSON array, **the first argument will be served as the group identifier**
   #   to ensure sequential processing for all tasks of the same group (aka.
   #   first-come-first-serve). Current time is appended at the argument array
-  #   for statistics.
+  #   for statistics. A callback is optional.
+  #
+  #     queue.enqueue 'param1', 'param2', -> console.log 'queued!'
+  #     queue.enqueue 'param1', 'param2'
   # 
   # No transactions are needed for enqueuing tasks.
   enqueue: (args..., callback) =>
@@ -225,6 +228,10 @@ class Queue
 
   # When registering a processing handler function, **Fairy** will immediately
   # start polling tasks and process them on present.
+  #
+  #     queue.regist (param1, param2, callback) ->
+  #       console.log param1, param2
+  #       callback()
   regist: (@handler) => @poll()
 
   # ### Poll New Task
