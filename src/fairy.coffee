@@ -207,12 +207,14 @@ class Queue
 
   # Tasks will be pushed into `SOURCE` Redis lists:
   # 
-  #   + `email` tasks will be queued at `SOURCE:email` list.
-  #   + Arguments except the optional callback function will be serialized as a
-  #   JSON array, **the first argument will be served as the group identifier**
-  #   to ensure sequential processing for all tasks of the same group (aka.
-  #   first-come-first-serve). Current time is appended at the argument array
-  #   for statistics. A callback is optional.
+  #   + `foo` tasks will be queued at `SOURCE:foo` list.
+  #   + Arguments except the (optional) callback function will be serialized as
+  #   a JSON array.
+  #   + **The first argument will be served as the group identifier** to ensure
+  #   sequential processing for all tasks of the same group (aka. first-come-
+  #   first-serve). Current time is appended at the argument array for
+  #   monitoring purpose.
+  #   + A callback is optional.
   #
   # **Usage:**
   #
