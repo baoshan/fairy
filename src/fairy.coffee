@@ -62,19 +62,10 @@ exports.connect = (options = {}) ->
   client.auth options.password if options.password?
   new Fairy client
 
-# ### A Crude Way to Exception Handling
-process.on 'uncaughtException', (err) ->
-  console.log 'Caught exception: ' + err
-
-# # When the process exits, if there's un-finished task, the `QUEUED` list need
-# # be blocked (add the group identifier into the `BLOCKED` set).
-# #
-# # Also, gracefully shutting down on SIGINT `(Crtl-C)`.
-# global.process.on 'exit', =>
-#   @redis.hdel @key('PROCESSING'), @_processing if @_processing
-#   @redis.sadd @key('BLOCKED'), @_processing_group if @_processing_group
-#   @redis.rpush @key('FAILED'), @task if @task
-# global.process.on 'SIGINT', => global.process.exit()
+# ### Exception Handling
+#
+# Use `uncaughtException`, `SIGING` to provide elegant exception handling and manual
+# interruption.
 
 # ## Class Fairy
 
