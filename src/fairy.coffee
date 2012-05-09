@@ -174,7 +174,6 @@ class Queue
   # of the queue as instance properties.
   constructor: (@redis, @name) ->
 
-
   # ### Function to Resolve Key Name
 
   # **Private** method to generate (`FAIRY`) prefixed and (queue name) suffixed keys. Keys
