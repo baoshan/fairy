@@ -58,7 +58,12 @@ prefix = 'FAIRY'
 #
 # The `connect` method use the passed-in options object to create a Redis
 # client. Then use the Redis client to initiate a new object of class `Fairy`.
-# See [node_redis documents] for possible keys of the options object.
+# The options object could have below keys:
+#
+#   + `port`, defaults to `6379`.
+#   + `host`, defaults to `127.0.0.1`.
+#   + `password`, if the Redis server requires authentication.
+#   + `options`, read [node_redis documents] for more detail.
 #
 # [node_redis documents]: https://github.com/mranney/node_redis
 exports.connect = (options = {}) ->
