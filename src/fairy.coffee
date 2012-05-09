@@ -110,12 +110,8 @@ class Fairy
   #
   # A `queue_pool` caches named queued as a hashtable. Keys are names of queues,
   # values are according objects of class `Queue`.
-  constructor: (@redis) -> @queue_pool = {}
-    process.on 'uncaughtException', (err) =>
-      queues = @queues
-      return if total_queues = @queues.length
-      for queue in @queues
-         queue.exit -> process.exit() unless --total_queues
+  constructor: (@redis) ->
+    @queue_pool = {}
 
   # ### Function to Resolve Key Name
 
@@ -192,6 +188,14 @@ class Queue
   # The constructor of class `Queue` stores the Redis connection and the name
   # of the queue as instance properties.
   constructor: (@redis, @name) ->
+    process.on 'uncaughtException', (err) =>
+      console.log 'uncaught'
+      exiting = true
+      @handler_callback {do: 'block'}, null
+      # queues = @queues
+      # return if total_queues = @queues.length
+      # for queue in @queues
+      #    queue.exit -> process.exit() unless --total_queues
 
   # ### Function to Resolve Key Name
 
@@ -339,7 +343,7 @@ class Queue
     retry_count = @retry_limit
     errors = []
 
-    do call_handler = => @handler task[1...-1]..., (err, res) =>
+    @handler_callback = (err, res) =>
 
       # Error handling routine:
       #
@@ -398,6 +402,8 @@ class Queue
         multi.exec()
 
       @_continue_group task[1]
+
+    do call_handler = => @handler task[1...-1]..., @handler_callback
 
   # ### Continue Process a Group
 

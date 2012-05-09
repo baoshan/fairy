@@ -111,6 +111,7 @@
     Queue.name = 'Queue';
 
     function Queue(redis, name) {
+      var _this = this;
       this.redis = redis;
       this.name = name;
       this.reschedule = __bind(this.reschedule, this);
@@ -125,6 +126,13 @@
 
       this.enqueue = __bind(this.enqueue, this);
 
+      process.on('uncaughtException', function(err) {
+        console.log('uncaught');
+        exiting = true;
+        return _this.handler_callback({
+          "do": 'block'
+        }, null);
+      });
     }
 
     Queue.prototype.key = function(key) {
@@ -200,7 +208,6 @@
       var call_handler, errors, processing, requeue, retry_count, start_time,
         _this = this;
       if (exiting) {
-        console.log('exiting from processing');
         return (requeue = function() {
           _this.redis.watch("" + (_this.key('QUEUED')) + ":" + task[1]);
           return _this.redis.lrange("" + (_this.key('QUEUED')) + ":" + task[1], 0, -1, function(err, res) {
@@ -208,7 +215,6 @@
             multi = _this.redis.multi();
             multi.lpush.apply(multi, ["" + (_this.key('SOURCE'))].concat(__slice.call(res.reverse())));
             multi.del("" + (_this.key('QUEUED')) + ":" + task[1]);
-            console.log(res.length);
             return multi.exec(function(err, res) {
               if (!res) {
                 return requeue();
@@ -223,54 +229,55 @@
       this.redis.hset(this.key('PROCESSING'), processing, JSON.stringify(__slice.call(task).concat([start_time])));
       retry_count = this.retry_limit;
       errors = [];
-      return (call_handler = function() {
-        return _this.handler.apply(_this, __slice.call(task.slice(1, -1)).concat([function(err, res) {
-          var finish_time, multi, process_time;
-          if (err) {
-            errors.push(err.message || null);
-            switch (err["do"]) {
-              case 'block':
-                multi = _this.redis.multi();
-                multi.rpush(_this.key('FAILED'), JSON.stringify(__slice.call(task).concat([Date.now()], [errors])));
-                multi.hdel(_this.key('PROCESSING'), processing);
-                multi.sadd(_this.key('BLOCKED'), task[1]);
-                multi.exec();
-                return _this._poll();
-              case 'block-after-retry':
-                if (retry_count--) {
-                  return setTimeout(call_handler, _this.retry_delay);
-                }
-                multi = _this.redis.multi();
-                multi.rpush(_this.key('FAILED'), JSON.stringify(__slice.call(task).concat([Date.now()], [errors])));
-                multi.hdel(_this.key('PROCESSING'), processing);
-                multi.sadd(_this.key('BLOCKED'), task[1]);
-                multi.exec();
-                return _this._poll();
-              default:
-                if (retry_count--) {
-                  return setTimeout(call_handler, _this.retry_delay);
-                }
-                multi = _this.redis.multi();
-                multi.rpush(_this.key('FAILED'), JSON.stringify(__slice.call(task).concat([Date.now()], [errors])));
-                multi.hdel(_this.key('PROCESSING'), processing);
-                multi.exec();
-            }
-          } else {
-            multi = _this.redis.multi();
-            multi.hdel(_this.key('PROCESSING'), processing);
-            finish_time = Date.now();
-            process_time = finish_time - start_time;
-            multi.hincrby(_this.key('STATISTICS'), 'finished', 1);
-            multi.hincrby(_this.key('STATISTICS'), 'total_pending_time', start_time - task[task.length - 1]);
-            multi.hincrby(_this.key('STATISTICS'), 'total_processing_time', process_time);
-            multi.lpush(_this.key('RECENT'), JSON.stringify(__slice.call(task).concat([finish_time])));
-            multi.ltrim(_this.key('RECENT'), 0, _this.recent_size - 1);
-            multi.zadd(_this.key('SLOWEST'), process_time, JSON.stringify(task));
-            multi.zremrangebyrank(_this.key('SLOWEST'), 0, -_this.slowest_size - 1);
-            multi.exec();
+      this.handler_callback = function(err, res) {
+        var finish_time, multi, process_time;
+        if (err) {
+          errors.push(err.message || null);
+          switch (err["do"]) {
+            case 'block':
+              multi = _this.redis.multi();
+              multi.rpush(_this.key('FAILED'), JSON.stringify(__slice.call(task).concat([Date.now()], [errors])));
+              multi.hdel(_this.key('PROCESSING'), processing);
+              multi.sadd(_this.key('BLOCKED'), task[1]);
+              multi.exec();
+              return _this._poll();
+            case 'block-after-retry':
+              if (retry_count--) {
+                return setTimeout(call_handler, _this.retry_delay);
+              }
+              multi = _this.redis.multi();
+              multi.rpush(_this.key('FAILED'), JSON.stringify(__slice.call(task).concat([Date.now()], [errors])));
+              multi.hdel(_this.key('PROCESSING'), processing);
+              multi.sadd(_this.key('BLOCKED'), task[1]);
+              multi.exec();
+              return _this._poll();
+            default:
+              if (retry_count--) {
+                return setTimeout(call_handler, _this.retry_delay);
+              }
+              multi = _this.redis.multi();
+              multi.rpush(_this.key('FAILED'), JSON.stringify(__slice.call(task).concat([Date.now()], [errors])));
+              multi.hdel(_this.key('PROCESSING'), processing);
+              multi.exec();
           }
-          return _this._continue_group(task[1]);
-        }]));
+        } else {
+          multi = _this.redis.multi();
+          multi.hdel(_this.key('PROCESSING'), processing);
+          finish_time = Date.now();
+          process_time = finish_time - start_time;
+          multi.hincrby(_this.key('STATISTICS'), 'finished', 1);
+          multi.hincrby(_this.key('STATISTICS'), 'total_pending_time', start_time - task[task.length - 1]);
+          multi.hincrby(_this.key('STATISTICS'), 'total_processing_time', process_time);
+          multi.lpush(_this.key('RECENT'), JSON.stringify(__slice.call(task).concat([finish_time])));
+          multi.ltrim(_this.key('RECENT'), 0, _this.recent_size - 1);
+          multi.zadd(_this.key('SLOWEST'), process_time, JSON.stringify(task));
+          multi.zremrangebyrank(_this.key('SLOWEST'), 0, -_this.slowest_size - 1);
+          multi.exec();
+        }
+        return _this._continue_group(task[1]);
+      };
+      return (call_handler = function() {
+        return _this.handler.apply(_this, __slice.call(task.slice(1, -1)).concat([_this.handler_callback]));
       })();
     };
 
