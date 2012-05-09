@@ -63,7 +63,7 @@ exports.connect = (options = {}) ->
   client.auth options.password if options.password?
   new Fairy client
 
-# ### Exception Handling
+# ### TODO: Exception Handling
 #
 # Use `uncaughtException`, `SIGING` to provide elegant exception handling and manual
 # interruption.
