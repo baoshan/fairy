@@ -15,16 +15,12 @@
     if (options == null) {
       options = {};
     }
-    client = redis.createClient(options.port, options.host);
+    client = redis.createClient(options.port, options.host, options.options);
     if (options.password != null) {
       client.auth(options.password);
     }
     return new Fairy(client);
   };
-
-  process.on('uncaughtException', function(err) {
-    return console.log('Caught exception: ' + err);
-  });
 
   Fairy = (function() {
 
@@ -144,7 +140,6 @@
 
     Queue.prototype._poll = function() {
       var _this = this;
-      console.log('polling');
       this.redis.watch(this.key('SOURCE'));
       return this.redis.lindex(this.key('SOURCE'), 0, function(err, res) {
         var multi, task;
