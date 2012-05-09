@@ -228,9 +228,9 @@ class Queue
       callback = undefined
     args.push Date.now()
     multi = @redis.multi()
-    multi.sadd @key('GROUPS'), args[0]
-    multi.hincrby @key('STATISTICS'), 'total', 1
     multi.rpush @key('SOURCE'), JSON.stringify(args)
+    multi.hincrby @key('STATISTICS'), 'total', 1
+    multi.sadd @key('GROUPS'), args[0]
     multi.exec callback
 
   # ### Register Handler
