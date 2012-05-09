@@ -56,8 +56,11 @@ prefix = 'FAIRY'
 #
 #     fairy = require('fairy').connect()
 #
-# `connect` method use the passed-in option to create a Redis client. Then use
-# that Redis client to initiate a new object of class `Fairy`.
+# `connect` method use the passed-in `options` object to create a Redis client.
+# Then use that Redis client to initiate a new object of class `Fairy`. Refer
+# [node_redis] for possible keys of the options object.
+#
+# [node_redis]: https://github.com/mranney/node_redis
 exports.connect = (options = {}) ->
   client = redis.createClient options.port, options.host, options.options
   client.auth options.password if options.password?
