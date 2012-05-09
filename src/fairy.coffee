@@ -31,7 +31,7 @@
 
 # ## Fairy in a Nutshell
 
-# `Fairy` depends on:
+# **Fairy** depends on:
 #
 #   + **[node-uuid]**, generate an unique identifier for each task.
 #   + **[redis]**, the node.js driver for Redis, of course!
