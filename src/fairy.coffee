@@ -163,7 +163,10 @@ class Queue
     # be blocked (add the group identifier into the `BLOCKED` set).
     #
     # Also, gracefully shutting down on SIGINT `(Crtl-C)`.
-    global.process.on 'exit', => @redis.sadd @key('BLOCKED'), @processing_group if @processing_group
+    global.process.on 'exit', =>
+      @redis.hdel @key('PROCESSING'), @processing if @processing
+      @redis.sadd @key('BLOCKED'), @processing_group if @processing_group
+      @redis.rpush @key('FAILED'), @task if @task
     global.process.on 'SIGINT', => global.process.exit()
 
   # ### Function to Resolve Key Name
@@ -204,7 +207,7 @@ class Queue
 
   # Tasks will be pushed into `SOURCE` Redis lists:
   # 
-  #   + `email` tasks will be queued at `source:email` list.
+  #   + `email` tasks will be queued at `SOURCE:email` list.
   #   + Arguments except the optional callback function will be serialized as a
   #   JSON array, **the first argument will be served as the group identifier**
   #   to ensure sequential processing for all tasks of the same group (aka.
@@ -216,17 +219,17 @@ class Queue
   #     queue.enqueue 'param1', 'param2', -> console.log 'queued!'
   #     queue.enqueue 'param1', 'param2'
   # 
-  # No transactions are needed for enqueuing tasks.
+  # A transaction ensures the atomicity.
   enqueue: (args..., callback) =>
-    @redis.sadd @key('GROUPS'), args[0]
-    @redis.hincrby @key('STATISTICS'), 'total', 1
-    if typeof callback is 'function'
-      args.push Date.now()
-      @redis.rpush @key('SOURCE'), JSON.stringify(args), callback
-    else
+    if typeof callback isnt 'function'
       args.push callback
-      args.push Date.now()
-      @redis.rpush @key('SOURCE'), JSON.stringify(args)
+      callback = undefined
+    args.push Date.now()
+    multi = @redis.multi()
+    multi.sadd @key('GROUPS'), args[0]
+    multi.hincrby @key('STATISTICS'), 'total', 1
+    multi.rpush @key('SOURCE'), JSON.stringify(args)
+    multi.exec callback
 
   # ### Register Handler
 
@@ -287,11 +290,11 @@ class Queue
   #
   # Calling the callback function is the responsibility of you. Otherwise
   # `Fairy` will stop dispatching tasks.
-  process : (task, is_new_task) =>
+  process : (@task, is_new_task) =>
 
     start_time  = Date.now()
-    processing = uuid.v4()
-    @redis.hset @key('PROCESSING'), processing, JSON.stringify [task..., start_time]
+    @processing = uuid.v4()
+    @redis.hset @key('PROCESSING'), @processing, JSON.stringify [task..., start_time]
     retry_count = @retry_limit
     errors = []
 
@@ -309,20 +312,29 @@ class Queue
         errors.push err.message or null
         switch err.do
           when 'block'
-            @redis.rpush @key('FAILED'), JSON.stringify([task..., Date.now(), errors])
-            @redis.hdel @key('PROCESSING'), processing
-            @redis.sadd @key('BLOCKED'), task[0]
+            multi = @redis.multi()
+            multi.rpush @key('FAILED'), JSON.stringify([task..., Date.now(), errors])
+            multi.hdel @key('PROCESSING'), @processing
+            multi.sadd @key('BLOCKED'), task[0]
+            multi.exec()
+            @task = null
             return @poll()
           when 'block-after-retry'
             return setTimeout call_handler, @retry_delay if retry_count--
-            @redis.rpush @key('FAILED'), JSON.stringify([task..., Date.now(), errors])
-            @redis.hdel @key('PROCESSING'), processing
-            @redis.sadd @key('BLOCKED'), task[0]
+            multi = @redis.multi()
+            multi.rpush @key('FAILED'), JSON.stringify([task..., Date.now(), errors])
+            multi.hdel @key('PROCESSING'), @processing
+            multi.sadd @key('BLOCKED'), task[0]
+            multi.exec()
+            @task = null
             return @poll()
           else
             return setTimeout call_handler, @retry_delay if retry_count--
-            @redis.rpush @key('FAILED'), JSON.stringify([task..., Date.now(), errors])
-            @redis.hdel @key('PROCESSING'), processing
+            multi = @redis.multi()
+            multi.rpush @key('FAILED'), JSON.stringify([task..., Date.now(), errors])
+            multi.hdel @key('PROCESSING'), @processing
+            multi.exec()
+            @task = null
 
       # Success handling routine:
       #
@@ -334,7 +346,8 @@ class Queue
       #   4. Track tasks take the longest processing time in `SLOWEST` sorted
       #   set.
       else
-        @redis.hdel @key('PROCESSING'), processing
+        @task = null
+        @redis.hdel @key('PROCESSING'), @processing
         finish_time  = Date.now()
         process_time = finish_time - start_time
         @redis.hincrby @key('STATISTICS'), 'finished', 1
