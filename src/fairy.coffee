@@ -51,16 +51,16 @@ prefix = 'FAIRY'
 
 # ### CommonJS Module Definition
 
-# The only exposed object is a `connect` method, which returns a `fairy` client
-# on invocation. **Usage:**
+# The only exposed object is a `connect` method, which returns a **Fairy**
+# client on invocation. **Usage:**
 #
 #     fairy = require('fairy').connect()
 #
-# `connect` method use the passed-in `options` object to create a Redis client.
-# Then use that Redis client to initiate a new object of class `Fairy`. Refer
-# [node_redis] for possible keys of the options object.
+# The `connect` method use the passed-in options object to create a Redis
+# client. Then use the Redis client to initiate a new object of class `Fairy`.
+# See [node_redis documents] for possible keys of the options object.
 #
-# [node_redis]: https://github.com/mranney/node_redis
+# [node_redis documents]: https://github.com/mranney/node_redis
 exports.connect = (options = {}) ->
   client = redis.createClient options.port, options.host, options.options
   client.auth options.password if options.password?
