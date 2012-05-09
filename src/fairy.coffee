@@ -33,8 +33,8 @@
 
 # **Fairy** depends on:
 #
+#   + **[redis]**, node.js driver for Redis, of course!
 #   + **[node-uuid]**, generate an unique identifier for each task.
-#   + **[redis]**, the node.js driver for Redis, of course!
 #   + **[express]**, only if you need the [http api] or [web front-end].
 #
 # [redis]:         https://github.com/mranney/node_redis
@@ -52,14 +52,14 @@ prefix = 'FAIRY'
 # ### CommonJS Module Definition
 
 # The only exposed object is a `connect` method, which returns a `fairy` client
-# on invocation.
+# on invocation. **Usage:**
 #
 #     fairy = require('fairy').connect()
 #
 # `connect` method use the passed-in option to create a Redis client. Then use
 # that Redis client to initiate a new object of class `Fairy`.
 exports.connect = (options = {}) ->
-  client = redis.createClient options.port, options.host
+  client = redis.createClient options.port, options.host, options.options
   client.auth options.password if options.password?
   new Fairy client
 
