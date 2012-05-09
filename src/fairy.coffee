@@ -77,8 +77,11 @@ exports.connect = (options = {}) ->
 # Use `uncaughtException`, `SIGING` to provide elegant exception and user
 # interruption handling.
 
+exiting = off
+
 process.on 'SIGINT', ->
-  process.exit()
+  exiting = on
+
 
 # ### Embed IP Address in Worker's Name
 get_server_ip = ->
@@ -108,6 +111,11 @@ class Fairy
   # A `queue_pool` caches named queued as a hashtable. Keys are names of queues,
   # values are according objects of class `Queue`.
   constructor: (@redis) -> @queue_pool = {}
+    process.on 'uncaughtException', (err) =>
+      queues = @queues
+      return if total_queues = @queues.length
+      for queue in @queues
+         queue.exit -> process.exit() unless --total_queues
 
   # ### Function to Resolve Key Name
 
@@ -261,7 +269,8 @@ class Queue
     worker_id = uuid.v4()
     @redis.hset @key('WORKERS'), worker_id, "#{os.hostname()}:#{get_server_ip()}:#{process.pid}"
     process.on 'exit', =>
-      @redis.hdel @key('WORKERS'), worker_id if @worker_id
+      console.log 'exiting'
+      @redis.hdel @key('WORKERS'), worker_id
     @_poll()
 
   # ### Poll New Task
@@ -281,6 +290,7 @@ class Queue
   # If there's no tasks in the `SOURCE` list, poll again after an interval of
   # `polling_interval` milliseconds.
   _poll: =>
+    return process.exit() if exiting
     @redis.watch @key('SOURCE')
     @redis.lindex @key('SOURCE'), 0, (err, res) =>
       if res
@@ -312,7 +322,17 @@ class Queue
   # Calling the callback function is the responsibility of you. Otherwise
   # `Fairy` will stop dispatching tasks.
   _process: (task) =>
-
+    if exiting
+      return do requeue = =>
+        @redis.watch "#{@key('QUEUED')}:#{task[1]}"
+        @redis.lrange "#{@key('QUEUED')}:#{task[1]}", 0, -1, (err, res) =>
+          multi = @redis.multi()
+          multi.lpush "#{@key('SOURCE')}", res.reverse()...
+          multi.del "#{@key('QUEUED')}:#{task[1]}"
+          multi.exec (err, res) ->
+            return requeue() unless res
+            process.exit()
+          
     start_time  = Date.now()
     processing = task[0]
     @redis.hset @key('PROCESSING'), processing, JSON.stringify [task..., start_time]
