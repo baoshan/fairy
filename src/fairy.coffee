@@ -37,8 +37,8 @@
 #   + **[redis]**, the node.js driver for Redis, of course!
 #   + **[express]**, only if you need the [http api] or [web front-end].
 #
-# [node-uuid]:     https://github.com/broofa/node-uuid
 # [redis]:         https://github.com/mranney/node_redis
+# [node-uuid]:     https://github.com/broofa/node-uuid
 # [express]:       https://github.com/visionmedia/express
 # [http api]:      fairy_web.html
 # [web front-end]: fairy_web.html
