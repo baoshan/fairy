@@ -12,7 +12,7 @@
 #   1. Tasks of group `X` and `Y` are appointed to worker `A`.
 #   2. Worker `A` is processing tasks of group `X` **sequentially**.
 #   3. Tasks of group `Y` are pending, while:
-#   4. Worker `B` is snoozing (because of 1)!
+#   4. Worker `B` is snoozing! *(because of 1)*
 #
 # **Fairy** will route the task of group `Y` to worker `B` in this scenario.
 #
@@ -208,13 +208,13 @@ class Queue
   # Tasks will be pushed into `SOURCE` Redis lists:
   # 
   #   + `foo` tasks will be queued at `SOURCE:foo` list.
+  #   + A callback is optional.
   #   + Arguments except the (optional) callback function will be serialized as
   #   a JSON array.
   #   + **The first argument will be served as the group identifier** to ensure
   #   sequential processing for all tasks of the same group (aka. first-come-
   #   first-serve). Current time is appended at the argument array for
   #   monitoring purpose.
-  #   + A callback is optional.
   #
   # **Usage:**
   #
