@@ -86,8 +86,9 @@ exiting = off
 # When `SIGINT`, (e.g. `Control-C`) received, gracefully exit the process by
 # notifying all queues exit after processing current.
 process.on 'SIGINT', ->
-  exiting = on
+  console.log "Fairy will block processing groups and waiting for #{queue_names.length} queues cleaning-up before exiting: #{queue_names}"
   process.exit() unless registered.length
+  exiting = on
 
 # When `uncaughtException` captured, **Fairy** can not tell if this is caught by
 # the handling function, as well as which queue cause the exception. **Fairy**
@@ -95,10 +96,11 @@ process.on 'SIGINT', ->
 process.on 'uncaughtException', (err) ->
   console.log 'CaughtException:', err
   console.log "Fairy will block processing groups and waiting for #{queue_names.length} queues cleaning-up before exiting: #{queue_names}"
-  exiting = true
+  process.exit() unless registered.length
+  exiting = on
 
 # ### Embed IP Address in Worker's Name
-get_server_ip = ->
+server_ip = ->
   for card, addresses of os.networkInterfaces()
     for address in addresses
       return address.address if not address.internal and address.family is 'IPv4'
@@ -191,8 +193,14 @@ class Fairy
 #   + Placing tasks -- `enqueue`
 #   + Regist handlers -- `regist`
 #   + Reschedule tasks -- `reschedule`
-#   + Query status -- `recently_finished_tasks`, `failed_tasks`,
-#   `blocked_groups`, `slowest_tasks`, `processing_tasks`, `statistics`, etc.
+#   + Query status --
+#     - `recently_finished_tasks`
+#     - `failed_tasks`
+#     - `blocked_groups`
+#     - `slowest_tasks`
+#     - `processing_tasks`
+#     - `workers`
+#     - `statistics`, etc.
 #
 # Class `Queue` is not exposed outside the commonjs module. To get an object of
 # class `Queue`, use the `queue` or `queues` method of an object of class
@@ -280,19 +288,23 @@ class Queue
 
   # ### Register Handler
 
-  # When registering a processing handler function, **Fairy** will immediately
-  # start polling tasks and process them on present. **Usage:**
+  # When registered a processing handler function, the queue becomes a worker
+  # automatically: **Fairy** will immediately start polling tasks and process
+  # them on present.
+  #
+  # When becomes a worker, **Fairy** will regist an uuid (v4) key in the
+  # `WORKERS` hash for the queue, and remove the key on exit. Except for hard
+  # termination like `SIGKILL`, monitoring the `WORKERS` hash will give you
+  # an overview of online workers. **Usage:**
   #
   #     queue.regist (param1, param2, callback) ->
   #       console.log param1, param2
   #       callback()
   regist: (@handler) =>
-    registered.push "#{@fairy.id}:#{@name}"
+    registered.push "#{@fairy.id}|#{@name}"
     worker_id = uuid.v4()
-    @redis.hset @key('WORKERS'), worker_id, "#{os.hostname()}:#{get_server_ip()}:#{process.pid}"
-    process.on 'exit', =>
-      console.log 'Fairy is exiting.'
-      @redis.hdel @key('WORKERS'), worker_id
+    @redis.hset @key('WORKERS'), worker_id, "#{os.hostname()}|#{server_ip()}|#{process.pid}"
+    process.on 'exit', => @redis.hdel @key('WORKERS'), worker_id
     @_poll()
 
   # ### Poll New Task
@@ -606,9 +618,32 @@ class Queue
     @redis.hvals @key('PROCESSING'), (err, res) ->
       callback res.map (entry) -> JSON.parse entry
 
+  # ### Get Workers Asynchronously
+  #
+  # Get all online workers of the queue. Online workers are registered in the
+  # `WORKERS` hash, the values is in `hostname|ip|pid` format.  **Usage:**
+  #
+  #     queue.workers (workers) ->
+  #       console.log "Total #{workers.length} workers is online."
+  #       for worker in workers
+  #         console.log worker.host, worker.ip, worker.pid
+
+  # `workers` is an asynchronous method. The only arg of the callback
+  # function is an array of online workers of the queue. Each worker object
+  # have:
+  #
+  #   + `host`, the host name of the worker machine.
+  #   + `ip`, the first external IPv4 address of the worker machine.
+  #   + `pid`, the process id of the working process.
   workers: (callback) ->
     @redis.hvals @key('WORKERS'), (err, res) ->
-      callback res.map (entry) -> entry.split ':'
+      callback res.map (entry) ->
+        segments = entry.split '|'
+        {
+          host: segments[0]
+          ip: segments[1]
+          pid: segments[2]
+        }
 
   # ### Get Statistics of a Queue Asynchronously
   #
@@ -655,7 +690,6 @@ class Queue
     multi.llen @key 'FAILED'
     multi.smembers @key 'BLOCKED'
     multi.hlen @key 'WORKERS'
-    # multi.lrange @key('EXIT'), 0, -1
     multi.exec (multi_err, multi_res) =>
 
       # Process the result of the transaction.
