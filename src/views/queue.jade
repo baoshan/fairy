@@ -1,0 +1,110 @@
+!!!5
+html(lang='en')
+  head
+    title 队列
+  body
+    div#statistics
+    div#queque_detail
+      div#statistic
+      div#recently_finished_tasks
+      div#failed_tasks
+      div#slowest_tasks
+      div#workers
+
+    script#tb_statistic_template(type = 'template/underscore')
+      |<table>
+      | <tr>
+      |  <td> 完成总数</td>
+      |  <td> 平均等待时间</td>
+      |  <td> 平均处理时间</td>
+      | </tr>
+      | <tr>
+      |  <td><%= statistic.finished_tasks %></td>
+      |  <td><%= statistic.average_pending_time %></td>
+      |  <td><%= statistic.average_processing_time %></td>
+      | </tr>
+      |</table>
+
+    script#tb_recently_finished_tasks_template(type = 'template/underscore')
+      |<table>
+      | <tr>
+      |  <td> 编号</td>
+      |  <td colspan = <%= finished_tasks.length?(finished_tasks[0].length -3):0 %>> 参数</td>
+      |  <td> 进入堆栈时间</td>
+      |  <td> 完成时间</td>
+      | </tr>
+      | <% _.each(finished_tasks, function(item) { %>
+      | <tr>
+      |  <td><%= _.first(item).substring(0,8) %></td>
+      |  <%_.each(_.first(_.rest(item,1),item.length-3), function(value){ %>
+      |  <td> <%= value %> </td>     
+      |  <% })%>
+      |  <td> <%= moment.duration((new Date).valueOf()-_.last(item,2)[0]).humanize()%></td>
+      |  <td> <%= moment.duration((new Date).valueOf()-_.last(item,2)[1]).humanize()%></td>
+      | </tr>
+      | <% }) %>
+      |</table>
+
+    script#tb_failed_template(type = 'template/underscore')
+      |<table>
+      | <tr>
+      |  <td> 编号</td>
+      |  <td colspan = <%= failed_tasks.length?(failed_tasks[0].length -4):0 %>> 参数</td>
+      |  <td> 进入堆栈时间</td>
+      |  <td> 完成时间</td>
+      |  <td> 失败原因</td>
+      | </tr>
+      | <% _.each(failed_tasks, function(item) { %>
+      | <tr>
+      |  <td><%= _.first(item).substring(0,8) %></td>
+      |  <%_.each(_.first(_.rest(item,1),item.length-4), function(value){ %>
+      |  <td> <%= value %> </td>     
+      |  <% })%>
+      |  <td> <%= moment.duration((new Date).valueOf()-_.last(item,3)[0]).humanize()%></td>
+      |  <td> <%= moment.duration((new Date).valueOf()-_.last(item,3)[1]).humanize()%></td>
+      |  <td> <%= _.last(item,3)[2] %></td>
+      | </tr>
+      | <% }) %>
+      |</table>
+
+    script#tb_slowest_template(type = 'template/underscore')
+      |<table>
+      | <tr>
+      |  <td> 编号</td>
+      |  <td colspan = <%= slowest_tasks.length?(slowest_tasks[0].length -3):0 %>> 参数</td>
+      |  <td> 进入堆栈时间</td>
+      |  <td> 完成时间</td>
+      | </tr>
+      | <% _.each(slowest_tasks, function(item) { %>
+      | <tr>
+      |  <td><%= _.first(item).substring(0,8) %></td>
+      |  <%_.each(_.first(_.rest(item,1),item.length-3), function(value){ %>
+      |  <td> <%= value %> </td>     
+      |  <% })%>
+      |  <td> <%= moment.duration((new Date).valueOf()-_.last(item,2)[0]).humanize()%></td>
+      |  <td> <%= parse_milliseconds(_.last(item))%></td>
+      | </tr>
+      | <% }) %>
+      |</table>
+
+    script#tb_workers_template(type = 'template/underscore')
+      |<table>
+      | <tr>
+      |  <td> 主机名 </td>
+      |  <td> ip </td>
+      |  <td> 进程编号</td>
+      | </tr>
+      | <% _.each(workers, function(item) { %>
+      | <tr>
+      |  <%_.each(item, function(value){ %>
+      |  <td> <%= value %> </td>     
+      |  <% })%>
+      | </tr>
+      | <% }) %>
+      |</table>
+
+
+    script(src='/js/underscore.js')
+    script(src='/js/jquery.js')
+    script(src='/js/moment.js')
+    script(src='/script/queue.js')
