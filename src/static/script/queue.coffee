@@ -1,14 +1,14 @@
 arr = [
-  '<table>',
-  '<thead><tr><th>名称</th><th>总数</th><th>完成数</th><th>处理中数</th><th>失败数</th><th>BLOCKED</th><th>等待中</th><th>工人</th><th>操作</th></tr></thead>',
+  '<table class="table table-bordered overview">',
+  '<thead><tr><th>Queue</th><th>Workers</th><th>Avg. Time</th><th>Total</th><th>Finished</th><th>Processing</th><th>Pending</th><th>Failed</th><th>Blocked</th><th>Schedule</th><th>Clear</th></tr></thead>',
   '<tbody>',
   '<% _.each(data, function(item){ %>',
   '<tr key=mykey>',
-  '<td><%= item.name %></td><td><%= item.total.tasks%>/<%= item.total.groups%></td><td><%= item.finished_tasks%></td><td><%= item.processing_tasks%></td><td><%= item.failed_tasks%></td><td><%= item.blocked.tasks%>/<%= item.blocked.groups%></td><td><%= item.pending_tasks%></td><td><%= item.workers%></td><td><button class="btn">CLICK</button> </td>',
+  '<td><%= item.name %></td><td><%= item.workers%></td><td>平均等待时间<td><td><span><%= item.total.tasks%></span><span>/</span><span><%= item.total.groups%><span></td><td><%= item.finished_tasks%></td><td><%= item.processing_tasks%></td><td><%= item.pending_tasks%></td><td><%= item.failed_tasks%></td><td><span><%= item.blocked.tasks%></span><span>/</span><span><%= item.blocked.groups%><span></td><td><button class="btn">Schedule</button><button class="btn">Clear</button></td>',
   '</tr>',
   '<%})%>',
   '<tr>',
-  '<td>total</td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.total.tasks); }, 0)%>/<%= _.reduce(data, function(memo, item){ return memo + Number(item.total.groups); }, 0) %></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.finished_tasks); }, 0)%></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.processing_tasks); }, 0)%></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.failed_tasks); }, 0)%></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.blocked.tasks); }, 0)%>/<%= _.reduce(data, function(memo, item){ return memo + Number(item.blocked.groups); }, 0)%></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.pending_tasks); }, 0)%></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.workers); }, 0)%></td><td> </td>',
+  '<td>Total</td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.workers); }, 0)%></td><td>平均等待时间</td><td><span><%= _.reduce(data, function(memo, item){ return memo + Number(item.total.tasks); }, 0)%></span><span>/</span><span><%= _.reduce(data, function(memo, item){ return memo + Number(item.total.groups); }, 0) %></span></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.finished_tasks); }, 0)%></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.processing_tasks); }, 0)%></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.pending_tasks); }, 0)%></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.failed_tasks); }, 0)%></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.blocked.tasks); }, 0)%>/<%= _.reduce(data, function(memo, item){ return memo + Number(item.blocked.groups); }, 0)%></td><td><button class="btn">Schedule</button></td><td><button class="btn">Clear</button></td>',
   '</tr>',
   '</tbody>',
   '</table>'
