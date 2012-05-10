@@ -1,4 +1,4 @@
-## Redis Queue Beats Message Groups
+## Redis Queue Battles Message Groups!
 
 **Fairy** is a lightweight queue engine for node.js based on Redis. **Fairy**
 offers ActiveMQ's **[message groups]** alike feature which can guarantee
