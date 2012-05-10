@@ -94,7 +94,8 @@ process.on 'SIGINT', ->
 # the handling function, as well as which queue cause the exception. **Fairy**
 # will fail all processing tasks and block the according group.
 process.on 'uncaughtException', (err) ->
-  console.log 'CaughtException:', err
+  console.log 'CaughtException:'
+  console.log err.stack
   console.log "Fairy will block processing groups and waiting for #{queue_names.length} queues cleaning-up before exiting: #{queue_names}"
   process.exit() unless registered.length
   exiting = on
@@ -218,7 +219,7 @@ class Queue
     @redis = fairy.redis
     process.on 'uncaughtException', (err) =>
       if @_handler_callback
-        @_handler_callback {do: 'block', message: err.toString()}, null
+        @_handler_callback {do: 'block', message: err.stack}, null
       else
         @_try_exit()
 
@@ -644,6 +645,19 @@ class Queue
           ip: segments[1]
           pid: segments[2]
         }
+
+  # ### Clear A Queue
+  #
+  # Clear a queue. Remove all tasks, reset statistics.
+  
+  clear: (callback) =>
+    @redis.watch @key('SOURCE')
+    @redis.keys "#{@key('QUEUED')}:*", (err, res) =>
+      multi = @redis.multi()
+      multi.del @key('GROUPS'), @key('RECENT'), @key('FAILED'), @key('SOURCE'), @key('STATISTICS'), @key('SLOWEST'), @key('BLOCKED'), res...
+      multi.exec (err, res) =>
+        return @clear callback unless res
+        callback() if callback
 
   # ### Get Statistics of a Queue Asynchronously
   #
