@@ -73,17 +73,24 @@ exports.connect = (options = {}) ->
   client.auth options.password if options.password?
   new Fairy client
 
-# ### TODO: Exception Handling
+# ### Exception Handling
 #
-# Use `uncaughtException`, `SIGING` to provide elegant exception and user
+# Use `uncaughtException` and `SIGINT` to provide elegant exception and user
 # interruption handling.
 
+# Module wide variable to instruct all queues exit after processing current
+# task.
 exiting = off
 
+# When `SIGINT`, (e.g. `Control-C`) received, gracefully exit the process by
+# notifying all queues exit after processing current.
 process.on 'SIGINT', ->
   exiting = on
 
-process.on 'uncaughtException', (err) =>
+# When `uncaughtException` captured, **Fairy** can not tell if this is caught by
+# the handling function, as well as which queue cause the exception. **Fairy**
+# will fail all processing tasks and block the according group.
+process.on 'uncaughtException', (err) ->
   console.log 'CaughtException:', err
   console.log "Fairy will block processing groups and waiting for #{queue_names.length} queues cleaning-up before exiting: #{queue_names}"
   exiting = true
@@ -95,6 +102,8 @@ get_server_ip = ->
       return address.address if not address.internal and address.family is 'IPv4'
   return 'UNKNOWN_IP'
 
+# Model wide variable used for allocating an increasing integer `id` for each
+# **Fairy** client.
 fairy_id = 0
 
 # ## Class Fairy
@@ -199,7 +208,10 @@ class Queue
   constructor: (@fairy, @name) ->
     @redis = fairy.redis
     process.on 'uncaughtException', (err) =>
-      @handler_callback {do: 'block', message: err.toString()}, null
+      if @_handler_callback
+        @_handler_callback {do: 'block', message: err.toString()}, null
+      else
+        @_try_exit()
 
   # ### Function to Resolve Key Name
 
@@ -277,7 +289,7 @@ class Queue
     worker_id = uuid.v4()
     @redis.hset @key('WORKERS'), worker_id, "#{os.hostname()}:#{get_server_ip()}:#{process.pid}"
     process.on 'exit', =>
-      console.log 'exiting'
+      console.log 'Fairy is exiting.'
       @redis.hdel @key('WORKERS'), worker_id
     @_poll()
 
@@ -316,7 +328,8 @@ class Queue
 
   # ### Exit When All Queues are Cleaned Up
 
-  # **Private** method.
+  # **Private** method. Wait if there're queues still working, or exit the
+  # process immediately.
   _try_exit: =>
     queue_names.splice queue_names.indexOf("#{@fairy.id}:#{@name}"), 1
     process.exit() unless queue_names.length
@@ -338,6 +351,11 @@ class Queue
   # Calling the callback function is the responsibility of you. Otherwise
   # `Fairy` will stop dispatching tasks.
   _process: (task) =>
+
+    # When the process is exiting, re-queue all task in the `QUEUED` list into
+    # `SOURCE` list. To ensure the correct processing order, `lpush` tasks in
+    # the `QUEUED` list in their reverse order. The `lrange` and `lpush` is
+    # protected by a transaction to atomicity.
     if exiting
       return do requeue = =>
         @redis.watch "#{@key('QUEUED')}:#{task[1]}"
@@ -348,14 +366,21 @@ class Queue
           multi.exec (err, res) =>
             return requeue() unless res
             return @_try_exit()
-          
+    
+    # Make sure each time 
+    #
+    #   1. Keep start time of processing.
+    #   2. Set `PROCESSING` hash in Redis.
+    #   3. Allow `retry_limit` times of retries.
     start_time  = Date.now()
     processing = task[0]
     @redis.hset @key('PROCESSING'), processing, JSON.stringify [task..., start_time]
     retry_count = @retry_limit
     errors = []
 
-    @handler_callback = (err, res) =>
+    @_handler_callback = handler_callback = (err, res) =>
+
+      @_handler_callback = null
 
       # Error handling routine:
       #
@@ -415,7 +440,8 @@ class Queue
 
       @_continue_group task[1]
 
-    do call_handler = => @handler task[1...-1]..., @handler_callback
+    do call_handler = =>
+      @handler task[1...-1]..., (@_handler_callback = handler_callback)
 
   # ### Continue Process a Group
 
