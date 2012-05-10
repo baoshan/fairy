@@ -50,6 +50,7 @@ os    = require 'os'
 prefix = 'FAIRY'
 
 queue_names = []
+registered = []
 
 # ### CommonJS Module Definition
 
@@ -86,6 +87,7 @@ exiting = off
 # notifying all queues exit after processing current.
 process.on 'SIGINT', ->
   exiting = on
+  process.exit() unless registered.length
 
 # When `uncaughtException` captured, **Fairy** can not tell if this is caught by
 # the handling function, as well as which queue cause the exception. **Fairy**
@@ -179,7 +181,6 @@ class Fairy
       for queue, i in queues
         do (queue, i) ->
           queue.statistics (statistics) ->
-            statistics.name = queue.name
             result[i] = statistics
             callback result if callback unless --total_queues
 
@@ -286,6 +287,7 @@ class Queue
   #       console.log param1, param2
   #       callback()
   regist: (@handler) =>
+    registered.push "#{@fairy.id}:#{@name}"
     worker_id = uuid.v4()
     @redis.hset @key('WORKERS'), worker_id, "#{os.hostname()}:#{get_server_ip()}:#{process.pid}"
     process.on 'exit', =>
@@ -666,6 +668,7 @@ class Queue
       # 2. Set `failed` key of returned object.
       statistics = multi_res[1] or {}
       result =
+        name: @name
         total:
           groups: multi_res[0]
           tasks: statistics.total or 0
