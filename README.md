@@ -1,6 +1,6 @@
-# Fairy : Queue System Treats Tasks Fairly.
+## Fairy: Redis Queue Beats Message Groups
 
-**Fairy** is a lightweight queue engine for node.js based on Redis. Fairy
+**Fairy** is a lightweight queue engine for node.js based on Redis. **Fairy**
 offers ActiveMQ's **[message groups]** alike feature which can guarantee
 the sequential processing order of tasks belong to a same group.
 
