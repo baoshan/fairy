@@ -24,7 +24,6 @@
 #
 #   + Tasks of a same groups need be processed in order.
 #   + Each worker processes tasks sequentially.
-#   + Worker spawns child process (e.g., a shell script) to handle the real job.
 #
 # Copyright © 2012, Baoshan Sheng.
 # Released under the MIT License.
@@ -49,6 +48,8 @@ os    = require 'os'
 # A constant prefix will be applied to all Redis keys for safety and
 # ease-of-management reasons.
 prefix = 'FAIRY'
+
+queue_names = []
 
 # ### CommonJS Module Definition
 
@@ -82,6 +83,10 @@ exiting = off
 process.on 'SIGINT', ->
   exiting = on
 
+process.on 'uncaughtException', (err) =>
+  console.log 'CaughtException:', err
+  console.log "Fairy will block processing groups and waiting for #{queue_names.length} queues cleaning-up before exiting: #{queue_names}"
+  exiting = true
 
 # ### Embed IP Address in Worker's Name
 get_server_ip = ->
@@ -89,6 +94,8 @@ get_server_ip = ->
     for address in addresses
       return address.address if not address.internal and address.family is 'IPv4'
   return 'UNKNOWN_IP'
+
+fairy_id = 0
 
 # ## Class Fairy
 
@@ -111,6 +118,7 @@ class Fairy
   # A `queue_pool` caches named queued as a hashtable. Keys are names of queues,
   # values are according objects of class `Queue`.
   constructor: (@redis) ->
+    @id = fairy_id++
     @queue_pool = {}
 
   # ### Function to Resolve Key Name
@@ -131,8 +139,9 @@ class Fairy
   #     foo = fairy.queue 'foo'
   queue: (name) ->
     return @queue_pool[name] if @queue_pool[name]
+    queue_names.push "#{@id}:#{name}"
     @redis.sadd @key('QUEUES'), name
-    @queue_pool[name] = new Queue @redis, name
+    @queue_pool[name] = new Queue @, name
 
   # ### Get All Queues Asynchronously
   
@@ -187,15 +196,10 @@ class Queue
 
   # The constructor of class `Queue` stores the Redis connection and the name
   # of the queue as instance properties.
-  constructor: (@redis, @name) ->
+  constructor: (@fairy, @name) ->
+    @redis = fairy.redis
     process.on 'uncaughtException', (err) =>
-      console.log 'uncaught'
-      exiting = true
-      @handler_callback {do: 'block'}, null
-      # queues = @queues
-      # return if total_queues = @queues.length
-      # for queue in @queues
-      #    queue.exit -> process.exit() unless --total_queues
+      @handler_callback {do: 'block', message: err.toString()}, null
 
   # ### Function to Resolve Key Name
 
@@ -294,7 +298,7 @@ class Queue
   # If there's no tasks in the `SOURCE` list, poll again after an interval of
   # `polling_interval` milliseconds.
   _poll: =>
-    return process.exit() if exiting
+    return @_try_exit() if exiting
     @redis.watch @key('SOURCE')
     @redis.lindex @key('SOURCE'), 0, (err, res) =>
       if res
@@ -309,6 +313,14 @@ class Queue
       else
         @redis.unwatch()
         setTimeout @_poll, @polling_interval
+
+  # ### Exit When All Queues are Cleaned Up
+
+  # **Private** method.
+  _try_exit: =>
+    queue_names.splice queue_names.indexOf("#{@fairy.id}:#{@name}"), 1
+    process.exit() unless queue_names.length
+    console.log "#{queue_names.length} queues left: #{queue_names}"
 
   # ### Process Each Group's First Task
 
@@ -333,9 +345,9 @@ class Queue
           multi = @redis.multi()
           multi.lpush "#{@key('SOURCE')}", res.reverse()...
           multi.del "#{@key('QUEUED')}:#{task[1]}"
-          multi.exec (err, res) ->
+          multi.exec (err, res) =>
             return requeue() unless res
-            process.exit()
+            return @_try_exit()
           
     start_time  = Date.now()
     processing = task[0]
