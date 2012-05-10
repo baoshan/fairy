@@ -358,6 +358,7 @@
           start_transaction = function() {
             var multi;
             multi = _this.redis.multi();
+            console.log('rpushing', requeued_tasks.length, requeued_tasks);
             if (requeued_tasks.length) {
               multi.rpush.apply(multi, [_this.key('SOURCE')].concat(__slice.call(requeued_tasks)));
             }

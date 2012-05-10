@@ -524,6 +524,7 @@ class Queue
         @redis.watch groups.map((group) => "#{@key('QUEUED')}:#{group}")... if groups.length
         start_transaction = =>
           multi = @redis.multi()
+          console.log 'rpushing', requeued_tasks.length, requeued_tasks
           multi.rpush @key('SOURCE'), requeued_tasks... if requeued_tasks.length
           multi.del @key 'FAILED'
           multi.del groups.map((group) => "#{@key('QUEUED')}:#{group}")... if groups.length
@@ -649,7 +650,7 @@ class Queue
   # ### Clear A Queue
   #
   # Clear a queue. Remove all tasks, reset statistics.
-  
+
   clear: (callback) =>
     @redis.watch @key('SOURCE')
     @redis.keys "#{@key('QUEUED')}:*", (err, res) =>
