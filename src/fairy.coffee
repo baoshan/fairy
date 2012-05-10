@@ -100,7 +100,7 @@ process.on 'uncaughtException', (err) ->
   exiting = on
 
 # ### Embed IP Address in Worker's Name
-get_server_ip = ->
+server_ip = ->
   for card, addresses of os.networkInterfaces()
     for address in addresses
       return address.address if not address.internal and address.family is 'IPv4'
@@ -193,8 +193,14 @@ class Fairy
 #   + Placing tasks -- `enqueue`
 #   + Regist handlers -- `regist`
 #   + Reschedule tasks -- `reschedule`
-#   + Query status -- `recently_finished_tasks`, `failed_tasks`,
-#   `blocked_groups`, `slowest_tasks`, `processing_tasks`, `statistics`, etc.
+#   + Query status --
+#     - `recently_finished_tasks`
+#     - `failed_tasks`
+#     - `blocked_groups`
+#     - `slowest_tasks`
+#     - `processing_tasks`
+#     - `workers`
+#     - `statistics`, etc.
 #
 # Class `Queue` is not exposed outside the commonjs module. To get an object of
 # class `Queue`, use the `queue` or `queues` method of an object of class
@@ -297,7 +303,7 @@ class Queue
   regist: (@handler) =>
     registered.push "#{@fairy.id}|#{@name}"
     worker_id = uuid.v4()
-    @redis.hset @key('WORKERS'), worker_id, "#{os.hostname()}|#{get_server_ip()}|#{process.pid}"
+    @redis.hset @key('WORKERS'), worker_id, "#{os.hostname()}|#{server_ip()}|#{process.pid}"
     process.on 'exit', => @redis.hdel @key('WORKERS'), worker_id
     @_poll()
 
