@@ -282,19 +282,23 @@ class Queue
 
   # ### Register Handler
 
-  # When registering a processing handler function, **Fairy** will immediately
-  # start polling tasks and process them on present. **Usage:**
+  # When registered a processing handler function, the queue becomes a worker
+  # automatically: **Fairy** will immediately start polling tasks and process
+  # them on present.
+  #
+  # When becomes a worker, **Fairy** will regist an uuid (v4) key in the
+  # `WORKERS` hash for the queue, and remove the key on exit. Except for hard
+  # termination like `SIGKILL`, monitoring the `WORKERS` hash will give you
+  # an overview of online workers. **Usage:**
   #
   #     queue.regist (param1, param2, callback) ->
   #       console.log param1, param2
   #       callback()
   regist: (@handler) =>
-    registered.push "#{@fairy.id}:#{@name}"
+    registered.push "#{@fairy.id}|#{@name}"
     worker_id = uuid.v4()
-    @redis.hset @key('WORKERS'), worker_id, "#{os.hostname()}:#{get_server_ip()}:#{process.pid}"
-    process.on 'exit', =>
-      console.log 'Fairy is exiting.'
-      @redis.hdel @key('WORKERS'), worker_id
+    @redis.hset @key('WORKERS'), worker_id, "#{os.hostname()}|#{get_server_ip()}|#{process.pid}"
+    process.on 'exit', => @redis.hdel @key('WORKERS'), worker_id
     @_poll()
 
   # ### Poll New Task
@@ -611,7 +615,7 @@ class Queue
   # ### Get Workers Asynchronously
   #
   # Get all online workers of the queue. Online workers are registered in the
-  # `WORKERS` hash, the values is in `hostname:ip:pid` format.  **Usage:**
+  # `WORKERS` hash, the values is in `hostname|ip|pid` format.  **Usage:**
   #
   #     queue.workers (workers) ->
   #       console.log "Total #{workers.length} workers is online."
@@ -619,7 +623,8 @@ class Queue
   #         console.log worker.host, worker.ip, worker.pid
 
   # `workers` is an asynchronous method. The only arg of the callback
-  # function is an array of online workers of the queue. Each worker object has:
+  # function is an array of online workers of the queue. Each worker object
+  # have:
   #
   #   + `host`, the host name of the worker machine.
   #   + `ip`, the first external IPv4 address of the worker machine.
@@ -627,7 +632,7 @@ class Queue
   workers: (callback) ->
     @redis.hvals @key('WORKERS'), (err, res) ->
       callback res.map (entry) ->
-        segments = entry.split ':'
+        segments = entry.split '|'
         {
           host: segments[0]
           ip: segments[1]
