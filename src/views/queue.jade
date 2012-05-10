@@ -1,32 +1,61 @@
 !!!5
 html(lang='en')
   head
-    title 队列
+    link(href='/css/bootstrap.css')
+    link(href='/css/queue.css')
+    title Fairy Statistics
   body
+    //Grid start
+    div.container
+    h1
+      span Fairy Statistics
+    div.table_title Overview
     div#statistics
     div#queque_detail
+      div.table_title Glance
+        i.icon-th
+        i.icon-th-large active
       div#statistic
-      div#recently_finished_tasks
-      div#failed_tasks
-      div#slowest_tasks
+      div.table_title Workers
       div#workers
+      
+      div.tabbable
+        ul.nav.nav-tabs
+          li.active
+            a(href="#tab1")(data-toggle="tab") 最近处理任务
+          li
+            a(href="#tab2")(data-toggle="tab") 失败任务汇总
+          li
+            a(href="#tab3")(data-toggle="tab") 周期最长
+        div.tab-content
+          div.tan-pane-title 最近处理任务
+          div.tab-pane active#tab1
+            div#recently_finished_tasks
+          div.tan-pane-title 失败任务汇总
+          div.tab-pane active#tab2
+            div#recently_finished_tasks
+          div.tan-pane-title 周期最长
+          div.tab-pane active#tab3
+            div#recently_finished_tasks      
 
     script#tb_statistic_template(type = 'template/underscore')
-      |<table>
+      |<table class="table table-bordered glance">
       | <tr>
-      |  <td> 完成总数</td>
-      |  <td> 平均等待时间</td>
-      |  <td> 平均处理时间</td>
+      |  <td>Toalt</td>
+      |  <td>Avg. Waiting In</td>
+      |  <td>Avg. Processing In</td>
+      |  <td>Avg. Finished In</td>
       | </tr>
       | <tr>
       |  <td><%= statistic.finished_tasks %></td>
       |  <td><%= statistic.average_pending_time %></td>
       |  <td><%= statistic.average_processing_time %></td>
+      |  <td>---</td>
       | </tr>
       |</table>
 
     script#tb_recently_finished_tasks_template(type = 'template/underscore')
-      |<table>
+      |<table class="table table-bordered glance">
       | <tr>
       |  <td> 编号</td>
       |  <td colspan = <%= finished_tasks.length?(finished_tasks[0].length -3):0 %>> 参数</td>
@@ -46,7 +75,7 @@ html(lang='en')
       |</table>
 
     script#tb_failed_template(type = 'template/underscore')
-      |<table>
+      |<table class="table table-bordered glance">
       | <tr>
       |  <td> 编号</td>
       |  <td colspan = <%= failed_tasks.length?(failed_tasks[0].length -4):0 %>> 参数</td>
@@ -68,7 +97,7 @@ html(lang='en')
       |</table>
 
     script#tb_slowest_template(type = 'template/underscore')
-      |<table>
+      |<table class="table table-bordered glance">
       | <tr>
       |  <td> 编号</td>
       |  <td colspan = <%= slowest_tasks.length?(slowest_tasks[0].length -3):0 %>> 参数</td>
@@ -88,11 +117,11 @@ html(lang='en')
       |</table>
 
     script#tb_workers_template(type = 'template/underscore')
-      |<table>
+      |<table class="table table-bordered glance">
       | <tr>
-      |  <td> 主机名 </td>
-      |  <td> ip </td>
-      |  <td> 进程编号</td>
+      |  <td>Host Name</td>
+      |  <td>IP</td>
+      |  <td>Process ID</td>
       | </tr>
       | <% _.each(workers, function(item) { %>
       | <tr>
@@ -108,3 +137,5 @@ html(lang='en')
     script(src='/js/jquery.js')
     script(src='/js/moment.js')
     script(src='/script/queue.js')
+    script(src='/js/bootstrap.js')
+    script(src='/js/liuzhengming.js')
