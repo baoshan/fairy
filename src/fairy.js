@@ -31,15 +31,19 @@
   exiting = false;
 
   process.on('SIGINT', function() {
-    exiting = true;
+    console.log("Fairy will block processing groups and waiting for " + queue_names.length + " queues cleaning-up before exiting: " + queue_names);
     if (!registered.length) {
-      return process.exit();
+      process.exit();
     }
+    return exiting = true;
   });
 
   process.on('uncaughtException', function(err) {
     console.log('CaughtException:', err);
     console.log("Fairy will block processing groups and waiting for " + queue_names.length + " queues cleaning-up before exiting: " + queue_names);
+    if (!registered.length) {
+      process.exit();
+    }
     return exiting = true;
   });
 

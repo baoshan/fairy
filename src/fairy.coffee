@@ -86,8 +86,9 @@ exiting = off
 # When `SIGINT`, (e.g. `Control-C`) received, gracefully exit the process by
 # notifying all queues exit after processing current.
 process.on 'SIGINT', ->
-  exiting = on
+  console.log "Fairy will block processing groups and waiting for #{queue_names.length} queues cleaning-up before exiting: #{queue_names}"
   process.exit() unless registered.length
+  exiting = on
 
 # When `uncaughtException` captured, **Fairy** can not tell if this is caught by
 # the handling function, as well as which queue cause the exception. **Fairy**
@@ -95,7 +96,8 @@ process.on 'SIGINT', ->
 process.on 'uncaughtException', (err) ->
   console.log 'CaughtException:', err
   console.log "Fairy will block processing groups and waiting for #{queue_names.length} queues cleaning-up before exiting: #{queue_names}"
-  exiting = true
+  process.exit() unless registered.length
+  exiting = on
 
 # ### Embed IP Address in Worker's Name
 get_server_ip = ->
@@ -606,9 +608,31 @@ class Queue
     @redis.hvals @key('PROCESSING'), (err, res) ->
       callback res.map (entry) -> JSON.parse entry
 
+  # ### Get Workers Asynchronously
+  #
+  # Get all online workers of the queue. Online workers are registered in the
+  # `WORKERS` hash, the values is in `hostname:ip:pid` format.  **Usage:**
+  #
+  #     queue.workers (workers) ->
+  #       console.log "Total #{workers.length} workers is online."
+  #       for worker in workers
+  #         console.log worker.host, worker.ip, worker.pid
+
+  # `workers` is an asynchronous method. The only arg of the callback
+  # function is an array of online workers of the queue. Each worker object has:
+  #
+  #   + `host`, the host name of the worker machine.
+  #   + `ip`, the first external IPv4 address of the worker machine.
+  #   + `pid`, the process id of the working process.
   workers: (callback) ->
     @redis.hvals @key('WORKERS'), (err, res) ->
-      callback res.map (entry) -> entry.split ':'
+      callback res.map (entry) ->
+        segments = entry.split ':'
+        {
+          host: segments[0]
+          ip: segments[1]
+          pid: segments[2]
+        }
 
   # ### Get Statistics of a Queue Asynchronously
   #
@@ -655,7 +679,6 @@ class Queue
     multi.llen @key 'FAILED'
     multi.smembers @key 'BLOCKED'
     multi.hlen @key 'WORKERS'
-    # multi.lrange @key('EXIT'), 0, -1
     multi.exec (multi_err, multi_res) =>
 
       # Process the result of the transaction.
