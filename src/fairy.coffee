@@ -49,9 +49,6 @@ os    = require 'os'
 # ease-of-management reasons.
 prefix = 'FAIRY'
 
-queue_names = []
-registered = []
-
 # ### CommonJS Module Definition
 
 # The only exposed object is a `connect` method, which returns a **Fairy**
@@ -83,15 +80,27 @@ exports.connect = (options = {}) ->
 # task.
 exiting = off
 
-enter_exiting_mode = ->
-  console.log "Fairy will block processing groups and waiting for #{queue_names.length} queues cleaning-up before exiting: #{queue_names}"
-  process.exit() unless registered.length
+# Keep all registered workers of the process in an array, rely on this array to
+# count cleaned workers on exiting.
+registered_workers = []
+
+# Log active workers while waiting for all workers to clean-up.
+logging_registered_workers = ->
+  console.log "\nFairy is waiting for #{registered_workers.length} workers to clean-up before exit:"
+  for registered_worker in registered_workers
+    registered_worker = registered_worker.split '|'
+    console.log "  * Client Id: #{registered_worker[0]}, Task: #{registered_worker[1]}"
+
+enter_cleanup_mode = ->
+  logging_registered_workers()
+  return process.exit() unless registered_workers.length
   exiting = on
 
 # When `SIGINT` (e.g. `Control-C`) or `SIGUSR2` is received, gracefully exit
-# the process by notifying all queues exit after processing current.
-process.once 'SIGINT',  -> enter_exiting_mode
-process.once 'SIGUSR2', -> enter_exiting_mode
+# the process by notifying all queues entering cleanup mode and exit after
+# all cleaned up.
+process.on 'SIGINT',  enter_cleanup_mode
+process.on 'SIGUSR2', enter_cleanup_mode
 
 # When `uncaughtException` captured, **Fairy** can not tell if this is caught by
 # the handling function, as well as which queue cause the exception. **Fairy**
@@ -99,22 +108,30 @@ process.once 'SIGUSR2', -> enter_exiting_mode
 process.on 'uncaughtException', (err) ->
   console.log 'Uncaught Exception:'
   console.log err.stack
-  console.log "Fairy will block processing groups and waiting for #{queue_names.length} queues cleaning-up before exiting: #{queue_names}"
-  process.exit() unless registered.length
-  exiting = on
+  console.log 'Fairy will block all processing groups before exit.'
+  enter_cleanup_mode()
 
-# ### Embed IP Address in Worker's Name
+# Say goodbye.
+process.on 'exit', ->
+  console.log "Fairy cleaned up, exiting..."
+
+# ## Utilities
+
+# ### Get Public IP
+#
+# **Fairy** embed public IP address of workers' environment in workers' name to
+# facilitate management.
 server_ip = ->
   for card, addresses of os.networkInterfaces()
     for address in addresses
       return address.address if not address.internal and address.family is 'IPv4'
   return 'UNKNOWN_IP'
 
-# Model wide variable used for allocating an increasing integer `id` for each
-# **Fairy** client.
-fairy_id = 0
-
 # ## Class Fairy
+
+# Model wide variable used for allocating an increasing integer `id` for each
+# **Fairy** client of current process.
+fairy_id = 0
 
 # Object of class `Fairy` keeps a Redis connection and a pool of named queues
 # (objects of class `Queue`) responsible for enqueuing and dispatching tasks,
@@ -156,7 +173,6 @@ class Fairy
   #     foo = fairy.queue 'foo'
   queue: (name) ->
     return @queue_pool[name] if @queue_pool[name]
-    queue_names.push "#{@id}:#{name}"
     @redis.sadd @key('QUEUES'), name
     @queue_pool[name] = new Queue @, name
 
@@ -220,11 +236,6 @@ class Queue
   # of the queue as instance properties.
   constructor: (@fairy, @name) ->
     @redis = fairy.redis
-    process.on 'uncaughtException', (err) =>
-      if @_handler_callback
-        @_handler_callback {do: 'block', message: err.stack}, null
-      else
-        @_try_exit()
 
   # ### Function to Resolve Key Name
 
@@ -305,9 +316,15 @@ class Queue
   #       console.log param1, param2
   #       callback()
   regist: (@handler) =>
-    registered.push "#{@fairy.id}|#{@name}"
+    registered_workers.push "#{@fairy.id}|#{@name}"
     worker_id = uuid.v4()
-    @redis.hset @key('WORKERS'), worker_id, "#{os.hostname()}|#{server_ip()}|#{process.pid}"
+    @redis.hset @key('WORKERS'), worker_id, "#{os.hostname()}|#{server_ip()}|#{process.pid}|#{Date.now()}"
+    process.on 'uncaughtException', (err) =>
+      if @_handler_callback
+        console.log "Worker #{worker_id.split('-')[0]} of task #{@name} will block current processing group" 
+        @_handler_callback {do: 'block', message: err.stack}, null
+      else
+        @_try_exit()
     process.on 'exit', => @redis.hdel @key('WORKERS'), worker_id
     @_poll()
 
@@ -349,9 +366,9 @@ class Queue
   # **Private** method. Wait if there're queues still working, or exit the
   # process immediately.
   _try_exit: =>
-    queue_names.splice queue_names.indexOf("#{@fairy.id}:#{@name}"), 1
-    process.exit() unless queue_names.length
-    console.log "#{queue_names.length} queues left: #{queue_names}"
+    registered_workers.splice registered_workers.indexOf "#{@fairy.id}|#{@name}", 1
+    process.exit() unless registered_workers.length
+    logging_registered_workers()
 
   # ### Process Each Group's First Task
 
@@ -646,12 +663,13 @@ class Queue
         {
           host: segments[0]
           ip: segments[1]
-          pid: segments[2]
+          pid: parseInt segments[2]
+          start: parseInt segments[3]
         }
 
   # ### Clear A Queue
   #
-  # Clear a queue. Remove all tasks, reset statistics.
+  # Clear a queue. Remove all tasks, callback statistics.
 
   clear: (callback) =>
     @redis.watch @key('SOURCE')
