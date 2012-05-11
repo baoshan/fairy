@@ -40,22 +40,12 @@ html(lang='en')
 
     script#tb_statistic_template(type = 'template/underscore')
       |<table class="table table-bordered glance">
-      | <thead>
-      |  <tr>
-      |   <th>Toalt</th>
-      |   <th>Avg. Waiting In</th>
-      |   <th>Avg. Processing In</th>
-      |   <th>Avg. Finished In</th>
-      |  </tr>
-      | </thead>
-      | <tbody>
-      |  <tr>
-      |   <td><%= statistic.finished_tasks %></td>
-      |   <td><%= statistic.average_pending_time %></td>
-      |   <td><%= statistic.average_processing_time %></td>
-      |   <td>---</td>
-      |  </tr>
-      | </tbody>
+      | <body>
+      |  <tr><td>Toalt</td><td><%= statistic.finished_tasks %></td></tr>
+      |  <tr><td>Avg. Waiting In</td><td><%= statistic.average_pending_time %></td></tr>
+      |  <tr><td>Avg. Processing In</td><td><%= statistic.average_processing_time %></td></tr>
+      |  <tr><td>Avg. Finished In</td><td><%= Number(statistic.average_pending_time) + Number(statistic.average_processing_time) %></td></tr>
+      | <body>
       |</table>
 
     script#tb_recently_finished_tasks_template(type = 'template/underscore')
@@ -135,27 +125,29 @@ html(lang='en')
     script#tb_workers_template(type = 'template/underscore')
       |<table class="table table-bordered glance">
       | <thead>
-      |   <tr>
-      |    <th>Host Name</th>
-      |    <th>IP</th>
-      |    <th>Process ID</th>
-      |   </tr>
+      | <tr>
+      |  <td>Host Name</td>
+      |  <td>IP</td>
+      |  <td>Process ID</td>
+      |  <td>start</td>
+      | </tr>
       | </thead>
       | <tbody>
       |   <% _.each(workers, function(item) { %>
       |   <tr>
-      |    <%_.each(item, function(value){ %>
-      |    <td> <%= value %> </td>     
-      |    <% })%>
+      |    <td><%= item.host %></td>
+      |    <td><%= item.ip %></td>
+      |    <td><%= item.pid %></td>
+      |    <td> uptime </td>
       |   </tr>
       |   <% }) %>
       | </tbody>
       |</table>
 
 
-    script(src='/js/underscore.js')
-    script(src='/js/jquery.js')
-    script(src='/js/moment.js')
+    script(src='http://documentcloud.github.com/underscore/underscore-min.js')
+    script(src='http://ajax.googleapis.com/ajax/libs/jquery/1.4/jquery.min.js')
+    script(src='https://raw.github.com/timrwood/moment/1.6.2/moment.js')
     script(src='/script/queue.js')
     script(src='/js/bootstrap.js')
     script(src='/js/liuzhengming.js')

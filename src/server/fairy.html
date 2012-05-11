@@ -1,0 +1,195 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<meta charset="utf-8">
+<link href="bootstrap/css/bootstrap.css" rel="stylesheet">
+<link href="css/queue.css" rel="stylesheet">
+<script src="bootstrap/js/jquery-1.7.2.js" type="text/javascript" language="javascript"></script>
+<script src="bootstrap/js/bootstrap.js" type="text/javascript" language="javascript"></script>
+<title>队列</title>
+
+</head>
+
+<body>
+<table class="table table-bordered overview">
+  <thead>
+    <tr>
+      <th>名称</th>
+      <th>总数</th>
+      <th>完成数</th>
+      <th>处理中数</th>
+      <th>失败数</th>
+      <th>BLOCKED</th>
+      <th>等待中</th>
+      <th>操作</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>AA</td>
+      <td>1500</td>
+      <td>750</td>
+      <td>300</td>
+      <td>100</td>
+      <td>480/4</td>
+      <td>350</td>
+      <td><button class="btn">CLICK</button></td>
+    </tr>
+    
+    <tr>
+      <td>AA</td>
+      <td>1500</td>
+      <td>750</td>
+      <td>300</td>
+      <td>100</td>
+      <td>480/4</td>
+      <td>350</td>
+      <td><button class="btn">CLICK</button></td>
+    </tr>
+    
+    <tr>
+      <td>AA</td>
+      <td>1500</td>
+      <td>750</td>
+      <td>300</td>
+      <td>100</td>
+      <td>480/4</td>
+      <td>350</td>
+      <td><button class="btn">CLICK</button></td>
+    </tr>
+    
+    <tr>
+      <td>AA</td>
+      <td>1500</td>
+      <td>750</td>
+      <td>300</td>
+      <td>100</td>
+      <td>480/4</td>
+      <td>350</td>
+      <td><button class="btn">CLICK</button></td>
+    </tr>
+    
+    <tr>
+      <td>AA</td>
+      <td>1500</td>
+      <td>750</td>
+      <td>300</td>
+      <td>100</td>
+      <td>480/4</td>
+      <td>350</td>
+      <td><button class="btn">CLICK</button></td>
+    </tr>
+    
+    <tr>
+      <td>total</td>
+      <td>7500</td>
+      <td>3750</td>
+      <td>1500</td>
+      <td>500</td>
+      <td>2400/20</td>
+      <td>1750</td>
+      <td><button class="btn">CLICK</button></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="project_statistics">项目统计</div>
+<table class="table table-bordered">
+  <thead>
+    <tr>
+      <th>完成总数</th>
+      <th>平均等待时间</th>
+      <th>平均处理时间</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>50</td>
+      <td>50s</td>
+      <td>6s</td>
+    </tr>
+  </tbody>
+</table>
+
+
+<div class="tabbable">
+  <ul class="nav nav-tabs">
+    <li class="active"><a href="#tab1" data-toggle="tab">最近处理任务</a></li>
+    <li><a href="#tab2" data-toggle="tab">失败任务汇总</a></li>
+    <li><a href="#tab3" data-toggle="tab">周期最长</a></li>
+  </ul>
+  <div class="tab-content">
+    <div class="tab-pane active" id="tab1">
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>参数1</th>
+            <th>参数2</th>
+            <th>...</th>
+            <th>时间</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>one days ago</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="tab-pane" id="tab2">
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>参数1</th>
+            <th>参数2</th>
+            <th>...</th>
+            <th>时间</th>
+            <th>失败原因</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>one days ago</td>
+            <td class="test" data-original-title="TITLE" data-content="1.content..2.content"><!--<a class="btn btn-danger test" rel="popover" href="#" data-original-title="TITLE" data-content="1.content..2.content">Hover Me</a>--></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="tab-pane" id="tab3">
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>处理时间</th>
+            <th>参数1</th>
+            <th>参数2</th>
+            <th>...</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>60s</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script type="text/javascript">
+$('.test').hover(
+function(){
+  $('.test').popover('toggle');
+})
+</script>
+
+</body>
+</html>
