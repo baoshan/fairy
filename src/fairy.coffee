@@ -83,18 +83,21 @@ exports.connect = (options = {}) ->
 # task.
 exiting = off
 
-# When `SIGINT`, (e.g. `Control-C`) received, gracefully exit the process by
-# notifying all queues exit after processing current.
-process.on 'SIGINT', ->
+enter_exiting_mode = ->
   console.log "Fairy will block processing groups and waiting for #{queue_names.length} queues cleaning-up before exiting: #{queue_names}"
   process.exit() unless registered.length
   exiting = on
+
+# When `SIGINT` (e.g. `Control-C`) or `SIGUSR2` is received, gracefully exit
+# the process by notifying all queues exit after processing current.
+process.once 'SIGINT',  -> enter_exiting_mode
+process.once 'SIGUSR2', -> enter_exiting_mode
 
 # When `uncaughtException` captured, **Fairy** can not tell if this is caught by
 # the handling function, as well as which queue cause the exception. **Fairy**
 # will fail all processing tasks and block the according group.
 process.on 'uncaughtException', (err) ->
-  console.log 'CaughtException:'
+  console.log 'Uncaught Exception:'
   console.log err.stack
   console.log "Fairy will block processing groups and waiting for #{queue_names.length} queues cleaning-up before exiting: #{queue_names}"
   process.exit() unless registered.length
@@ -524,7 +527,6 @@ class Queue
         @redis.watch groups.map((group) => "#{@key('QUEUED')}:#{group}")... if groups.length
         start_transaction = =>
           multi = @redis.multi()
-          console.log 'rpushing', requeued_tasks.length, requeued_tasks
           multi.rpush @key('SOURCE'), requeued_tasks... if requeued_tasks.length
           multi.del @key 'FAILED'
           multi.del groups.map((group) => "#{@key('QUEUED')}:#{group}")... if groups.length
@@ -658,7 +660,7 @@ class Queue
       multi.del @key('GROUPS'), @key('RECENT'), @key('FAILED'), @key('SOURCE'), @key('STATISTICS'), @key('SLOWEST'), @key('BLOCKED'), res...
       multi.exec (err, res) =>
         return @clear callback unless res
-        callback() if callback
+        @statistics callback
 
   # ### Get Statistics of a Queue Asynchronously
   #
