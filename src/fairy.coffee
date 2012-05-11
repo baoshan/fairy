@@ -71,7 +71,7 @@ exports.connect = (options = {}) ->
   client.auth options.password if options.password?
   new Fairy client
 
-# ### Exception Handling
+# ### Exception & Interruption Handling
 #
 # Use `uncaughtException` and `SIGINT` to provide elegant exception and user
 # interruption handling.
@@ -80,7 +80,7 @@ exports.connect = (options = {}) ->
 # task.
 exiting = off
 
-# Keep all registered workers of the process in an array, rely on this array to
+# Keep current process's all registered workers an array, rely on this array to
 # count cleaned workers on exiting.
 registered_workers = []
 
@@ -91,6 +91,12 @@ logging_registered_workers = ->
     registered_worker = registered_worker.split '|'
     console.log "  * Client Id: #{registered_worker[0]}, Task: #{registered_worker[1]}"
 
+# Fairy will enter cleanup mode before exit when:
+#
+#   + Received `SIGINT` or `SIGUSR2`.
+#   + `uncaughtException` captured.
+#
+# If there's no registered workers, exit directly.
 enter_cleanup_mode = ->
   logging_registered_workers()
   return process.exit() unless registered_workers.length
@@ -111,7 +117,7 @@ process.on 'uncaughtException', (err) ->
   console.log 'Fairy will block all processing groups before exit.'
   enter_cleanup_mode()
 
-# Say goodbye.
+# Say goodbye on exit.
 process.on 'exit', ->
   console.log "Fairy cleaned up, exiting..."
 
