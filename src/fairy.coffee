@@ -647,15 +647,15 @@ class Queue
         entry = JSON.parse(entry)
 
   # ### Get Source Tasks Asynchronously
-  
+
   # Get tasks in the `SOURCE` list. **NOTE:** Tasks in the `SOURCE` list does
   # **NOT** equal to **pending** tasks! There may be tasks in the `QUEUED` lists
   # need be processed before processing tasks in the `SOURCE` list.
   #
   # Accepted parameters are:
   #
-  #   1. `skip`, *optional*, the number of skipped tasks. Defaults to 0.
-  #   2. `take`, *optional*, the number of tasks need be taken. Defaults to 10.
+  #   1. `skip` *(optional)*, the number of skipped tasks. Defaults to 0.
+  #   2. `take` *(optional)*, the number of tasks need be taken. Defaults to 10.
   #   3. `callback`, the callback function. Arguments of which follows nodejs error
   #   handling convention: `err` and `res`
   #
