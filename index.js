@@ -1,2 +1,2 @@
 
-module.exports = require('./src/fairy');
+module.exports = require('./lib/fairy.js');

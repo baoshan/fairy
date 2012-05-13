@@ -657,7 +657,7 @@ class Queue
   #   1. `skip` *(optional)*, the number of skipped tasks. Defaults to 0.
   #   2. `take` *(optional)*, the number of tasks need be taken. Defaults to 10.
   #   3. `callback`, the callback function. Arguments of which follows nodejs error
-  #   handling convention: `err` and `res`
+  #   handling convention: `err` and `res`.
   #
   # Below is an example `res` array:
   #
@@ -681,13 +681,13 @@ class Queue
     @redis.lrange @key('SOURCE'), skip, skip + take - 1, (err, res) ->
       callback err if err
       callback null, res.map (entry) ->
-        entry = JSON.parse(entry)
+        entry = JSON.parse entry
         id: entry[0]
         params: entry[1..-2]
-        queued: new Date entry[entry.length - 1]
+        queued: new Date entry.pop()
 
   # ### Get Workers Asynchronously
-  #
+
   # Get all online workers of the queue. Online workers are registered in the
   # `WORKERS` hash, the values is in `hostname|ip|pid` format.  **Usage:**
   #
@@ -695,7 +695,7 @@ class Queue
   #       console.log "Total #{workers.length} workers is online."
   #       for worker in workers
   #         console.log worker.host, worker.ip, worker.pid
-
+  #
   # `workers` is an asynchronous method. The only arg of the callback
   # function is an array of online workers of the queue. Each worker object
   # have:
@@ -705,14 +705,13 @@ class Queue
   #   + `pid`, the process id of the working process.
   workers: (callback) ->
     @redis.hvals @key('WORKERS'), (err, res) ->
-      callback res.map (entry) ->
+      callback err if err
+      callback null, res.map (entry) ->
         segments = entry.split '|'
-        {
-          host: segments[0]
-          ip: segments[1]
-          pid: parseInt segments[2]
-          start: parseInt segments[3]
-        }
+        host: segments[0]
+        ip: segments[1]
+        pid: parseInt segments[2]
+        since: new Date parseInt segments[3]
 
   # ### Clear A Queue
   #
