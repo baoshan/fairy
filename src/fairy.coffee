@@ -657,9 +657,14 @@ class Queue
   #   1. `skip`, *optional*, the number of skipped tasks. Defaults to 0.
   #   2. `take`, *optional*, the number of tasks need be taken. Defaults to 10.
   #   3. `callback`, the callback function. Arguments of which follows nodejs error
-  #   handling convention: (err, res).
+  #   handling convention: `err` and `res`. Below is an example `res` array:
   #
-  # Possible combinations of arguments are:
+  #     [{ id: '8c0c3eab-8114-41d6-8808-2ae8615d38b4',
+  #        params: [ 'param1', 'param2' ],
+  #        queued: Sat, 12 May 2012 07:41:33 GMT
+  #      }, ...]
+  #
+  # Possible combos of arguments are:
   #
   #   1. `callback`. (`skip` defaults to 0, `take` defaults to 10).
   #   2. `skip` and `callback`. (`take` defaults to 10).
