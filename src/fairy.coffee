@@ -666,8 +666,8 @@ class Queue
   #
   # Possible combos of arguments are:
   #
-  #   1. `callback`. (`skip` defaults to 0, `take` defaults to 10).
-  #   2. `skip` and `callback`. (`take` defaults to 10).
+  #   1. `callback`. (leave `skip` defaults to 0, `take` defaults to 10).
+  #   2. `skip` and `callback`. (leave `take` defaults to 10).
   #   3. `skip`, `take`, and `callback`.
   #
   # **Usage:**
