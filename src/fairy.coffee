@@ -643,7 +643,35 @@ class Queue
   # function is an array of processing tasks of the queue.
   processing_tasks: (callback) ->
     @redis.hvals @key('PROCESSING'), (err, res) ->
-      callback res.map (entry) -> JSON.parse entry
+      callback res.map (entry) ->
+        entry = JSON.parse(entry)
+
+  # ### Get Source Tasks Asynchronously
+  #
+  # Get (up to 10) tasks in the `SOURCE` list. Tasks in the `SOURCE` list
+  # does **NOT** equal to **pending** tasks since there may be tasks in the
+  # `QUEUED` list pending for processing.
+  #
+  # The accept parameters are:
+  #
+  #   1. The callback function. The argument of which follows
+  #   2. *Optional*, the number of skipped tasks. Defaults to 0.
+  #   3. *Optional*, the number of tasks need be taken. Defaults to 10.
+  #
+  #
+  # **Usage:**
+  #
+  #     queue.source_tasks (tasks) ->
+  #       console.log tasks
+  #     , 0, 10
+  source_tasks: (callback, skip=0, take=10) ->
+    @redis.lrange @key('SOURCE'), skip, skip + take - 1, (err, res) ->
+      callback err if err
+      callback res.map (entry) ->
+        entry = JSON.parse(entry)
+        id: entry[0]
+        params: entry[1..-2]
+        queued: new Date entry[entry.length - 1]
 
   # ### Get Workers Asynchronously
   #
