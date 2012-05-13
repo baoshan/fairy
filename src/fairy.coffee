@@ -648,26 +648,34 @@ class Queue
 
   # ### Get Source Tasks Asynchronously
   #
-  # Get (up to 10) tasks in the `SOURCE` list. Tasks in the `SOURCE` list
-  # does **NOT** equal to **pending** tasks since there may be tasks in the
-  # `QUEUED` list pending for processing.
+  # Get tasks in the `SOURCE` list. **NOTE:** Tasks in the `SOURCE` list does
+  # **NOT** equal to **pending** tasks! There may be tasks in the `QUEUED` lists
+  # need be processed before processing tasks in the `SOURCE` list.
   #
-  # The accept parameters are:
+  # Accepted parameters are:
   #
-  #   1. The callback function. The argument of which follows
-  #   2. *Optional*, the number of skipped tasks. Defaults to 0.
-  #   3. *Optional*, the number of tasks need be taken. Defaults to 10.
+  #   1. `skip`, *optional*, the number of skipped tasks. Defaults to 0.
+  #   2. `take`, *optional*, the number of tasks need be taken. Defaults to 10.
+  #   3. `callback`, the callback function. Arguments of which follows nodejs error
+  #   handling convention: (err, res).
   #
+  # Possible combinations of arguments are:
+  #
+  #   1. `callback`. (`skip` defaults to 0, `take` defaults to 10).
+  #   2. `skip`, `callback`. (`take` defaults to 10).
+  #   3. `skip`, `take`, `callback`.
   #
   # **Usage:**
   #
-  #     queue.source_tasks (tasks) ->
+  #     queue.source_tasks 20, 5, (err, tasks) ->
   #       console.log tasks
-  #     , 0, 10
-  source_tasks: (callback, skip=0, take=10) ->
+  source_tasks: (args..., callback) ->
+    return if typeof callback isnt 'function'
+    skip = args[0] or 0
+    take = args[1] or 10
     @redis.lrange @key('SOURCE'), skip, skip + take - 1, (err, res) ->
       callback err if err
-      callback res.map (entry) ->
+      callback null, res.map (entry) ->
         entry = JSON.parse(entry)
         id: entry[0]
         params: entry[1..-2]
