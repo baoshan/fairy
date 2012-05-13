@@ -662,15 +662,13 @@ class Queue
   # Possible combinations of arguments are:
   #
   #   1. `callback`. (`skip` defaults to 0, `take` defaults to 10).
-  #   2. `skip`, `callback`. (`take` defaults to 10).
-  #   3. `skip`, `take`, `callback`.
+  #   2. `skip` and `callback`. (`take` defaults to 10).
+  #   3. `skip`, `take`, and `callback`.
   #
   # **Usage:**
   #
-  #     queue.source_tasks 20, 5, (err, tasks) ->
-  #       console.log tasks
+  #     queue.source_tasks 20, 5, (err, tasks) -> YOUR CODE HERE
   source_tasks: (args..., callback) ->
-    return if typeof callback isnt 'function'
     skip = args[0] or 0
     take = args[1] or 10
     @redis.lrange @key('SOURCE'), skip, skip + take - 1, (err, res) ->
