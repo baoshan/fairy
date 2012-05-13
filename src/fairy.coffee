@@ -647,7 +647,7 @@ class Queue
         entry = JSON.parse(entry)
 
   # ### Get Source Tasks Asynchronously
-  #
+  
   # Get tasks in the `SOURCE` list. **NOTE:** Tasks in the `SOURCE` list does
   # **NOT** equal to **pending** tasks! There may be tasks in the `QUEUED` lists
   # need be processed before processing tasks in the `SOURCE` list.
