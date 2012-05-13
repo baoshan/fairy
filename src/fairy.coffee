@@ -723,9 +723,8 @@ class Queue
         since: new Date parseInt entry[3]
 
   # ### Clear A Queue
-  #
-  # Clear a queue. Remove all tasks, callback statistics.
-
+  
+  # Clear a queue. Remove **all** tasks, callback statistics.
   clear: (callback) =>
     @redis.watch @key('SOURCE')
     @redis.keys "#{@key('QUEUED')}:*", (err, res) =>
