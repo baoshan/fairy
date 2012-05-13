@@ -656,7 +656,7 @@ class Queue
   #
   #   1. `skip` *(optional)*, the number of skipped tasks. Defaults to 0.
   #   2. `take` *(optional)*, the number of tasks need be taken. Defaults to 10.
-  #   3. `callback`, the callback function. Arguments of which follows nodejs error
+  #   3. `callback`, the callback function. Arguments of which follows node.js error
   #   handling convention: `err` and `res`.
   #
   # Below is an example `res` array:
@@ -688,30 +688,39 @@ class Queue
 
   # ### Get Workers Asynchronously
 
-  # Get all online workers of the queue. Online workers are registered in the
-  # `WORKERS` hash, the values is in `hostname|ip|pid` format.  **Usage:**
+  # Asynchronous method to get all **live** workers of the queue. **Live**
+  # workers are registered in the `WORKERS` hash. Values of `WORKERS` hash are
+  # in `hostname|ip|pid|since` format.
   #
-  #     queue.workers (workers) ->
-  #       console.log "Total #{workers.length} workers is online."
-  #       for worker in workers
-  #         console.log worker.host, worker.ip, worker.pid
-  #
-  # `workers` is an asynchronous method. The only arg of the callback
-  # function is an array of online workers of the queue. Each worker object
-  # have:
+  # Arguments of the callback function follow node.js error handling convention:
+  # `err` and `res`. `res` is an array of live workers. Each worker object have:
   #
   #   + `host`, the host name of the worker machine.
   #   + `ip`, the first external IPv4 address of the worker machine.
   #   + `pid`, the process id of the working process.
+  #   + `since`, the born date of the worker.
+  #
+  # Below is an example of returned workers:
+  #
+  #     [{
+  #        host: 'baoshan',
+  #        ip: '192.168.2.7',
+  #        pid: 1628
+  #        since: Sat, 12 May 2012 07:28:21 GMT // Date Object
+  #      }, ...]
+  #
+  # **Usage:**
+  #
+  #     queue.workers (workers) -> YOUR CODE HERE
   workers: (callback) ->
     @redis.hvals @key('WORKERS'), (err, res) ->
       callback err if err
       callback null, res.map (entry) ->
-        segments = entry.split '|'
-        host: segments[0]
-        ip: segments[1]
-        pid: parseInt segments[2]
-        since: new Date parseInt segments[3]
+        entry = entry.split '|'
+        host: entry[0]
+        ip: entry[1]
+        pid: parseInt entry[2]
+        since: new Date parseInt entry[3]
 
   # ### Clear A Queue
   #
