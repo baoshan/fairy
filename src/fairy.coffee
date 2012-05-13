@@ -663,7 +663,7 @@ class Queue
   #
   #     [{ id: '8c0c3eab-8114-41d6-8808-2ae8615d38b4',
   #        params: [ 'param1', 'param2' ],
-  #        queued: Sat, 12 May 2012 07:41:33 GMT
+  #        queued: Sat, 12 May 2012 07:41:33 GMT // Date Object
   #      }, ...]
   #
   # Possible combos of arguments are:
