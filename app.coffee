@@ -14,50 +14,56 @@ app.use express.compiler
   #app.get '/queue', (req, res) -> res.render 'queue', { layout: false }
 
 app.get '/api/queues/statistics', (req, res) ->
-  console.log(1111111111111111)
-  fairy.statistics (err,stats) ->
-    console.log 'err:',err if err
-    console.log(222222222222222)
+  fairy.statistics (err, stats) ->
+    return res.send err.stack if err
     res.send stats
 
 app.post '/api/queues/:name/reschedule', (req, res) ->
   queue = fairy.queue req.params.name
-  queue.reschedule (stats) -> 
+  queue.reschedule (err, stats) -> 
+    return res.send err.stack if err
     res.send stats
 
 app.post '/api/queues/:name/clear', (req, res) ->
   queue = fairy.queue req.params.name
-  queue.clear (stats) -> 
+  queue.clear (err, stats) -> 
+    return res.send err.stack if err
     res.send stats
 
 app.get '/api/queues/:name/statistics', (req, res) ->
   queue = fairy.queue req.params.name
-  queue.statistics (stats) ->
+  queue.statistics (err, stats) ->
+    return res.send err.stack if err
     res.send stats
 
 app.get '/api/queues/:name/recently_finished_tasks', (req, res) ->
   queue = fairy.queue req.params.name
-  queue.recently_finished_tasks (tasks) ->
+  queue.recently_finished_tasks (err, tasks) ->
+    return res.send err.stack if err
     res.send tasks
 
 app.get '/api/queues/:name/failed_tasks', (req, res) ->
   queue = fairy.queue req.params.name
-  queue.failed_tasks (tasks) ->
+  queue.failed_tasks (err, tasks) ->
+    return res.send err.stack if err
     res.send tasks
 
 app.get '/api/queues/:name/slowest_tasks', (req, res) ->
   queue = fairy.queue req.params.name
-  queue.slowest_tasks (tasks) ->
+  queue.slowest_tasks (err, tasks) ->
+    return res.send err.stack if err
     res.send tasks
 
 app.get '/api/queues/:name/processing_tasks', (req, res) ->
   queue = fairy.queue req.params.name
-  queue.processing_tasks (tasks) ->
+  queue.processing_tasks (err, tasks) ->
+    return res.send err.stack if err
     res.send tasks
 
 app.get '/api/queues/:name/workers', (req, res) ->
   queue = fairy.queue req.params.name
-  queue.workers (workers) ->
+  queue.workers (err,workers) ->
+    return res.send err.stack if err
     res.send workers
 
 app.listen 3004
