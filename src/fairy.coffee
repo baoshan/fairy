@@ -815,35 +815,37 @@ class Queue
   
   # Statistics of a queue include:
   # 
-  #   + `name`, name of the queue
+  #   + `name`, name of the queue.
+  #   + `workers`, total live workers.
+  #   + `processing_tasks`, total processing tasks.
   #   + `total`
-  #     - `tasks`, total tasks placed
-  #     - `groups`, total groups placed
-  #   + `finished_tasks`, total tasks finished
+  #     - `groups`, total groups of tasks.
+  #     - `tasks`, total tasks placed.
+  #   + `finished_tasks`, total tasks finished.
   #   + `average_pending_time`, average time spent on waiting for processing the
-  #   finished tasks in milliseconds
+  #   finished tasks in milliseconds.
   #   + `average_processing_time`, average time spent on processing the finished
-  #   tasks in milliseconds
-  #   + `failed_tasks`, total tasks failed
+  #   tasks in milliseconds.
+  #   + `failed_tasks`, total tasks failed.
   #   + `blocked`
-  #     - `groups`, total blocked groups
-  #     - `tasks`, total blocked tasks
-  #   + `pending_tasks`, total pending tasks
+  #     - `groups`, total blocked groups.
+  #     - `tasks`, total blocked tasks.
+  #   + `pending_tasks`, total pending tasks.
   #
   # `statistics` is an asynchronous method. Arguments of the callback function
-  # follow node.js async callback convention: `err` and `res`.
+  # follow node.js asynchronous callback convention: `err` and `res`.
   #
   # Below is an example of the `res` object:
   #
   #       { name: 'task',
+  #         workers: 1,
+  #         processing_tasks: 0,
   #         total: { groups: 10, tasks: '20000' },
   #         finished_tasks: '8373',
   #         average_pending_time: 313481,
   #         average_processing_time: 14,
-  #         blocked: { groups: 9, tasks: 11612 },
-  #         processing_tasks: 0,
   #         failed_tasks: 15,
-  #         workers: 1,
+  #         blocked: { groups: 9, tasks: 11612 },
   #         pending_tasks: 0 }
   #
   # **Usage:**
