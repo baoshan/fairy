@@ -71,8 +71,8 @@
   <table class="table table-bordered">
     <tr><td>Toalt</td><td><%= statistic.finished_tasks %></td></tr>
     <tr><td>Avg. Waiting In</td><td><%= statistic.average_pending_time %></td></tr>
-    <tr><td>Avg. Processing In</td><td><%= statistic.average_process_time %></td></tr>
-    <tr><td>Avg. Finished In</td><td><%= Number(statistic.average_pending_time) + Number(statistic.average_process_time) %></td></tr>
+    <tr><td>Avg. Processing In</td><td><%= statistic.average_processing_time %></td></tr>
+    <tr><td>Avg. Finished In</td><td><%= Number(statistic.average_pending_time) + Number(statistic.average_processing_time) %></td></tr>
   </table>
 </script>
 
@@ -208,6 +208,5 @@
 </script>
 
 <script src="fairy_active.js" type="text/javascript"></script>
-<script src="fairy.js" type="text/javascript"></script>
 </body>
 </html>
