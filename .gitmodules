@@ -1,0 +1,6 @@
+[submodule "node_modules/node-uuid"]
+	path = node_modules/node-uuid
+	url = git://github.com/broofa/node-uuid.git
+[submodule "node_modules/redis"]
+	path = node_modules/redis
+	url = git://github.com/mranney/node_redis.git
