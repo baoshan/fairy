@@ -824,7 +824,7 @@ class Queue
   #   + `finished_tasks`, total tasks finished.
   #   + `average_pending_time`, average time spent on waiting for processing the
   #   finished tasks in milliseconds.
-  #   + `average_processing_time`, average time spent on processing the finished
+  #   + `average_process_time`, average time spent on processing the finished
   #   tasks in milliseconds.
   #   + `failed_tasks`, total tasks failed.
   #   + `blocked`
@@ -843,7 +843,7 @@ class Queue
   #         total: { groups: 10, tasks: 20000 },
   #         finished_tasks: 8373,
   #         average_pending_time: 313481,
-  #         average_processing_time: 14,
+  #         average_process_time: 14,
   #         failed_tasks: 15,
   #         blocked: { groups: 9, tasks: 11612 },
   #         pending_tasks: 0 }
