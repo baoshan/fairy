@@ -908,7 +908,7 @@ class Queue
       #   1. Set `blocked.groups` of result.
       #   2. Initiate another transaction to count all `BLOCKED` tasks. Blocked
       #   tasks are tasks in the `QUEUED` list whose group identifiers are in
-      #   the `BLOCKED` set. **Note:** The first element of each `QUEUED` list
+      #   the `BLOCKED` set. **Note:** The leftmost task of each `QUEUED` list
       #   will not be counted, since that's the causing (failed) task.
       #   3. Calculate pending tasks.
       #
