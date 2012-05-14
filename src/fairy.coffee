@@ -472,7 +472,7 @@ class Queue
         process_time = finish_time - start_time
         multi.hincrby @key('STATISTICS'), 'finished', 1
         multi.hincrby @key('STATISTICS'), 'total_pending_time', start_time - task[task.length - 1]
-        multi.hincrby @key('STATISTICS'), 'total_processing_time', process_time
+        multi.hincrby @key('STATISTICS'), 'total_process_time', process_time
         multi.lpush @key('RECENT'), JSON.stringify([task..., finish_time])
         multi.ltrim @key('RECENT'), 0, @recent_size - 1
         multi.zadd @key('SLOWEST'), process_time, JSON.stringify([task..., start_time])
@@ -805,7 +805,7 @@ class Queue
       return callback err if err
       multi = @redis.multi()
       multi.del @key('GROUPS'), @key('RECENT'), @key('FAILED'), @key('SOURCE'), @key('STATISTICS'), @key('SLOWEST'), @key('BLOCKED'), res...
-      multi.hmset @key('STATISTICS'), 'total', 0, 'finished', 0, 'total_pending_time', 0, 'total_processing_time', 0
+      multi.hmset @key('STATISTICS'), 'total', 0, 'finished', 0, 'total_pending_time', 0, 'total_process_time', 0
       multi.exec (err, res) =>
         return callback err if err
         return @clear callback unless res
@@ -824,7 +824,7 @@ class Queue
   #   + `finished_tasks`, total tasks finished.
   #   + `average_pending_time`, average time spent on waiting for processing the
   #   finished tasks in milliseconds.
-  #   + `average_processing_time`, average time spent on processing the finished
+  #   + `average_process_time`, average time spent on processing the finished
   #   tasks in milliseconds.
   #   + `failed_tasks`, total tasks failed.
   #   + `blocked`
@@ -843,13 +843,13 @@ class Queue
   #         total: { groups: 10, tasks: 20000 },
   #         finished_tasks: 8373,
   #         average_pending_time: 313481,
-  #         average_processing_time: 14,
+  #         average_process_time: 14,
   #         failed_tasks: 15,
   #         blocked: { groups: 9, tasks: 11612 },
   #         pending_tasks: 0 }
   #
   # If there're no finished tasks, `average_pending_time` and
-  # `average_processing_time` will both be string `-`.
+  # `average_process_time` will both be string `-`.
   #
   # **Usage:**
   #
@@ -863,7 +863,7 @@ class Queue
     #     + `total`
     #     + `finished`
     #     + `total_pending_time`
-    #     + `total_processing_time`
+    #     + `total_process_time`
     #   3. Count processing tasks -- `LLEN` of `PROCESSING` list.
     #   4. Count failed task -- `LLEN` of `FAILED` list.
     #   5. Get identifiers of blocked group -- `SMEMBERS` of `BLOCKED` set.
@@ -880,12 +880,11 @@ class Queue
 
       # Process the result of the transaction.
       #
-      # 1. Process `STATISTICS` hash:
-      #   + Convert:
-      #     - `total_pending_time` and `total_processing_time` into:
-      #     - `average_pending_time` and `average_processing_time`
-      #   + Calibrate initial condition (in case of no task is finished).
-      # 2. Set `failed` key of returned object.
+      # 1. Assign transaction results to result object, and:
+      # 2. Convert:
+      #   - `total_pending_time` into `average_pending_time`, and:
+      #   - `total_process_time` into `average_process_time`
+      # 3. Calibrate initial condition (in case of no task is finished).
       statistics = multi_res[1] or {}
       result =
         name: @name
@@ -894,28 +893,27 @@ class Queue
           tasks: parseInt(statistics.total) or 0
         finished_tasks: parseInt(statistics.finished) or 0
         average_pending_time: Math.round(statistics.total_pending_time * 100 / statistics.finished) / 100
-        average_processing_time: Math.round(statistics.total_processing_time * 100 / statistics.finished) / 100
-        blocked: {}
+        average_process_time: Math.round(statistics.total_process_time * 100 / statistics.finished) / 100
+        blocked:
+          groups: multi_res[4].length
         processing_tasks: multi_res[2]
         failed_tasks: multi_res[3]
         workers: multi_res[5]
       if result.finished_tasks is 0
         result.average_pending_time = '-'
-        result.average_processing_time = '-'
+        result.average_process_time = '-'
 
       # Calculate blocked and pending tasks:
       # 
-      #   1. Set `blocked.groups` of result.
-      #   2. Initiate another transaction to count all `BLOCKED` tasks. Blocked
-      #   tasks are tasks in the `QUEUED` list whose group identifiers are in
+      #   1. Initiate another transaction to count all `BLOCKED` tasks. Blocked
+      #   tasks are tasks in the `QUEUED` lists whose group identifiers are in
       #   the `BLOCKED` set. **Note:** The leftmost task of each `QUEUED` list
       #   will not be counted, since that's the causing (failed) task.
-      #   3. Calculate pending tasks.
+      #   2. Calculate pending tasks.
       #
       # The equation used to calculate pending tasks is:
       #
       #      pending = total - finished - processing - failed - blocked
-      result.blocked.groups = multi_res[4].length
       multi2 = @redis.multi()
       multi2.llen "#{@key('QUEUED')}:#{group}" for group in multi_res[4]
       multi2.exec (multi2_err, multi2_res) ->
