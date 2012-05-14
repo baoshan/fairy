@@ -98,7 +98,7 @@ thead tr{ background:#F5F5F5; color:#666}
 .overview tr td:nth-child(10),.overview tr td:nth-child(11){ text-align:center !important;}
 
 .overview #active{ background:#F5F5F5;}
-.overview #active td:nth-child(1){ background-image:url("data:image/png;base64,/iVBORw0KGgoAAAANSUhEUgAAAAYAAAACCAYAAAB7Xa1eAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAASSURBVBhXYwg7/PY/NsyASwIAfV0kPQJmW2IAAAAASUVORK5CYII=") !important; background-repeat:repeat-y !important;}
+.overview #active td:nth-child(1){ background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAYAAAACCAYAAAB7Xa1eAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAASSURBVBhXYwg7/PY/NsyASwIAfV0kPQJmW2IAAAAASUVORK5CYII=") !important; background-repeat:repeat-y !important;}
 .overview #active td:nth-child(7){ background:#fdc1c1 !important;}
 .overview #active td:nth-child(8){ background:#fdc1c1 !important;}
 
