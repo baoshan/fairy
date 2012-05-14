@@ -1,9 +1,0 @@
-body{ width:1024px; margin:50px auto auto auto; overflow-y:scroll;}
-.overview tbody tr td:nth-child(5){ color:red; font-weight:bold;}
-thead tr{ background:#F5F5F5;}
-/*项目统计*/
-.project_statistics{
-  font-size:16px;
-  line-height:3;
-  font-weight:400;
-}
