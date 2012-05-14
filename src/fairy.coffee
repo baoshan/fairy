@@ -203,7 +203,8 @@ class Fairy
   #     fairy.statistics (stats) ->
   #       console.log "Stats of #{stats.length} queues: ", stats
   statistics: (callback) =>
-    @queues (queues) ->
+    @queues (err, queues) ->
+      return callback err if err
       return callback [] unless total_queues = queues.length
       result = []
       for queue, i in queues
@@ -510,10 +511,7 @@ class Queue
   # ### Re-Schedule Failed and Blocked Tasks
 
   # Requeue the failed and blocked tasks into `SOURCE` list. Useful for failure
-  # recovery. **Usage:**
-  #
-  #     queue.reschedule () ->
-  #       console.log 'reschedule successed'
+  # recovery. `reschedule` will:
   #
   #   1. Requeue tasks in the `FAILED` list into `SOURCE` list, and,
   #   2. Pop all blocked tasks (`QUEUED` lists listed in the `BLOCKED` set,
@@ -521,7 +519,14 @@ class Queue
   #   who blocked the queue which is already requeued in step 1) into `SOURCE`
   #   list.
   #
-  # Above commands should be protected by a transaction.
+  # Above commands should be protected by a transaction. `reschedule` is an
+  # asynchronous method. Arguments of the callback function follow node.js error
+  # handling convention: `err` and `res`. On success, the `res` object will be
+  # the same as the `res` object of `statistics` method.
+  #
+  # **Usage:**
+  #
+  #     queue.reschedule (err, statistics) -> # YOUR CODE
   reschedule: (callback) =>
    
     # Make sure `FAILED` list and `BLOCKED` set are not touched during the
@@ -692,7 +697,7 @@ class Queue
         started: entry.pop()
         queued: entry.pop()
 
-  # ### Get Currently Processing Tasks Asynchronously
+  # ### Get Processing Tasks Asynchronously
   
   # Currently processing tasks are tasks in the `PROCESSING` list.
   #
