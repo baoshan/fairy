@@ -1,3 +1,4 @@
 *.swp
 *.dmp
-lib
+lib/server.js
+lib/fairy.js

@@ -2,7 +2,7 @@ connect = require 'connect'
 
 exports = module.exports = (options) ->
   fairy = require('../fairy.coffee').connect options
-  connect.static(__dirname + '/static',{ maxAge: 86400000 })
+  connect.static(__dirname + '/server',{ maxAge: 86400000 })
   (req, res, next) ->
     switch req.url
       when '/api/queues/statistics' 
@@ -31,6 +31,10 @@ exports = module.exports = (options) ->
       when '/api/queues/:name/slowest_tasks'
         queue = fairy.queue req.params.name
         queue.slowest_tasks (tasks) ->
+          res.send tasks
+      when '/api/queues/:name/processing_tasks'
+        queue = fairy.queue req.params.name
+        queue.processing_tasks (tasks) ->
           res.send tasks
       when '/api/queues/:name/workers'
         queue = fairy.queue req.params.name

@@ -109,6 +109,12 @@ data_bind_detail = (name)->
   })
   $.ajax({
     type: 'GET'
+    url: '/api/queues/' + name + '/processing_tasks'
+    success: (task)->
+      $('#processing_tasks').html _.template($('#tb_processing_tasks_template').html(), { processing_tasks: task })
+  })
+  $.ajax({
+    type: 'GET'
     url: '/api/queues/' + name + '/workers'
     success: (workers)->
       $('#workers').html _.template($('#tb_workers_template').html(), { workers: workers })

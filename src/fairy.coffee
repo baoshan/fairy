@@ -815,26 +815,45 @@ class Queue
   
   # Statistics of a queue include:
   # 
+  #   + `name`, name of the queue.
+  #   + `workers`, total live workers.
+  #   + `processing_tasks`, total processing tasks.
   #   + `total`
-  #     - `tasks`, total tasks placed
-  #     - `groups`, total groups placed
-  #   + `finished_tasks`, total tasks finished
+  #     - `groups`, total groups of tasks.
+  #     - `tasks`, total tasks placed.
+  #   + `finished_tasks`, total tasks finished.
   #   + `average_pending_time`, average time spent on waiting for processing the
-  #   finished tasks in milliseconds
+  #   finished tasks in milliseconds.
   #   + `average_processing_time`, average time spent on processing the finished
-  #   tasks in milliseconds
-  #   + `failed_tasks`, total tasks failed
+  #   tasks in milliseconds.
+  #   + `failed_tasks`, total tasks failed.
   #   + `blocked`
-  #     - `groups`, total blocked groups
-  #     - `tasks`, total blocked tasks
-  #   + `pending_tasks`, total pending tasks
+  #     - `groups`, total blocked groups.
+  #     - `tasks`, total blocked tasks.
+  #   + `pending_tasks`, total pending tasks.
   #
-  # `statistics` is an asynchronous method. The only arg of the callback
-  # function is the statistics of the queue.
+  # `statistics` is an asynchronous method. Arguments of the callback function
+  # follow node.js asynchronous callback convention: `err` and `res`.
+  #
+  # Below is an example of the `res` object:
+  #
+  #       { name: 'task',
+  #         workers: 1,
+  #         processing_tasks: 0,
+  #         total: { groups: 10, tasks: 20000 },
+  #         finished_tasks: 8373,
+  #         average_pending_time: 313481,
+  #         average_processing_time: 14,
+  #         failed_tasks: 15,
+  #         blocked: { groups: 9, tasks: 11612 },
+  #         pending_tasks: 0 }
+  #
+  # If there're no finished tasks, `average_pending_time` and
+  # `average_processing_time` will both be string `-`.
   #
   # **Usage:**
   #
-  #       queue.statistics (err, statistics) -> YOUR CODE
+  #       queue.statistics (err, statistics) -> # YOUR CODE
   statistics: (callback) ->
 
     # Start a transaction, in the transaction:
@@ -857,7 +876,6 @@ class Queue
     multi.smembers @key('BLOCKED')
     multi.hlen @key('WORKERS')
     multi.exec (multi_err, multi_res) =>
-
       return callback multi_err if multi_err
 
       # Process the result of the transaction.
@@ -873,8 +891,8 @@ class Queue
         name: @name
         total:
           groups: multi_res[0]
-          tasks: statistics.total or 0
-        finished_tasks: statistics.finished or 0
+          tasks: parseInt(statistics.total) or 0
+        finished_tasks: parseInt(statistics.finished) or 0
         average_pending_time: Math.round(statistics.total_pending_time * 100 / statistics.finished) / 100
         average_processing_time: Math.round(statistics.total_processing_time * 100 / statistics.finished) / 100
         blocked: {}
@@ -888,15 +906,15 @@ class Queue
       # Calculate blocked and pending tasks:
       # 
       #   1. Set `blocked.groups` of result.
-      #   2. Initiate another transaction to count all `BLOCKED` tasks. Blocked tasks
-      #   are tasks in the `QUEUED` list whose group identifier is in the
-      #   `BLOCKED` set. **Note:** The first element of each `QUEUED` list will not be
-      #   counted, since that's the blocking (failed) task.
+      #   2. Initiate another transaction to count all `BLOCKED` tasks. Blocked
+      #   tasks are tasks in the `QUEUED` list whose group identifiers are in
+      #   the `BLOCKED` set. **Note:** The leftmost task of each `QUEUED` list
+      #   will not be counted, since that's the causing (failed) task.
       #   3. Calculate pending tasks.
       #
       # The equation used to calculate pending tasks is:
       #
-      #     pending = total - finished - processing - failed - blocked
+      #      pending = total - finished - processing - failed - blocked
       result.blocked.groups = multi_res[4].length
       multi2 = @redis.multi()
       multi2.llen "#{@key('QUEUED')}:#{group}" for group in multi_res[4]
