@@ -4,6 +4,7 @@ option '-w', '--watch', 'continually build the fairy library'
 
 task 'build', 'Build the fairy source code', (options) ->
   exec([
+    'mkdir -p lib/server'
     'cp src/server/fairy.html lib/server/fairy.html'
     'cp src/server/fairy.css  lib/server/fairy.css'
     'cp src/server/fairy_active.js lib/server/fairy_active.js'
