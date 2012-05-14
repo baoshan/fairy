@@ -815,6 +815,7 @@ class Queue
   
   # Statistics of a queue include:
   # 
+  #   + `name`, name of the queue
   #   + `total`
   #     - `tasks`, total tasks placed
   #     - `groups`, total groups placed
@@ -829,12 +830,25 @@ class Queue
   #     - `tasks`, total blocked tasks
   #   + `pending_tasks`, total pending tasks
   #
-  # `statistics` is an asynchronous method. The only arg of the callback
-  # function is the statistics of the queue.
+  # `statistics` is an asynchronous method. Arguments of the callback function
+  # follow node.js async callback convention: `err` and `res`.
+  #
+  # Below is an example of the `res` object:
+  #
+  #       { name: 'task',
+  #         total: { groups: 10, tasks: '20000' },
+  #         finished_tasks: '8373',
+  #         average_pending_time: 313481,
+  #         average_processing_time: 14,
+  #         blocked: { groups: 9, tasks: 11612 },
+  #         processing_tasks: 0,
+  #         failed_tasks: 15,
+  #         workers: 1,
+  #         pending_tasks: 0 }
   #
   # **Usage:**
   #
-  #       queue.statistics (err, statistics) -> YOUR CODE
+  #       queue.statistics (err, statistics) -> # YOUR CODE
   statistics: (callback) ->
 
     # Start a transaction, in the transaction:
@@ -857,7 +871,6 @@ class Queue
     multi.smembers @key('BLOCKED')
     multi.hlen @key('WORKERS')
     multi.exec (multi_err, multi_res) =>
-
       return callback multi_err if multi_err
 
       # Process the result of the transaction.
