@@ -389,7 +389,6 @@ class Queue
   #   + **failed**, then inspect the passed in argument, retry or block
   #   according to the `do` property of the error object.
   #
-  #
   # Calling the callback function is the responsibility of you. Otherwise
   # `Fairy` will stop dispatching tasks.
   _process: (task) =>
@@ -594,7 +593,7 @@ class Queue
   #
   # **Usage:**
   #
-  #     queue.recently_finished_tasks (tasks) -> YOUR CODE
+  #     queue.recently_finished_tasks (err, tasks) -> YOUR CODE
   recently_finished_tasks: (callback) =>
     @redis.lrange @key('RECENT'), 0, -1, (err, res) ->
       return callback err if err
@@ -623,8 +622,7 @@ class Queue
   #
   # **Usage:**
   #
-  #     queue.failed_tasks (tasks) -> YOUR OWN CODE
-  #
+  #     queue.failed_tasks (err, tasks) -> YOUR CODE
   failed_tasks: (callback) =>
     @redis.lrange @key('FAILED'), 0, -1, (err, res) ->
       return callback err if err
@@ -649,7 +647,7 @@ class Queue
   #
   # **Usage:**
   #
-  #     queue.blocked_groups (groups) -> YOUR OWN CODE
+  #     queue.blocked_groups (err, groups) -> YOUR CODE
   #
   blocked_groups: (callback) ->
     @redis.smembers @key('BLOCKED'), (err, res) ->
@@ -677,7 +675,7 @@ class Queue
   #
   # **Usage:**
   #
-  #     queue.slowest_tasks (tasks) -> YOUR CODE HERE
+  #     queue.slowest_tasks (err, task) -> YOUR CODE
   #
   # `slowest_tasks` is an asynchronous method. The only arg of the callback
   # function is an array of slowest tasks in the reverse order by processing
@@ -711,7 +709,7 @@ class Queue
   #
   # **Usage:**
   #
-  #     queue.processing_tasks (tasks) -> YOUR CODE HERE
+  #     queue.processing_tasks (err, tasks) -> YOUR CODE
   processing_tasks: (callback) ->
     @redis.hvals @key('PROCESSING'), (err, res) ->
       return callback err if err
@@ -750,7 +748,7 @@ class Queue
   #
   # **Usage:**
   #
-  #     queue.source_tasks 20, 5, (err, tasks) -> YOUR CODE HERE
+  #     queue.source_tasks 20, 5, (err, tasks) -> YOUR CODE
   source_tasks: (args..., callback) ->
     skip = args[0] or 0
     take = args[1] or 10
@@ -787,7 +785,7 @@ class Queue
   #
   # **Usage:**
   #
-  #     queue.workers (workers) -> YOUR CODE HERE
+  #     queue.workers (err, workers) -> YOUR CODE
   workers: (callback) =>
     @redis.hvals @key('WORKERS'), (err, res) ->
       return callback err if err
@@ -831,13 +829,12 @@ class Queue
   #     - `tasks`, total blocked tasks
   #   + `pending_tasks`, total pending tasks
   #
-  # **Usage:**
-  #
-  #       queue.statistics (statistics) ->
-  #         console.log "Statistics of #{queue.name}:", statistics
-  #
   # `statistics` is an asynchronous method. The only arg of the callback
   # function is the statistics of the queue.
+  #
+  # **Usage:**
+  #
+  #       queue.statistics (err, statistics) -> YOUR CODE
   statistics: (callback) ->
 
     # Start a transaction, in the transaction:
