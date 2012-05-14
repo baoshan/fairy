@@ -840,13 +840,16 @@ class Queue
   #       { name: 'task',
   #         workers: 1,
   #         processing_tasks: 0,
-  #         total: { groups: 10, tasks: '20000' },
-  #         finished_tasks: '8373',
+  #         total: { groups: 10, tasks: 20000 },
+  #         finished_tasks: 8373,
   #         average_pending_time: 313481,
   #         average_processing_time: 14,
   #         failed_tasks: 15,
   #         blocked: { groups: 9, tasks: 11612 },
   #         pending_tasks: 0 }
+  #
+  # If there're no finished tasks, `average_pending_time` and
+  # `average_processing_time` will both be string `-`.
   #
   # **Usage:**
   #
@@ -888,8 +891,8 @@ class Queue
         name: @name
         total:
           groups: multi_res[0]
-          tasks: statistics.total or 0
-        finished_tasks: statistics.finished or 0
+          tasks: parseInt(statistics.total) or 0
+        finished_tasks: parseInt(statistics.finished) or 0
         average_pending_time: Math.round(statistics.total_pending_time * 100 / statistics.finished) / 100
         average_processing_time: Math.round(statistics.total_processing_time * 100 / statistics.finished) / 100
         blocked: {}
