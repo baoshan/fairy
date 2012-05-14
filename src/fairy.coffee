@@ -849,7 +849,7 @@ class Queue
   #         pending_tasks: 0 }
   #
   # If there're no finished tasks, `average_pending_time` and
-  # `average_processing_time` will both be string `-`.
+  # `average_process_time` will both be string `-`.
   #
   # **Usage:**
   #
@@ -880,12 +880,11 @@ class Queue
 
       # Process the result of the transaction.
       #
-      # 1. Process `STATISTICS` hash:
-      #   + Convert:
-      #     - `total_pending_time` into `average_pending_time`, and:
-      #     - `total_process_time` into `average_process_time`
-      #   + Calibrate initial condition (in case of no task is finished).
-      # 2. Set `failed` key of returned object.
+      # + Assign multi results to result object, and:
+      # + Convert:
+      #   - `total_pending_time` into `average_pending_time`, and:
+      #   - `total_process_time` into `average_process_time`
+      # + Calibrate initial condition (in case of no task is finished).
       statistics = multi_res[1] or {}
       result =
         name: @name
@@ -895,7 +894,8 @@ class Queue
         finished_tasks: parseInt(statistics.finished) or 0
         average_pending_time: Math.round(statistics.total_pending_time * 100 / statistics.finished) / 100
         average_process_time: Math.round(statistics.total_process_time * 100 / statistics.finished) / 100
-        blocked: {}
+        blocked:
+          groups: multi_res[4].length
         processing_tasks: multi_res[2]
         failed_tasks: multi_res[3]
         workers: multi_res[5]
@@ -905,17 +905,15 @@ class Queue
 
       # Calculate blocked and pending tasks:
       # 
-      #   1. Set `blocked.groups` of result.
-      #   2. Initiate another transaction to count all `BLOCKED` tasks. Blocked
+      #   1. Initiate another transaction to count all `BLOCKED` tasks. Blocked
       #   tasks are tasks in the `QUEUED` lists whose group identifiers are in
       #   the `BLOCKED` set. **Note:** The leftmost task of each `QUEUED` list
       #   will not be counted, since that's the causing (failed) task.
-      #   3. Calculate pending tasks.
+      #   2. Calculate pending tasks.
       #
       # The equation used to calculate pending tasks is:
       #
       #      pending = total - finished - processing - failed - blocked
-      result.blocked.groups = multi_res[4].length
       multi2 = @redis.multi()
       multi2.llen "#{@key('QUEUED')}:#{group}" for group in multi_res[4]
       multi2.exec (multi2_err, multi2_res) ->
