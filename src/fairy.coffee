@@ -880,11 +880,11 @@ class Queue
 
       # Process the result of the transaction.
       #
-      # + Assign transaction results to result object, and:
-      # + Convert:
+      # 1. Assign transaction results to result object, and:
+      # 2. Convert:
       #   - `total_pending_time` into `average_pending_time`, and:
       #   - `total_process_time` into `average_process_time`
-      # + Calibrate initial condition (in case of no task is finished).
+      # 3. Calibrate initial condition (in case of no task is finished).
       statistics = multi_res[1] or {}
       result =
         name: @name
