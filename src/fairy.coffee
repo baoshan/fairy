@@ -203,7 +203,8 @@ class Fairy
   #     fairy.statistics (stats) ->
   #       console.log "Stats of #{stats.length} queues: ", stats
   statistics: (callback) =>
-    @queues (queues) ->
+    @queues (err, queues) ->
+      return callback err if err
       return callback [] unless total_queues = queues.length
       result = []
       for queue, i in queues
@@ -692,7 +693,7 @@ class Queue
         started: entry.pop()
         queued: entry.pop()
 
-  # ### Get Currently Processing Tasks Asynchronously
+  # ### Get Processing Tasks Asynchronously
   
   # Currently processing tasks are tasks in the `PROCESSING` list.
   #
