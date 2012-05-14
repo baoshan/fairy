@@ -880,7 +880,7 @@ class Queue
 
       # Process the result of the transaction.
       #
-      # + Assign multi results to result object, and:
+      # + Assign transaction results to result object, and:
       # + Convert:
       #   - `total_pending_time` into `average_pending_time`, and:
       #   - `total_process_time` into `average_process_time`
