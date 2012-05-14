@@ -189,9 +189,10 @@ class Fairy
   #     queues = fairy.queues()
   #     console.log "#{queues.length} queues: ", queues.map (queue) ->
   #       queue.name
-  queues: (callback) ->
+  queues: (callback) =>
     @redis.smembers @key('QUEUES'), (err, res) =>
-      callback res.map (name) => @queue name
+      return callback err if err
+      callback null, res.map (name) => @queue name
 
   # ### Get Statistics for All Queues Asynchronously
   
@@ -201,16 +202,16 @@ class Fairy
   #
   #     fairy.statistics (stats) ->
   #       console.log "Stats of #{stats.length} queues: ", stats
-  statistics: (callback) ->
-    return unless typeof callback is 'function'
+  statistics: (callback) =>
     @queues (queues) ->
       return callback [] unless total_queues = queues.length
       result = []
       for queue, i in queues
         do (queue, i) ->
-          queue.statistics (statistics) ->
+          queue.statistics (err, statistics) ->
+            return callback err if err
             result[i] = statistics
-            callback result if callback unless --total_queues
+            callback null, result if callback unless --total_queues
 
 # ## Class Queue
 
@@ -475,7 +476,7 @@ class Queue
         multi.hincrby @key('STATISTICS'), 'total_processing_time', process_time
         multi.lpush @key('RECENT'), JSON.stringify([task..., finish_time])
         multi.ltrim @key('RECENT'), 0, @recent_size - 1
-        multi.zadd @key('SLOWEST'), process_time, JSON.stringify(task)
+        multi.zadd @key('SLOWEST'), process_time, JSON.stringify([task..., start_time])
         multi.zremrangebyrank @key('SLOWEST'), 0, - @slowest_size - 1
         multi.exec()
 
@@ -532,10 +533,10 @@ class Queue
     # Push all failed tasks (without last two parameters: error message and
     # failure time) into a temporary task array storing tasks to be rescheduled.
     # Then, get all blocked groups.
-    @failed_tasks (tasks) =>
+    @failed_tasks (err, tasks) =>
       requeued_tasks = []
       requeued_tasks.push tasks.map((task) -> JSON.stringify task[...-2])...
-      @blocked_groups (groups) =>
+      @blocked_groups (err, groups) =>
 
         # Make sure all blocked `QUEUED` list are not touched when you
         # reschedule tasks in them. Then, start the transaction as:
@@ -556,6 +557,7 @@ class Queue
           multi.del @key 'BLOCKED'
           multi.del @key 'PROCESSING'
           multi.exec (multi_err, multi_res) =>
+            return callback multi_err if multi_err
             if multi_res then @statistics callback if callback
             else @reschedule callback
 
@@ -574,77 +576,151 @@ class Queue
         else start_transaction()
 
   # ### Get Recently Finished Tasks Asynchronously
-  #
-  # Recently finished tasks (up to a limited size) will be stored in the
-  # `RECENT` list in the reverse order of finished time. **Usage:**
-  #
-  #     queue.recently_finished_tasks (tasks) ->
-  #       console.log "Recently finished tasks are: ", tasks
 
-  # `recently_finished_tasks` is an asynchronous method. The only arg of the
-  # callback function will be an array of finished tasks in the reverse order of
-  # finished time.
-  recently_finished_tasks: (callback) ->
+  # Recently finished tasks are tasks stored in the `RECENT` list (in the
+  # reverse order of finished time), which will be limited to a maximum size
+  # default to 10.
+  #
+  # `recently_finished_tasks` is an asynchronous method. Arguments of the
+  # callback function follow node.js error handling convention: `err` and `res`.
+  #
+  # Below is an example `res` array:
+  #
+  #     [{ id:       '8c0c3eab-8114-41d6-8808-2ae8615d38b4',
+  #        params:   [ 'param1', 'param2' ],
+  #        queued:   Sat, 12 May 2012 07:41:33 GMT // Date Object
+  #        finished: Sat, 12 May 2012 07:41:59 GMT // Date Object
+  #      }, ...]
+  #
+  # **Usage:**
+  #
+  #     queue.recently_finished_tasks (tasks) -> YOUR CODE
+  recently_finished_tasks: (callback) =>
     @redis.lrange @key('RECENT'), 0, -1, (err, res) ->
-      callback res.map (entry) -> JSON.parse entry
+      return callback err if err
+      callback null, res.map (entry) ->
+        entry = JSON.parse entry
+        id: entry[0]
+        params: entry[1..-3]
+        finished: new Date entry.pop()
+        queued: new Date entry.pop()
 
   # ### Get Failed Tasks Asynchronously
+  
+  # Failed tasks are stored in the `FAILED` list.
   #
-  # Failed tasks are stored in the `FAILED` list. **Usage:**
+  # `failed_tasks` is an asynchronous method. Arguments of the callback function
+  # follow node.js convention: `err` and `res`.
+  # 
+  # Below is an example `res` array:
   #
-  #     queue.failed_tasks (tasks) ->
-  #       console.log "#{tasks.length} tasks failed: ", tasks
-
-  # `failed_tasks` is an asynchronous method. The only arg of the callback
-  # function is an array of failed tasks in the order of failure time.  
-  failed_tasks: (callback) ->
+  #     [{ id:     '8c0c3eab-8114-41d6-8808-2ae8615d38b4',
+  #        params: [ 'param1', 'param2' ],
+  #        queued: Sat, 12 May 2012 07:41:33 GMT // Date Object
+  #        failed: Sat, 12 May 2012 07:41:59 GMT // Date Object
+  #        reason: [ 'failure reason 1', 'failure reason 2', ...]
+  #      }, ...]
+  #
+  # **Usage:**
+  #
+  #     queue.failed_tasks (tasks) -> YOUR OWN CODE
+  #
+  failed_tasks: (callback) =>
     @redis.lrange @key('FAILED'), 0, -1, (err, res) ->
-      callback res.map (entry) -> JSON.parse entry
+      return callback err if err
+      callback null, res.map (entry) ->
+        entry = JSON.parse entry
+        id: entry[0]
+        params: entry[1..-4]
+        reason: entry.pop()
+        failed: entry.pop()
+        queued: entry.pop()
 
   # ### Get Blocked Groups Asynchronously
+  
+  # Blocked groups' identifiers are stored in the `BLOCKED` set.
   #
-  # Blocked groups' identifiers are stored in the `BLOCKED` set. **Usage:**
+  # `blocked_groups` is an asynchronous method. Arguments of the callback
+  # function follow node.js async callback pattern: `err` and `res`.
   #
-  #     queue.blocked_groups (groups) ->
-  #       console.log "#{groups.length} groups blocked: ", groups
-
-  # `blocked_groups` is an asynchronous method. The only arg of the callback
-  # function is an array of identifiers of blocked group. 
+  # Below is an example `res` array:
+  #
+  #     [ 'group1', 'group2', ...]
+  #
+  # **Usage:**
+  #
+  #     queue.blocked_groups (groups) -> YOUR OWN CODE
+  #
   blocked_groups: (callback) ->
     @redis.smembers @key('BLOCKED'), (err, res) ->
-      callback res.map (entry) -> JSON.parse entry
+      return callback err if err
+      callback null, res.map (entry) ->
+        entry = JSON.parse entry
+
 
   # ### Get Slowest Tasks Asynchronously
-  #
-  # Slowest tasks are tasks stored in the `SLOWEST` ordered set, which will be
-  # limited to a maximum size default to 10. **Usage:**
-  #
-  #     queue.slowest_tasks (tasks) ->
-  #       console.log "Slowest tasks are: ", tasks
 
+  # Slowest tasks are tasks stored in the `SLOWEST` ordered set, which will be
+  # limited to a maximum size default to 10.
+  #
+  # `slowest_tasks` is an asynchronous method. Arguments of the callback
+  # function follow node.js error handling convention: `err` and `res`.
+  #
+  # Below is an example `res` array:
+  #
+  #     [{ id:      '8c0c3eab-8114-41d6-8808-2ae8615d38b4',
+  #        params:  [ 'param1', 'param2' ],
+  #        queued:  Sat, 12 May 2012 07:41:33 GMT // Date Object
+  #        started: Sat, 12 May 2012 07:41:39 GMT // Date Object
+  #        time:    1876 // time taken in milliseconds
+  #      }, ...]
+  #
+  # **Usage:**
+  #
+  #     queue.slowest_tasks (tasks) -> YOUR CODE HERE
+  #
   # `slowest_tasks` is an asynchronous method. The only arg of the callback
   # function is an array of slowest tasks in the reverse order by processing
   # time. The actual processing time will be appended at the end of the task's
   # original arguments.
   slowest_tasks: (callback) ->
     @redis.zrevrange @key('SLOWEST'), 0, -1, "WITHSCORES", (err, res) ->
+      return callback err if err
       res = res.map (entry) -> JSON.parse entry
-      callback ([res[i]...,res[i + 1]] for i in [0...res.length] by 2)
+      callback null, ([res[i]...,res[i + 1]] for i in [0...res.length] by 2).map (entry) ->
+        id: entry[0]
+        params: entry[1..-3]
+        time: entry.pop()
+        started: entry.pop()
+        queued: entry.pop()
 
   # ### Get Currently Processing Tasks Asynchronously
+  
+  # Currently processing tasks are tasks in the `PROCESSING` list.
   #
-  # Currently processing tasks are tasks in the `RECENT` list, which will be
-  # limited to a maximum size defaults to 10. **Usage:**
+  # `processing_tasks` is an asynchronous method. Arguments of the callback
+  # function follow node.js error handling convention: `err` and `res`.
   #
-  #     queue.processing_tasks (tasks) ->
-  #       console.log "#{tasks.length} tasks being processing: ", tasks
-
-  # `processing_tasks` is an asynchronous method. The only arg of the callback
-  # function is an array of processing tasks of the queue.
+  # Below is an example `res` array:
+  #
+  #     [{ id:      '8c0c3eab-8114-41d6-8808-2ae8615d38b4',
+  #        params:  [ 'param1', 'param2' ],
+  #        queued:  Sat, 12 May 2012 07:41:33 GMT // Date Object
+  #        started: Sat, 12 May 2012 07:41:39 GMT // Date Object
+  #      }, ...]
+  #
+  # **Usage:**
+  #
+  #     queue.processing_tasks (tasks) -> YOUR CODE HERE
   processing_tasks: (callback) ->
     @redis.hvals @key('PROCESSING'), (err, res) ->
-      callback res.map (entry) ->
+      return callback err if err
+      callback null, res.map (entry) ->
         entry = JSON.parse(entry)
+        id: entry[0]
+        params: entry[1..-3]
+        start: new Date entry.pop()
+        queued: new Date entry.pop()
 
   # ### Get Source Tasks Asynchronously
 
@@ -661,7 +737,7 @@ class Queue
   #
   # Below is an example `res` array:
   #
-  #     [{ id: '8c0c3eab-8114-41d6-8808-2ae8615d38b4',
+  #     [{ id:     '8c0c3eab-8114-41d6-8808-2ae8615d38b4',
   #        params: [ 'param1', 'param2' ],
   #        queued: Sat, 12 May 2012 07:41:33 GMT // Date Object
   #      }, ...]
@@ -712,9 +788,9 @@ class Queue
   # **Usage:**
   #
   #     queue.workers (workers) -> YOUR CODE HERE
-  workers: (callback) ->
+  workers: (callback) =>
     @redis.hvals @key('WORKERS'), (err, res) ->
-      callback err if err
+      return callback err if err
       callback null, res.map (entry) ->
         entry = entry.split '|'
         host: entry[0]
@@ -724,18 +800,21 @@ class Queue
 
   # ### Clear A Queue
   
-  # Clear a queue. Remove **all** tasks, callback statistics.
+  # Remove **all** tasks of the queue, and reset statistics.
   clear: (callback) =>
     @redis.watch @key('SOURCE')
     @redis.keys "#{@key('QUEUED')}:*", (err, res) =>
+      return callback err if err
       multi = @redis.multi()
       multi.del @key('GROUPS'), @key('RECENT'), @key('FAILED'), @key('SOURCE'), @key('STATISTICS'), @key('SLOWEST'), @key('BLOCKED'), res...
+      multi.hmset @key('STATISTICS'), 'total', 0, 'finished', 0, 'total_pending_time', 0, 'total_processing_time', 0
       multi.exec (err, res) =>
+        return callback err if err
         return @clear callback unless res
         @statistics callback
 
   # ### Get Statistics of a Queue Asynchronously
-  #
+  
   # Statistics of a queue include:
   # 
   #   + `total`
@@ -756,37 +835,40 @@ class Queue
   #
   #       queue.statistics (statistics) ->
   #         console.log "Statistics of #{queue.name}:", statistics
-
+  #
   # `statistics` is an asynchronous method. The only arg of the callback
   # function is the statistics of the queue.
   statistics: (callback) ->
 
-    return if typeof callback isnt 'function'
-
     # Start a transaction, in the transaction:
     #
-    # 1. Get all fields and values in the `STATISTICS` hash, including:
-    #   + `total`
-    #   + `finished`
-    #   + `total_pending_time`
-    #   + `total_processing_time`
-    # 2. Get the length of the `FAILED` list (total failed tasks).
-    # 3. Get all the members of the `BLOCKED` set (identifiers of blocked group).
+    #   1. Count total groups -- `SCARD` of `GROUPS` set.
+    #   2. Get all fields and values in the `STATISTICS` hash, including:
+    #     + `total`
+    #     + `finished`
+    #     + `total_pending_time`
+    #     + `total_processing_time`
+    #   3. Count processing tasks -- `LLEN` of `PROCESSING` list.
+    #   4. Count failed task -- `LLEN` of `FAILED` list.
+    #   5. Get identifiers of blocked group -- `SMEMBERS` of `BLOCKED` set.
+    #   6. Count **live** workers of this queue -- `HLEN` of `WORKERS`.
     multi = @redis.multi()
-    multi.scard @key 'GROUPS'
-    multi.hgetall @key 'STATISTICS'
-    multi.hlen @key 'PROCESSING'
-    multi.llen @key 'FAILED'
-    multi.smembers @key 'BLOCKED'
-    multi.hlen @key 'WORKERS'
+    multi.scard @key('GROUPS')
+    multi.hgetall @key('STATISTICS')
+    multi.hlen @key('PROCESSING')
+    multi.llen @key('FAILED')
+    multi.smembers @key('BLOCKED')
+    multi.hlen @key('WORKERS')
     multi.exec (multi_err, multi_res) =>
+
+      return callback multi_err if multi_err
 
       # Process the result of the transaction.
       #
       # 1. Process `STATISTICS` hash:
       #   + Convert:
-      #     - `total_pending_time`, and `total_processing_time` into:
-      #     - `average_pending_time`, and `average_processing_time`
+      #     - `total_pending_time` and `total_processing_time` into:
+      #     - `average_pending_time` and `average_processing_time`
       #   + Calibrate initial condition (in case of no task is finished).
       # 2. Set `failed` key of returned object.
       statistics = multi_res[1] or {}
@@ -799,12 +881,12 @@ class Queue
         average_pending_time: Math.round(statistics.total_pending_time * 100 / statistics.finished) / 100
         average_processing_time: Math.round(statistics.total_processing_time * 100 / statistics.finished) / 100
         blocked: {}
-      if not result.finished_tasks
+        processing_tasks: multi_res[2]
+        failed_tasks: multi_res[3]
+        workers: multi_res[5]
+      if result.finished_tasks is 0
         result.average_pending_time = '-'
         result.average_processing_time = '-'
-      result.processing_tasks = multi_res[2]
-      result.failed_tasks = multi_res[3]
-      result.workers = multi_res[5]
 
       # Calculate blocked and pending tasks:
       # 
@@ -813,14 +895,16 @@ class Queue
       #   are tasks in the `QUEUED` list whose group identifier is in the
       #   `BLOCKED` set. The first element of each `QUEUED` list will not be
       #   counted, since that's the blocking (failed) task.
-      #   3. Calculate pending tasks. The equation used to calculate pending
-      #   tasks is:
+      #   3. Calculate pending tasks.
       #
-      # `pending = total - finished - processing - failed - blocked`
+      # The equation used to calculate pending tasks is:
+      #
+      #     pending = total - finished - processing - failed - blocked
       result.blocked.groups = multi_res[4].length
       multi2 = @redis.multi()
-      multi2.llen "#{@key 'QUEUED'}:#{group}" for group in multi_res[4]
+      multi2.llen "#{@key('QUEUED')}:#{group}" for group in multi_res[4]
       multi2.exec (multi2_err, multi2_res) ->
+        return callback multi2_err if multi2_err
         result.blocked.tasks = multi2_res.reduce(((a, b) -> a + b), - result.blocked.groups)
         result.pending_tasks = result.total.tasks - result.finished_tasks - result.processing_tasks - result.failed_tasks - result.blocked.tasks
-        callback result
+        callback null, result
