@@ -91,6 +91,8 @@ logging_registered_workers = ->
     registered_worker = registered_worker.split '|'
     console.log "  * Client Id: #{registered_worker[0]}, Task: #{registered_worker[1]}"
 
+cleanup_required = off
+
 # Fairy will enter cleanup mode before exit when:
 #
 #   + Received `SIGINT` or `SIGUSR2`.
@@ -98,6 +100,7 @@ logging_registered_workers = ->
 #
 # If there's no registered workers, exit directly.
 enter_cleanup_mode = ->
+  cleanup_required = on
   logging_registered_workers()
   return process.exit() unless registered_workers.length
   exiting = on
@@ -119,7 +122,7 @@ process.on 'uncaughtException', (err) ->
 
 # Say goodbye on exit.
 process.on 'exit', ->
-  console.log "Fairy cleaned up, exiting..."
+  console.log "Fairy cleaned up, exiting..." if cleanup_required
 
 # ## Utilities
 
