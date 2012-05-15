@@ -124,7 +124,8 @@
     <td> <%= moment.duration((new Date).valueOf()-(new Date(item.queued)).valueOf()).humanize()%></td>
     <td> <%= moment.duration((new Date).valueOf()-(new Date(item.failed)).valueOf()).humanize()%></td>
     <%_.each(item.reason, function(value){ %>
-      <td> <%= value %></td>
+      <!--td> <%= value %></td-->
+      <td class="test" data-original-title="Failed Reason" data-content="<%= value %>">More>></td>
     <% })%>
    </tr>
    <% }) %>
