@@ -8,12 +8,15 @@
     "type": "git",
     "url": "git@github.com:baoshan/fairy.git"
   },
-  "main": "src/fairy.coffee",
+  "main": "lib/fairy.js",
   "dependencies": {
     "redis": "*",
     "node-uuid": "*"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "mocha": "*",
+    "should": "*"
+  },
   "optionalDependencies": {},
   "engines": {
     "node": "*"

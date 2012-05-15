@@ -1,4 +1,5 @@
 *.swp
 *.dmp
+node_modules
 lib/server.js
 lib/fairy.js
