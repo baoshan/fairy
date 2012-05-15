@@ -48,12 +48,12 @@
       </div>
      
       <div class="tab-pane-title">当前处理任务</div>
-      <div class="tab-pane" id="tab2">
+      <div class="tab-pane" id="tab3">
         <div id="processing_tasks"></div>
       </div>
 
       <div class="tab-pane-title">周期最长</div>
-      <div class="tab-pane" id="tab3">
+      <div class="tab-pane" id="tab4">
         <div id="slowest_tasks"></div>
       </div>
     
@@ -111,7 +111,7 @@
       <th colspan = <%= failed_tasks.length?failed_tasks[0].params.length:0 %>> 参数</th>
       <th> 进入堆栈时间</th>
       <th> 完成时间</th>
-      <th> 失败原因</th>
+      <th colspan = <%= failed_tasks.length?failed_tasks[0].reason.length:0%>> 失败原因</th>
      </tr>
    </thead>
    <tbody>
@@ -146,7 +146,7 @@
    <% _.each(slowest_tasks, function(item) { %>
    <tbody>
      <tr>
-      <td><%= item.id %></td>
+      <td><%= item.id.substring(0,8) %></td>
       <%_.each( item.params, function(value){ %>
       <td> <%= value %> </td>     
       <% })%>
@@ -172,7 +172,7 @@
    <% _.each(processing_tasks, function(item) { %>
    <tbody>
      <tr>
-      <td><%= item.id %></td>
+      <td><%= item.id.substring(0,8) %></td>
       <%_.each( item.params, function(value){ %>
       <td> <%= value %> </td>     
       <% })%>
