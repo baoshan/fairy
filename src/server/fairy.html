@@ -71,8 +71,8 @@
   <table class="table table-bordered glance">
     <tr><th>Toalt</td><th><%= statistic.finished_tasks %></td></tr>
     <tr><th>Avg. Waiting In</th><td><%= statistic.average_pending_time %></td></tr>
-    <tr><th>Avg. Processing In</th><td><%= statistic.average_processing_time %></td></tr>
-    <tr><th>Avg. Finished In</th><td><%= Number(statistic.average_pending_time) + Number(statistic.average_processing_time) %></td></tr>
+    <tr><th>Avg. Processing In</th><td><%= statistic.average_process_time %></td></tr>
+    <tr><th>Avg. Finished In</th><td><%= Number(statistic.average_pending_time) + Number(statistic.average_process_time) %></td></tr>
   </table>
 </script>
 
