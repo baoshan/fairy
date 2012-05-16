@@ -112,13 +112,25 @@ table[class*="workers"]{
 table[class*="glance"] tr th:nth-child(1){ 
   background:#F5F5F5;
 }
-.table_title i{
+.table_title>i{
   position:absolute;
   top:50%;
   margin-top:-8px;
   filter: Alpha(opacity=40);
   opacity: 0.4;
   cursor:pointer;
+}
+.table_title .control-group{
+  position:absolute;
+  right:0px;
+  top:-3px;
+  font-size:14px;
+}
+.table_title .control-group select{
+  margin-left:-5px;
+}
+.table_title .control-group i{
+  margin-top:2px;
 }
 .table_title i:hover{
   filter: Alpha(opacity=100);
