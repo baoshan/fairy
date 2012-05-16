@@ -11,7 +11,9 @@
   "main": "lib/fairy.js",
   "dependencies": {
     "redis": "*",
-    "node-uuid": "*"
+    "node-uuid": "*",
+    "connect": "*",
+    "express": "3.0"
   },
   "devDependencies": {
     "mocha": "*",

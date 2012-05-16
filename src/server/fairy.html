@@ -71,8 +71,8 @@
   <table class="table table-bordered glance">
     <tr><th>Toalt</td><th><%= statistic.finished_tasks %></td></tr>
     <tr><th>Avg. Waiting In</th><td><%= statistic.average_pending_time %></td></tr>
-    <tr><th>Avg. Processing In</th><td><%= statistic.average_processing_time %></td></tr>
-    <tr><th>Avg. Finished In</th><td><%= Number(statistic.average_pending_time) + Number(statistic.average_processing_time) %></td></tr>
+    <tr><th>Avg. Processing In</th><td><%= statistic.average_process_time %></td></tr>
+    <tr><th>Avg. Finished In</th><td><%= Number(statistic.average_pending_time) + Number(statistic.average_process_time) %></td></tr>
   </table>
 </script>
 
@@ -124,7 +124,8 @@
     <td> <%= moment.duration((new Date).valueOf()-(new Date(item.queued)).valueOf()).humanize()%></td>
     <td> <%= moment.duration((new Date).valueOf()-(new Date(item.failed)).valueOf()).humanize()%></td>
     <%_.each(item.reason, function(value){ %>
-      <td> <%= value %></td>
+      <!--td> <%= value %></td-->
+      <td class="test" data-original-title="Failed Reason" data-content="<%= value %>">More>></td>
     <% })%>
    </tr>
    <% }) %>
