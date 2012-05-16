@@ -62,7 +62,7 @@ bind = () ->
         $(that).parent().parent().html _.template(arr[5], { item: stat })
         statistics[index] = stat
         $('#statistics tr:last').html _.template(arr[9], { data: statistics })
-        if $('#queque_detail').display is 'none'
+        if $('#queque_detail').is(":visible")
           data_bind_detail name
     })
   $('#statistics .btn_clear').live 'click', (event)-> 
@@ -79,7 +79,7 @@ bind = () ->
         $(that).parent().parent().html _.template(arr[5], { item: stat })
         statistics[index] = stat
         $('#statistics tr:last').html _.template(arr[9], { data: statistics })
-        if $('#queque_detail').display is 'none'
+        if $('#queque_detail').is(":visible")
           data_bind_detail name
     })
 
