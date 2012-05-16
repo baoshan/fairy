@@ -1,5 +1,5 @@
-connect = require 'connect'
-Router  = require('express').Router 
+express = require 'express'
+Router  = express.Router 
 router = new Router()
 
 exports = module.exports = (options) ->
@@ -50,7 +50,7 @@ exports = module.exports = (options) ->
       reswrite(res, workers)
   (req, res, next) ->
     router.middleware req, res, -> 
-      connect.static(__dirname + '/server',{ maxAge: 86400000 })(req, res, next)
+      express.static(__dirname + '/server', {redirect: false})(req, res, next)
 
 reswrite = (res, content) ->
   res.writeHead 200, { 'Content-Type': 'application/json'}
