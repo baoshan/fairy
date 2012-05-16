@@ -160,11 +160,17 @@ table[class*="glance"] tr th:nth-child(1){
   display:none;
   position:absolute;
   left : -400px;
-  top:-10px;
+  top:-20px;
   text-align:left !important;
+  z-index:1000;
 }
 .failed_popover .tab-content{
-  overflow:visible;
+  overflow:visible !important;
+  padding:5px;
+  font-size:13px;
+}
+.tab-content{
+  overflow:visible !important;
 }
 td:hover .failed_popover{
   display:block;
@@ -176,7 +182,7 @@ td:hover .failed_popover{
 .failed_popover:after{
   position:absolute;
   right:-10px;
-  top:10px;
+  top:20px;
   content:"▶";
   font-size:14px;
   color:#333;
@@ -187,7 +193,7 @@ td:hover .failed_popover{
   overflow:none !important;
 }
 .failed_popover .nav-tabs > li a{
-  overflow:none important;
+  overflow:hidden important;
   /*font-size:0px;*/
 }
 

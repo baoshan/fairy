@@ -63,13 +63,13 @@ window.onload=init;
 //点击图标切换 统计 下显示表格的方式
 $('.icon-th').click( function(){
 
-  $('.tabbable').addClass('xz');
+  $('#workers + .tabbable').addClass('xz');
   $(this).addClass('active');
   $('.icon-th-large').removeClass('active');
 })
 $('.icon-th-large').click( function(){
 
-  $('.tabbable').removeClass('xz');
+  $('#workers + .tabbable').removeClass('xz');
   $(this).addClass('active');
   $('.icon-th').removeClass('active');
 
@@ -87,7 +87,13 @@ $(document).scroll(function(){
 })
 
 
-
+//失败队列下的切换标签加的class==active
+$("tr").click(function(){
+  $(".failed_popover").find(".nav-tabs>li:nth-child(1)").addClass("active");
+  $(".failed_popover").find(".tab-content>div:nth-child(1)").addClass("active");
+  console.log($(".failed_popover"))
+})
+console.log($("tr"))
 
 
 

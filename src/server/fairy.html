@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <link href="http://twitter.github.com/bootstrap/assets/css/bootstrap.css" rel="stylesheet">
 <link href="fairy.css" rel="stylesheet">
+
 <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js" type="text/javascript"></script>
 <script src="http://twitter.github.com/bootstrap/assets/js/bootstrap.js" type="text/javascript"></script>
 <script src="http://documentcloud.github.com/underscore/underscore-min.js" type="text/javascript"></script>
@@ -24,7 +25,7 @@
   <div class="table_title">Glance<i class="icon-th"></i><i class="icon-th-large active"></i></div>
   <div id="statistic"></div>
   
-  <div class="table_title">WOrkers</div>
+  <div class="table_title">Workers</div>
   <div id="workers"></div>
   
   <!--最近处理任务---失败任务汇总---周期最长-->
@@ -125,17 +126,19 @@
     <td> <%= moment.duration((new Date).valueOf()-(new Date(item.failed)).valueOf()).humanize()%></td>
     <td>
     
-       <div class="failed_popover_position">more>><div class="failed_popover"><div class="arrow"></div><div class="popover-inner"><div class="popover-content">
+       <div class="failed_popover_position">more ...<div class="failed_popover"><div class="arrow"></div><div class="popover-inner"><div class="popover-content">
 		   
 			<div class='tabbable'>
 			  <ul class='nav nav-tabs'>
-				<%_.each(item.reason, function(value){ %>
-				<li class=''><a href='#click1' data-toggle='tab'><%= value %></a></li>
+				<%i =0 %>
+				<%_.each(item.reason, function(value, i){ %>
+				<% item.reason["id"+i] = id.new() %>
+				<li class=''><a href='#click<%= item.reason["id"+i] %>' data-toggle='tab'><%= ++i %></a></li>
 				<% })%>
 			  </ul>
 			  <div class='tab-content'>
-				<%_.each(item.reason, function(value){ %>
-				<div class='tab-pane' id='click1'>
+				<%_.each(item.reason, function(value, i){ %>
+				<div class='tab-pane' id='click<%= item.reason["id"+i]%>'>
 				  <%= value %>
 				</div>
 				<% })%>
@@ -227,6 +230,7 @@
 </script>
 
 <script src="fairy.js" type="text/javascript"></script>
+<script type="text/javascript">window.id = new id_factory()</script>
 <script src="http://twitter.github.com/bootstrap/assets/js/bootstrap.js" type="text/javascript"></script>
 <script src="fairy_active.js" type="text/javascript"></script>
 </body>
