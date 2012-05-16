@@ -60,7 +60,7 @@ window.onload=init;
 //--------------------------Table Crosshair--end----------------------------
 
 
-/*点击图标切换 统计 下显示表格的方式*/
+//点击图标切换 统计 下显示表格的方式
 $('.icon-th').click( function(){
 
   $('.tabbable').addClass('xz');
@@ -75,7 +75,7 @@ $('.icon-th-large').click( function(){
 
 })
 
-/*顶部阴影*/
+//顶部阴影
 $(document).scroll(function(){
   var scroll_top = $(document).scrollTop();
   if(scroll_top>40){
@@ -85,3 +85,17 @@ $(document).scroll(function(){
     $('h1').removeClass("h1_shadow");
   }
 })
+
+
+
+
+
+
+
+
+
+
+
+
+
+
