@@ -208,7 +208,7 @@ class Fairy
   statistics: (callback) =>
     @queues (err, queues) ->
       return callback err if err
-      return callback [] unless total_queues = queues.length
+      return callback null, [] unless total_queues = queues.length
       result = []
       for queue, i in queues
         do (queue, i) ->
