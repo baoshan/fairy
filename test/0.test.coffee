@@ -32,7 +32,7 @@ module.exports =
 
   'should all be processed': (done) ->
     exec "rm -f #{__dirname}/workers/*.dmp", (err, stdout, stderr) ->
-      total_process = 50
+      total_process = 8
       child_processes = while total_process--
         exec "coffee #{__dirname}/workers/perfect.coffee" # , (err, stdout, stderr) -> console.log err, stdout, stderr
       do probe = ->

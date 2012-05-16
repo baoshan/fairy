@@ -717,7 +717,7 @@ class Queue
       res = res.map (entry) -> JSON.parse entry
       callback null, ([res[i]...,res[i + 1]] for i in [0...res.length] by 2).map (entry) ->
         id: entry[0]
-        params: entry[1..-3]
+        params: entry[1..-4]
         time: entry.pop()
         started: new Date entry.pop()
         queued: new Date entry.pop()
