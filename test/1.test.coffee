@@ -34,10 +34,13 @@ module.exports =
     exec "rm -f #{__dirname}/workers/*.dmp", (err, stdout, stderr) ->
       total_process = 50
       child_processes = while total_process--
-        exec "coffee #{__dirname}/workers/perfect.coffee" # , (err, stdout, stderr) -> console.log err, stdout, stderr
+        exec "coffee #{__dirname}/workers/fail-and-block.coffee" # , (err, stdout, stderr) -> console.log err, stdout, stderr
       do probe = ->
         queue.statistics (err, statistics) ->
-          if statistics.finished_tasks is total
+          if statistics.pending_tasks is 0 and statistics.processing_tasks is 0 and statistics.finished_tasks isnt total
+            queue.reschedule (err, statistics) ->
+              setTimeout probe, 10
+          else if statistics.finished_tasks is total
             statistics.pending_tasks.should.equal 0
             statistics.processing_tasks.should.equal 0
             done()
