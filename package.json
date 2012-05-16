@@ -12,13 +12,13 @@
   "dependencies": {
     "redis": "*",
     "node-uuid": "*",
-    "connect": "*",
     "express": "3.0"
   },
   "devDependencies": {
     "mocha": "*",
     "should": "*",
-    "coffee-script": "*"
+    "coffee-script": "*",
+    "connect": "*"
   },
   "optionalDependencies": {},
   "engines": {

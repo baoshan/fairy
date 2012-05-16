@@ -71,7 +71,7 @@ exports.connect = (options = {}) ->
   client.auth options.password if options.password?
   new Fairy client
 
-# ### Exception & Interruption Handling
+# ### Exception / Interruption Handling
 #
 # Use `uncaughtException` and `SIGINT` to provide elegant exception and user
 # interruption handling.
@@ -85,46 +85,48 @@ exiting = off
 registered_workers = []
 
 # Log active workers while waiting for all workers to clean-up.
-logging_registered_workers = ->
+log_registered_workers = ->
   console.log "\nFairy is waiting for #{registered_workers.length} workers to clean-up before exit:"
   for registered_worker in registered_workers
-    registered_worker = registered_worker.split '|'
-    console.log "  * Client Id: #{registered_worker[0]}, Task: #{registered_worker[1]}"
+    worker_info = registered_worker.split '|'
+    console.log "  * Client Id: [#{worker_info[0]}], Task: [#{worker_info[1]}]"
 
 cleanup_required = off
 
 # Fairy will enter cleanup mode before exit when:
 #
-#   + Received `SIGINT` or `SIGUSR2`.
+#   + Received `SIGINT`, `SIGHUP`, or `SIGUSR2`.
 #   + `uncaughtException` captured.
 #
 # If there's no registered workers, exit directly.
 enter_cleanup_mode = ->
-  cleanup_required = on
-  logging_registered_workers()
-  return process.exit() unless registered_workers.length
-  exiting = on
+  if registered_workers.length
+    log_registered_workers()
+    cleanup_required = on
+    exiting = on
+  else
+    return process.exit()
 
-# When `SIGINT` (e.g. `Control-C`) or `SIGUSR2` is received, gracefully exit
-# the process by notifying all queues entering cleanup mode and exit after
+# When `SIGINT` (e.g. `Control-C`), `SIGHUP` or `SIGUSR2` is received,
+# gracefully exit by notifying all workers entering cleanup mode and exit after
 # all cleaned up.
-process.on 'SIGINT',  enter_cleanup_mode
+process.on 'SIGINT', enter_cleanup_mode
+process.on 'SIGHUP', enter_cleanup_mode
 process.on 'SIGUSR2', enter_cleanup_mode
 
 # When `uncaughtException` captured, **Fairy** can not tell if this is caught by
 # the handling function, as well as which queue cause the exception. **Fairy**
 # will fail all processing tasks and block the according group.
 process.on 'uncaughtException', (err) ->
-  console.log 'Uncaught Exception:'
-  console.log err.stack
-  console.log 'Fairy will block all processing groups before exit.'
+  console.log 'Uncaught Exception:', err.stack
+  console.log 'Workers will block their processing groups before exit.' if registered_workers.length
   enter_cleanup_mode()
 
 # Say goodbye on exit.
 process.on 'exit', ->
   console.log "Fairy cleaned up, exiting..." if cleanup_required
 
-# ## Utilities
+# ## Helper Methods
 
 # ### Get Public IP
 #
@@ -208,7 +210,7 @@ class Fairy
   statistics: (callback) =>
     @queues (err, queues) ->
       return callback err if err
-      return callback [] unless total_queues = queues.length
+      return callback null, [] unless total_queues = queues.length
       result = []
       for queue, i in queues
         do (queue, i) ->
@@ -291,25 +293,23 @@ class Queue
   #   + Arguments except the (optional) callback function will be serialized as
   #   a JSON array.
   #   + **The first argument will be served as the group identifier** to ensure
-  #   sequential processing for all tasks of the same group (aka. first-come-
-  #   first-serve). Current time is appended at the argument array for
-  #   monitoring purpose.
+  #   sequential processing for all tasks of the same group (aka. first-come,
+  #   first-serve, first-done). Current time is appended at the argument array
+  #   for monitoring purpose.
   #
   # **Usage:**
   #
-  #     queue.enqueue 'param1', 'param2', -> console.log 'queued!'
-  #     queue.enqueue 'param1', 'param2'
+  #     queue.enqueue 'group_id', 'param2', (err, res) -> # YOUR CODE
   # 
   # A transaction ensures the atomicity.
   enqueue: (args..., callback) =>
     if typeof callback isnt 'function'
       args.push callback
       callback = undefined
-    args.push Date.now()
     multi = @redis.multi()
-    multi.rpush @key('SOURCE'), JSON.stringify([uuid.v4(), args...])
-    multi.hincrby @key('STATISTICS'), 'total', 1
+    multi.rpush @key('SOURCE'), JSON.stringify([uuid.v4(), args..., Date.now()])
     multi.sadd @key('GROUPS'), args[0]
+    multi.hincrby @key('STATISTICS'), 'total', 1
     multi.exec callback
 
   # ### Register Handler
@@ -330,13 +330,16 @@ class Queue
     registered_workers.push "#{@fairy.id}|#{@name}"
     worker_id = uuid.v4()
     @redis.hset @key('WORKERS'), worker_id, "#{os.hostname()}|#{server_ip()}|#{process.pid}|#{Date.now()}"
+
     process.on 'uncaughtException', (err) =>
       if @_handler_callback
-        console.log "Worker #{worker_id.split('-')[0]} of task #{@name} will block current processing group" 
+        console.log "Worker [#{worker_id.split('-')[0]}] registered for Task [#{@name}] will block its current processing group" 
         @_handler_callback {do: 'block', message: err.stack}, null
       else
         @_try_exit()
+
     process.on 'exit', => @redis.hdel @key('WORKERS'), worker_id
+
     @_poll()
 
   # ### Poll New Task
@@ -362,12 +365,14 @@ class Queue
       if res
         task = JSON.parse res
         @processing_id = task[0]
-        multi = @redis.multi()
-        multi.lpop @key('SOURCE')
-        multi.rpush "#{@key('QUEUED')}:#{task[1]}", res
-        multi.exec (multi_err, multi_res) =>
-          return @_poll() if not multi_res or multi_res[1] isnt 1
-          @_process task
+        @redis.llen "#{@key('QUEUED')}:#{task[1]}", (err, len) =>
+          multi = @redis.multi()
+          multi.lpop @key('SOURCE')
+          multi.rpush "#{@key('QUEUED')}:#{task[1]}", res
+          multi.hset @key('PROCESSING'), task[0], JSON.stringify [task..., Date.now()] unless len
+          multi.exec (multi_err, multi_res) =>
+            return @_poll() if not multi_res or multi_res[1] isnt 1
+            @_process task
       else
         @redis.unwatch()
         setTimeout @_poll, @polling_interval
@@ -379,7 +384,7 @@ class Queue
   _try_exit: =>
     registered_workers.splice registered_workers.indexOf "#{@fairy.id}|#{@name}", 1
     process.exit() unless registered_workers.length
-    logging_registered_workers()
+    log_registered_workers()
 
   # ### Process Each Group's First Task
 
@@ -419,7 +424,6 @@ class Queue
     #   3. Allow `retry_limit` times of retries.
     start_time  = Date.now()
     processing = task[0]
-    @redis.hset @key('PROCESSING'), processing, JSON.stringify [task..., start_time]
     retry_count = @retry_limit
     errors = []
 
@@ -435,6 +439,7 @@ class Queue
       #     + `block-after-retry`: retry n times, block the group if still
       #     fails (blocking).
       #     + or: retry n times, skip the task if still fails (non-blocking).
+      #     Set `retry_limit` to `0` to skip failed tasks immediately.
       if err
         errors.push err.message or null
         switch err.do
@@ -501,15 +506,31 @@ class Queue
   # processing a same task.
   _continue_group: (group) =>
     @redis.watch "#{@key('QUEUED')}:#{group}"
-    multi = @redis.multi()
-    multi.lpop "#{@key('QUEUED')}:#{group}"
-    multi.lindex "#{@key('QUEUED')}:#{group}", 0
-    multi.exec (multi_err, multi_res) =>
-      return @_continue_group group unless multi_res   
-      if multi_res[1]
-        @_process JSON.parse(multi_res[1]), true
+    @redis.lindex "#{@key('QUEUED')}:#{group}", 1, (err, res) =>
+      if res
+        task = JSON.parse(res)
+        multi = @redis.multi()
+        multi.lpop "#{@key('QUEUED')}:#{group}"
+        multi.hset @key('PROCESSING'), task[0], JSON.stringify [task..., Date.now()]
+        multi.exec (multi_err, multi_res) =>
+          return @_continue_group group unless multi_res   
+          @_process task, true
       else
-        @_poll()
+        multi = @redis.multi()
+        multi.lpop "#{@key('QUEUED')}:#{group}"
+        multi.exec (multi_err, multi_res) =>
+          return @_continue_group group unless multi_res   
+          @_poll()
+
+          #multi = @redis.multi()
+          #multi.lpop "#{@key('QUEUED')}:#{group}"
+          #multi.lindex "#{@key('QUEUED')}:#{group}", 0
+          #multi.exec (multi_err, multi_res) =>
+          #  return @_continue_group group unless multi_res   
+          #  if multi_res[1]
+          #    @_process JSON.parse(multi_res[1]), true
+          #  else
+          #    @_poll()
 
   # ### Re-Schedule Failed and Blocked Tasks
 
@@ -531,18 +552,19 @@ class Queue
   #
   #     queue.reschedule (err, statistics) -> # YOUR CODE
   reschedule: (callback) =>
-   
+    
     # Make sure `FAILED` list and `BLOCKED` set are not touched during the
     # transaction.
     @redis.watch @key 'FAILED'
     @redis.watch @key 'BLOCKED'
+    @redis.watch @key 'PROCESSING'
 
     # Push all failed tasks (without last two parameters: error message and
     # failure time) into a temporary task array storing tasks to be rescheduled.
     # Then, get all blocked groups.
     @failed_tasks (err, tasks) =>
       requeued_tasks = []
-      requeued_tasks.push tasks.map((task) -> JSON.stringify task[...-2])...
+      requeued_tasks.push tasks.map((task) -> JSON.stringify [task.id, task.params..., task.queued.valueOf()])...
       @blocked_groups (err, groups) =>
 
         # Make sure all blocked `QUEUED` list are not touched when you
@@ -558,11 +580,11 @@ class Queue
         @redis.watch groups.map((group) => "#{@key('QUEUED')}:#{group}")... if groups.length
         start_transaction = =>
           multi = @redis.multi()
-          multi.rpush @key('SOURCE'), requeued_tasks... if requeued_tasks.length
+          multi.lpush @key('SOURCE'), requeued_tasks.reverse()... if requeued_tasks.length
           multi.del @key 'FAILED'
           multi.del groups.map((group) => "#{@key('QUEUED')}:#{group}")... if groups.length
           multi.del @key 'BLOCKED'
-          multi.del @key 'PROCESSING'
+          # multi.del @key 'PROCESSING'
           multi.exec (multi_err, multi_res) =>
             return callback multi_err if multi_err
             if multi_res then @statistics callback if callback
@@ -639,8 +661,8 @@ class Queue
         id: entry[0]
         params: entry[1..-4]
         reason: entry.pop()
-        failed: entry.pop()
-        queued: entry.pop()
+        failed: new Date entry.pop()
+        queued: new Date entry.pop()
 
   # ### Get Blocked Groups Asynchronously
   
@@ -697,8 +719,8 @@ class Queue
         id: entry[0]
         params: entry[1..-3]
         time: entry.pop()
-        started: entry.pop()
-        queued: entry.pop()
+        started: new Date entry.pop()
+        queued: new Date entry.pop()
 
   # ### Get Processing Tasks Asynchronously
   

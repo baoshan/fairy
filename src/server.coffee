@@ -3,7 +3,7 @@ Router  = require('express').Router
 router = new Router()
 
 exports = module.exports = (options) ->
-  fairy = require('./fairy.coffee').connect options
+  fairy = require('../.').connect options
   router.route 'get', '/api/queues/statistics',(req, res, next) ->
     fairy.statistics (err, stats) ->
       return reswrite(res, err.stack) if err
