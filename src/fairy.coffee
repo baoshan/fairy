@@ -71,7 +71,7 @@ exports.connect = (options = {}) ->
   client.auth options.password if options.password?
   new Fairy client
 
-# ### Exception & Interruption Handling
+# ### Exception / Interruption Handling
 #
 # Use `uncaughtException` and `SIGINT` to provide elegant exception and user
 # interruption handling.
@@ -85,46 +85,48 @@ exiting = off
 registered_workers = []
 
 # Log active workers while waiting for all workers to clean-up.
-logging_registered_workers = ->
+log_registered_workers = ->
   console.log "\nFairy is waiting for #{registered_workers.length} workers to clean-up before exit:"
   for registered_worker in registered_workers
-    registered_worker = registered_worker.split '|'
-    console.log "  * Client Id: #{registered_worker[0]}, Task: #{registered_worker[1]}"
+    worker_info = registered_worker.split '|'
+    console.log "  * Client Id: [#{worker_info[0]}], Task: [#{worker_info[1]}]"
 
 cleanup_required = off
 
 # Fairy will enter cleanup mode before exit when:
 #
-#   + Received `SIGINT` or `SIGUSR2`.
+#   + Received `SIGINT`, `SIGHUP`, or `SIGUSR2`.
 #   + `uncaughtException` captured.
 #
 # If there's no registered workers, exit directly.
 enter_cleanup_mode = ->
-  cleanup_required = on
-  logging_registered_workers()
-  return process.exit() unless registered_workers.length
-  exiting = on
+  if registered_workers.length
+    log_registered_workers()
+    cleanup_required = on
+    exiting = on
+  else
+    return process.exit()
 
-# When `SIGINT` (e.g. `Control-C`) or `SIGUSR2` is received, gracefully exit
-# the process by notifying all queues entering cleanup mode and exit after
+# When `SIGINT` (e.g. `Control-C`), `SIGHUP` or `SIGUSR2` is received,
+# gracefully exit by notifying all workers entering cleanup mode and exit after
 # all cleaned up.
-process.on 'SIGINT',  enter_cleanup_mode
+process.on 'SIGINT', enter_cleanup_mode
+process.on 'SIGHUP', enter_cleanup_mode
 process.on 'SIGUSR2', enter_cleanup_mode
 
 # When `uncaughtException` captured, **Fairy** can not tell if this is caught by
 # the handling function, as well as which queue cause the exception. **Fairy**
 # will fail all processing tasks and block the according group.
 process.on 'uncaughtException', (err) ->
-  console.log 'Uncaught Exception:'
-  console.log err.stack
-  console.log 'Fairy will block all processing groups before exit.'
+  console.log 'Uncaught Exception:', err.stack
+  console.log 'Workers will block their processing groups before exit.' if registered_workers.length
   enter_cleanup_mode()
 
 # Say goodbye on exit.
 process.on 'exit', ->
   console.log "Fairy cleaned up, exiting..." if cleanup_required
 
-# ## Utilities
+# ## Helper Methods
 
 # ### Get Public IP
 #
@@ -291,25 +293,23 @@ class Queue
   #   + Arguments except the (optional) callback function will be serialized as
   #   a JSON array.
   #   + **The first argument will be served as the group identifier** to ensure
-  #   sequential processing for all tasks of the same group (aka. first-come-
-  #   first-serve). Current time is appended at the argument array for
-  #   monitoring purpose.
+  #   sequential processing for all tasks of the same group (aka. first-come,
+  #   first-serve, first-done). Current time is appended at the argument array
+  #   for monitoring purpose.
   #
   # **Usage:**
   #
-  #     queue.enqueue 'param1', 'param2', -> console.log 'queued!'
-  #     queue.enqueue 'param1', 'param2'
+  #     queue.enqueue 'group_id', 'param2', (err, res) -> # YOUR CODE
   # 
   # A transaction ensures the atomicity.
   enqueue: (args..., callback) =>
     if typeof callback isnt 'function'
       args.push callback
       callback = undefined
-    args.push Date.now()
     multi = @redis.multi()
-    multi.rpush @key('SOURCE'), JSON.stringify([uuid.v4(), args...])
-    multi.hincrby @key('STATISTICS'), 'total', 1
+    multi.rpush @key('SOURCE'), JSON.stringify([uuid.v4(), args..., Date.now()])
     multi.sadd @key('GROUPS'), args[0]
+    multi.hincrby @key('STATISTICS'), 'total', 1
     multi.exec callback
 
   # ### Register Handler
@@ -333,7 +333,7 @@ class Queue
 
     process.on 'uncaughtException', (err) =>
       if @_handler_callback
-        console.log "Worker #{worker_id.split('-')[0]} of task #{@name} will block current processing group" 
+        console.log "Worker [#{worker_id.split('-')[0]}] registered for Task [#{@name}] will block its current processing group" 
         @_handler_callback {do: 'block', message: err.stack}, null
       else
         @_try_exit()
@@ -384,7 +384,7 @@ class Queue
   _try_exit: =>
     registered_workers.splice registered_workers.indexOf "#{@fairy.id}|#{@name}", 1
     process.exit() unless registered_workers.length
-    logging_registered_workers()
+    log_registered_workers()
 
   # ### Process Each Group's First Task
 
@@ -717,7 +717,7 @@ class Queue
       res = res.map (entry) -> JSON.parse entry
       callback null, ([res[i]...,res[i + 1]] for i in [0...res.length] by 2).map (entry) ->
         id: entry[0]
-        params: entry[1..-3]
+        params: entry[1..-4]
         time: entry.pop()
         started: new Date entry.pop()
         queued: new Date entry.pop()
