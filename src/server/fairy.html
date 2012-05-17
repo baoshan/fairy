@@ -240,7 +240,7 @@
       <td><%= item.host %></td>
       <td><%= item.ip %></td>
       <td><%= item.pid %></td>
-      <td><%= item.since%> </td>
+      <td><%= moment.duration((new Date).valueOf()-(new Date(item.since)).valueOf()).humanize()%></td>
      </tr>
      <% }) %>
    </tbody>

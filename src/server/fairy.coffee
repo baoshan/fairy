@@ -15,14 +15,32 @@ arr = [
 ]
 
 statistics = []
-$.ajax({
-  type: 'GET'
-  url: '/api/queues/statistics'
-  success: (data) ->
-    statistics = data
-    $('#statistics').html _.template(arr.join(''), { data : data})
-    bind()
-})
+select_index = 0
+
+$('select').find("option:nth-child(1)").attr("selected","true")
+
+init = () ->
+  console.log (new Date).toString()
+  $.ajax({
+    type: 'GET'
+    url: '/api/queues/statistics'
+    success: (data) ->
+      statistics = data
+      $('#statistics').html _.template(arr.join(''), { data : data})
+      bind()
+      if $('#queque_detail').is(":visible")
+        #name = $($('#statistics').find('tr[id]').find('td')).html() 
+        console.log 'init index', select_index
+        $($('#statistics').find('tr')[select_index]).attr("id","active")
+        name = $($($('#statistics').find('tr')[select_index]).find('td:first')).html()
+        console.log 'name', name
+        data_bind_detail name
+      select_value = $("select").find("option:selected").text()
+      console.log 'select_value', select_value
+      setTimeout (-> init()), select_value.substring(0, select_value.length-1)*1000
+  })
+
+$(document).ready -> init()
 
 btn_click = (obj) ->
   console.log obj
@@ -44,6 +62,8 @@ bind = () ->
     $('#statistics tr').removeAttr('id')
     $(that).attr("id","active")
     name = $($(that).find('td')[0]).html()
+    select_index = $(that).parent().index()
+    console.log 'select_index', select_index
     console.log name
     data_bind_detail name
   
@@ -63,8 +83,8 @@ bind = () ->
         $(that).parent().parent().html _.template(arr[5], { item: stat })
         statistics[index] = stat
         $('#statistics tr:last').html _.template(arr[9], { data: statistics })
-        if $('#queque_detail').is(":visible")
-          data_bind_detail name
+        #if $('#queque_detail').is(":visible")
+        #data_bind_detail name
     })
   $('#statistics .btn_clear').live 'click', (event)-> 
     event.stopPropagation()  
@@ -80,8 +100,8 @@ bind = () ->
         $(that).parent().parent().html _.template(arr[5], { item: stat })
         statistics[index] = stat
         $('#statistics tr:last').html _.template(arr[9], { data: statistics })
-        if $('#queque_detail').is(":visible")
-          data_bind_detail name
+        #if $('#queque_detail').is(":visible")
+        #data_bind_detail name
     })
 
 data_bind_detail = (name)->
@@ -136,3 +156,12 @@ $('#queque_detail').hide()
 @id_factory = () ->
   i = 0
   return {new: () -> return i++ }
+
+$("select").change () ->
+  console.log 11111111111
+  console.log 'time', $(this).val().substring(0, $(this).val().length-1)
+  init()
+  #select_value = $(this).val()
+  #time = select_value.substring(0, select_value.length-1)
+  #setTimeout (-> init()), 1000*time
+  
