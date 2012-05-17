@@ -49,8 +49,9 @@ exports = module.exports = (options) ->
       return reswrite(res, err.stack) if err
       reswrite(res, workers)
   (req, res, next) ->
-    router.middleware req, res, -> 
-      express.static(__dirname + '/server', {redirect: false})(req, res, next)
+    router.middleware req, res, ->
+      express.staticCache() req, res, ->
+        express.static(__dirname + '/server', {redirect: false})(req, res, next)
 
 reswrite = (res, content) ->
   res.writeHead 200, { 'Content-Type': 'application/json'}
