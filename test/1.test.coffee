@@ -4,7 +4,7 @@ require 'should'
 task = 'TEST0'
 fairy = require("#{__dirname}/..").connect()
 queue = fairy.queue task
-total = 1000
+total = 2000
 groups = 10
 generated = 0
 group_sequence = [0 .. groups - 1].map -> 0
@@ -37,12 +37,16 @@ module.exports =
         exec "coffee #{__dirname}/workers/fail-and-block.coffee" # , (err, stdout, stderr) -> console.log err, stdout, stderr
       do probe = ->
         queue.reschedule (err, statistics) ->
-        setTimeout probe, 50
+        setTimeout probe, 100
 
       do stats = ->
         queue.statistics (err, statistics) ->
           if statistics.finished_tasks is total
-            done()
+            setTimeout ->
+              queue.statistics (err, statistics) ->
+                if statistics.finished_tasks is total and statistics.pending_tasks is 0
+                  done()
+            , 100
           else
             setTimeout stats, 10
           #  queue.statistics (err, statistics) ->

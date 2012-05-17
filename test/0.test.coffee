@@ -4,7 +4,7 @@ require 'should'
 task = 'TEST0'
 fairy = require("#{__dirname}/..").connect()
 queue = fairy.queue task
-total = 1000
+total = 2000
 groups = 10
 generated = 0
 group_sequence = [0 .. groups - 1].map -> 0
