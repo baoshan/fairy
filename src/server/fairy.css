@@ -1,7 +1,4 @@
 body{/*width:1024px;*/ margin:auto auto; overflow-y:scroll; font-family:Palatino, "Palatino Linotype", Georgia, serif;}
-
-
-
 /*h1*/
 h1{
   position:fixed;
@@ -69,6 +66,7 @@ h1+.table_title{ margin-top:120px;}
   -o-transition: background-color 0.1s ease;
   transition: background-color 0.1s ease;
 }
+.overview td,.overview th{ white-space:nowrap;}
 .overview tr td:hover{ cursor:default;}
 .overview tr th{ min-width:50px;}
 .overview tr th:nth-child(1){ min-width:85px;}
