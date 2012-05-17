@@ -16,6 +16,7 @@ arr = [
 
 statistics = []
 select_index = 0
+t = 0
 
 $('select').find("option:nth-child(1)").attr("selected","true")
 
@@ -27,25 +28,20 @@ init = () ->
     success: (data) ->
       statistics = data
       $('#statistics').html _.template(arr.join(''), { data : data})
-      bind()
       if $('#queque_detail').is(":visible")
-        #name = $($('#statistics').find('tr[id]').find('td')).html() 
-        console.log 'init index', select_index
         $($('#statistics').find('tr')[select_index]).attr("id","active")
         name = $($($('#statistics').find('tr')[select_index]).find('td:first')).html()
-        console.log 'name', name
         data_bind_detail name
       select_value = $("select").find("option:selected").text()
-      console.log 'select_value', select_value
-      setTimeout (-> init()), select_value.substring(0, select_value.length-1)*1000
+      t = setTimeout (-> init()), select_value.substring(0, select_value.length-1)*1000
   })
 
-$(document).ready -> init()
+$(document).ready -> 
+  init()
+  bind()
 
 btn_click = (obj) ->
-  console.log obj
   name = $(obj).parent().parent().find('td:first').html()
-  console.log name
   $.ajax({
     type: 'POST'
     url: '/api/queues/' + name + '/reschedule'
@@ -63,8 +59,6 @@ bind = () ->
     $(that).attr("id","active")
     name = $($(that).find('td')[0]).html()
     select_index = $(that).parent().index()
-    console.log 'select_index', select_index
-    console.log name
     data_bind_detail name
   
     $('#queque_detail').show()
@@ -73,7 +67,6 @@ bind = () ->
     event.stopPropagation()  
     name = $(@).parent().parent().find('td:first').html()
     that = @
-    console.log name
     $.ajax({
       type: 'POST'
       url: '/api/queues/' + name + '/reschedule'
@@ -83,25 +76,19 @@ bind = () ->
         $(that).parent().parent().html _.template(arr[5], { item: stat })
         statistics[index] = stat
         $('#statistics tr:last').html _.template(arr[9], { data: statistics })
-        #if $('#queque_detail').is(":visible")
-        #data_bind_detail name
     })
   $('#statistics .btn_clear').live 'click', (event)-> 
     event.stopPropagation()  
     name = $(@).parent().parent().find('td:first').html()
-    console.log name
     that = @
     $.ajax({
       type: 'POST'
       url: '/api/queues/' + name + '/clear'
       success: (stat) ->
         index = $(that).parent().parent().index()
-        console.log index
         $(that).parent().parent().html _.template(arr[5], { item: stat })
         statistics[index] = stat
         $('#statistics tr:last').html _.template(arr[9], { data: statistics })
-        #if $('#queque_detail').is(":visible")
-        #data_bind_detail name
     })
 
 data_bind_detail = (name)->
@@ -109,7 +96,6 @@ data_bind_detail = (name)->
     type: 'GET'
     url: '/api/queues/' + name + '/statistics'
     success: (stat) ->
-
       $('#statistic').html _.template($('#tb_statistic_template').html(), { statistic: stat })
   })
   $.ajax({
@@ -158,10 +144,27 @@ $('#queque_detail').hide()
   return {new: () -> return i++ }
 
 $("select").change () ->
-  console.log 11111111111
-  console.log 'time', $(this).val().substring(0, $(this).val().length-1)
+  clearTimeout(t)
   init()
-  #select_value = $(this).val()
-  #time = select_value.substring(0, select_value.length-1)
-  #setTimeout (-> init()), 1000*time
-  
+
+# --------------------------Table Crosshair--end----------------------------
+
+# 点击图标切换 统计 下显示表格的方式
+$('.icon-th').click () ->
+  $('#workers + .tabbable').addClass('xz')
+  $(this).addClass('active')
+  $('.icon-th-large').removeClass('active')
+
+$('.icon-th-large').click () ->
+  $('#workers + .tabbable').removeClass('xz')
+  $(this).addClass('active')
+  $('.icon-th').removeClass('active')
+
+#顶部阴影
+$(document).scroll () ->
+  scroll_top = $(document).scrollTop()
+  if scroll_top > 40
+    $('h1').addClass("h1_shadow")
+  else
+    $('h1').removeClass("h1_shadow")
+
