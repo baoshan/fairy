@@ -1,13 +1,4 @@
-﻿$('.test').hover(
-function(){
-  $('.test').popover('toggle');
-})
-$('.test1').hover(
-function(){
-  $('.test1').tooltip('toggle');
-})
-
-//--------------------------Table Crosshair--START----------------------------
+﻿//--------------------------Table Crosshair--START----------------------------
 function hoverOver()
 {
     this.parentNode.className = "hoverRow";
@@ -85,18 +76,6 @@ $(document).scroll(function(){
     $('h1').removeClass("h1_shadow");
   }
 })
-
-
-//失败队列下的切换标签加的class==active
-$("tr").click(function(){
-  $(".failed_popover").find(".nav-tabs>li:nth-child(1)").addClass("active");
-  $(".failed_popover").find(".tab-content>div:nth-child(1)").addClass("active");
-  console.log($(".failed_popover"))
-})
-console.log($("tr"))
-
-
-
 
 
 

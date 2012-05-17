@@ -28,13 +28,14 @@
 # Copyright © 2012, Baoshan Sheng.
 # Released under the MIT License.
 
+
 # ## Fairy in a Nutshell
 
 # **Fairy** depends on:
 #
 #   + **[redis]**, node.js driver for Redis, of course!
 #   + **[node-uuid]**, generate an unique identifier for each task.
-#   + **[express]**, only if you need the [http api] or [web front-end].
+#   + **[express]**, required by the [http api] and [web front-end] middleware.
 #
 # [redis]:         https://github.com/mranney/node_redis
 # [node-uuid]:     https://github.com/broofa/node-uuid
@@ -48,6 +49,7 @@ os    = require 'os'
 # A constant prefix will be applied to all Redis keys for safety and
 # ease-of-management reasons.
 prefix = 'FAIRY'
+
 
 # ### CommonJS Module Definition
 
@@ -67,12 +69,10 @@ prefix = 'FAIRY'
 #
 # [node_redis documents]: https://github.com/mranney/node_redis
 exports.connect = (options = {}) ->
-  client = redis.createClient options.port, options.host, options.options
-  client.auth options.password if options.password?
-  new Fairy client
+  new Fairy options
 
 # ### Exception / Interruption Handling
-#
+
 # Use `uncaughtException` and `SIGINT` to provide elegant exception and user
 # interruption handling.
 
@@ -118,8 +118,8 @@ process.on 'SIGUSR2', enter_cleanup_mode
 # the handling function, as well as which queue cause the exception. **Fairy**
 # will fail all processing tasks and block the according group.
 process.on 'uncaughtException', (err) ->
-  console.log 'Uncaught Exception:', err.stack
-  console.log 'Workers will block their processing groups before exit.' if registered_workers.length
+  console.log 'Exception:', err.stack
+  console.log 'Fairy workers will block their processing groups before exit.' if registered_workers.length
   enter_cleanup_mode()
 
 # Say goodbye on exit.
@@ -138,6 +138,14 @@ server_ip = ->
       return address.address if not address.internal and address.family is 'IPv4'
   return 'UNKNOWN_IP'
 
+# ## Create Redis Client
+create_client = (options) ->
+  client = redis.createClient options.port, options.host, options.options
+  client.auth options.password if options.password?
+  client
+
+
+
 # ## Class Fairy
 
 # Model wide variable used for allocating an increasing integer `id` for each
@@ -148,6 +156,8 @@ fairy_id = 0
 # (objects of class `Queue`) responsible for enqueuing and dispatching tasks,
 # etc.
 class Fairy
+
+
 
   # ### Constructor
   #
@@ -162,9 +172,12 @@ class Fairy
   #
   # A `queue_pool` caches named queued as a hashtable. Keys are names of queues,
   # values are according objects of class `Queue`.
-  constructor: (@redis) ->
+  constructor: (@options) ->
+    @redis = create_client options
     @id = fairy_id++
     @queue_pool = {}
+
+
 
   # ### Function to Resolve Key Name
 
@@ -173,6 +186,8 @@ class Fairy
   #
   #   + `QUEUES`, Redis set, containing names of all registered queues.
   key: (key) -> "#{prefix}:#{key}"
+
+
 
   # ### Get a Named Queue
 
@@ -187,6 +202,8 @@ class Fairy
     @redis.sadd @key('QUEUES'), name
     @queue_pool[name] = new Queue @, name
 
+
+
   # ### Get All Queues Asynchronously
   
   # Return named queues whose names are stored in the `QUEUES` set.
@@ -198,6 +215,8 @@ class Fairy
     @redis.smembers @key('QUEUES'), (err, res) =>
       return callback err if err
       callback null, res.map (name) => @queue name
+
+
 
   # ### Get Statistics for All Queues Asynchronously
   
@@ -552,57 +571,73 @@ class Queue
   #
   #     queue.reschedule (err, statistics) -> # YOUR CODE
   reschedule: (callback) =>
-    
-    # Make sure `FAILED` list and `BLOCKED` set are not touched during the
-    # transaction.
-    @redis.watch @key 'FAILED'
-    @redis.watch @key 'BLOCKED'
-    @redis.watch @key 'PROCESSING'
 
-    # Push all failed tasks (without last two parameters: error message and
-    # failure time) into a temporary task array storing tasks to be rescheduled.
-    # Then, get all blocked groups.
-    @failed_tasks (err, tasks) =>
-      requeued_tasks = []
-      requeued_tasks.push tasks.map((task) -> JSON.stringify [task.id, task.params..., task.queued.valueOf()])...
-      @blocked_groups (err, groups) =>
+    client = create_client @fairy.options
 
-        # Make sure all blocked `QUEUED` list are not touched when you
-        # reschedule tasks in them. Then, start the transaction as:
-        #
-        #   1. Push tasks in the temporary task array into `SOURCE` list.
-        #   2. Delete `FAILED` list.
-        #   3. Delete all blocked `QUEUED` list.
-        #   4. Delete `BLOCKED` set.
-        #
-        # Commit the transaction, re-initiate the transaction when concurrency
-        # occurred, otherwise the reschedule is finished.
-        @redis.watch groups.map((group) => "#{@key('QUEUED')}:#{group}")... if groups.length
-        start_transaction = =>
-          multi = @redis.multi()
-          multi.lpush @key('SOURCE'), requeued_tasks.reverse()... if requeued_tasks.length
-          multi.del @key 'FAILED'
-          multi.del groups.map((group) => "#{@key('QUEUED')}:#{group}")... if groups.length
-          multi.del @key 'BLOCKED'
-          # multi.del @key 'PROCESSING'
-          multi.exec (multi_err, multi_res) =>
-            return callback multi_err if multi_err
-            if multi_res then @statistics callback if callback
-            else @reschedule callback
+    do reschedule = =>
+      # Make sure `FAILED` list and `BLOCKED` set are not touched during the
+      # transaction.
+      client.watch @key('FAILED')
+      client.watch @key('SOURCE')
+      client.watch @key('BLOCKED')
+      client.watch @key('PROCESSING')
+      client.hlen @key('PROCESSING'), (err, res) =>
+        if res
+          client.unwatch()
+          return reschedule()
 
-        # If there're blocked task groups, then:
-        # 
-        #   1. Find all blocked tasks, and:
-        #   2. Push them into the temporary tasks array, finally:
-        #   3. Start the transaction when this is done for all blocked groups.
-        #
-        # Otherwise, start the transaction immediately.
-        if total_groups = groups.length
-          for group in groups
-            @redis.lrange "#{@key('QUEUED')}:#{group}", 1, -1, (err, res) =>
-              requeued_tasks.push res...
-              start_transaction() unless --total_groups
-        else start_transaction()
+        # Push all failed tasks (without last two parameters: error message and
+        # failure time) into a temporary task array storing tasks to be rescheduled.
+        # Then, get all blocked groups.
+        @failed_tasks (err, tasks) =>
+          requeued_tasks = []
+          requeued_tasks.push tasks.map((task) -> JSON.stringify [task.id, task.params..., task.queued.valueOf()])...
+          @blocked_groups (err, groups) =>
+
+            # Make sure all blocked `QUEUED` list are not touched when you
+            # reschedule tasks in them. Then, start the transaction as:
+            #
+            #   1. Push tasks in the temporary task array into `SOURCE` list.
+            #   2. Delete `FAILED` list.
+            #   3. Delete all blocked `QUEUED` list.
+            #   4. Delete `BLOCKED` set.
+            #
+            # Commit the transaction, re-initiate the transaction when concurrency
+            # occurred, otherwise the reschedule is finished.
+            client.watch groups.map((group) => "#{@key('QUEUED')}:#{group}")... if groups.length
+            start_transaction = =>
+              multi = client.multi()
+              multi.lpush @key('SOURCE'), requeued_tasks.reverse()... if requeued_tasks.length
+              multi.del @key 'FAILED'
+              multi.del groups.map((group) => "#{@key('QUEUED')}:#{group}")... if groups.length
+              multi.del @key 'BLOCKED'
+              multi.exec (multi_err, multi_res) =>
+                if multi_err
+                  client.quit()
+                  return callback multi_err 
+                if multi_res
+                  client.del @key('RESCHEDULE')
+                  client.quit()
+                  @statistics callback
+                  #=>
+                  #  @rescheduling = off
+                  #  callback.apply @, arguments if callback
+                else
+                  reschedule callback
+
+            # If there're blocked task groups, then:
+            # 
+            #   1. Find all blocked tasks, and:
+            #   2. Push them into the temporary tasks array, finally:
+            #   3. Start the transaction when this is done for all blocked groups.
+            #
+            # Otherwise, start the transaction immediately.
+            if total_groups = groups.length
+              for group in groups
+                client.lrange "#{@key('QUEUED')}:#{group}", 1, -1, (err, res) =>
+                  requeued_tasks.push res...
+                  start_transaction() unless --total_groups
+            else start_transaction()
 
   # ### Get Recently Finished Tasks Asynchronously
 
@@ -678,12 +713,12 @@ class Queue
   # **Usage:**
   #
   #     queue.blocked_groups (err, groups) -> YOUR CODE
-  #
   blocked_groups: (callback) ->
     @redis.smembers @key('BLOCKED'), (err, res) ->
       return callback err if err
       callback null, res.map (entry) ->
         entry = JSON.parse entry
+
 
 
   # ### Get Slowest Tasks Asynchronously
@@ -722,6 +757,8 @@ class Queue
         started: new Date entry.pop()
         queued: new Date entry.pop()
 
+
+
   # ### Get Processing Tasks Asynchronously
   
   # Currently processing tasks are tasks in the `PROCESSING` list.
@@ -749,6 +786,8 @@ class Queue
         params: entry[1..-3]
         start: new Date entry.pop()
         queued: new Date entry.pop()
+
+
 
   # ### Get Source Tasks Asynchronously
 
@@ -790,6 +829,8 @@ class Queue
         params: entry[1..-2]
         queued: new Date entry.pop()
 
+
+
   # ### Get Workers Asynchronously
 
   # Asynchronous method to get all **live** workers of the queue. **Live**
@@ -826,6 +867,8 @@ class Queue
         pid: parseInt entry[2]
         since: new Date parseInt entry[3]
 
+
+
   # ### Clear A Queue
   
   # Remove **all** tasks of the queue, and reset statistics.
@@ -840,6 +883,8 @@ class Queue
         return callback err if err
         return @clear callback unless res
         @statistics callback
+
+
 
   # ### Get Statistics of a Queue Asynchronously
   
