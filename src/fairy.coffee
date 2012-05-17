@@ -145,7 +145,6 @@ create_client = (options) ->
   client
 
 
-
 # ## Class Fairy
 
 # Model wide variable used for allocating an increasing integer `id` for each
@@ -156,7 +155,6 @@ fairy_id = 0
 # (objects of class `Queue`) responsible for enqueuing and dispatching tasks,
 # etc.
 class Fairy
-
 
 
   # ### Constructor
@@ -178,7 +176,6 @@ class Fairy
     @queue_pool = {}
 
 
-
   # ### Function to Resolve Key Name
 
   # **Private** method to generate prefixed keys. Keys used by objects of class `Fairy`
@@ -186,7 +183,6 @@ class Fairy
   #
   #   + `QUEUES`, Redis set, containing names of all registered queues.
   key: (key) -> "#{prefix}:#{key}"
-
 
 
   # ### Get a Named Queue
@@ -203,7 +199,6 @@ class Fairy
     @queue_pool[name] = new Queue @, name
 
 
-
   # ### Get All Queues Asynchronously
   
   # Return named queues whose names are stored in the `QUEUES` set.
@@ -215,7 +210,6 @@ class Fairy
     @redis.smembers @key('QUEUES'), (err, res) =>
       return callback err if err
       callback null, res.map (name) => @queue name
-
 
 
   # ### Get Statistics for All Queues Asynchronously
@@ -325,11 +319,11 @@ class Queue
     if typeof callback isnt 'function'
       args.push callback
       callback = undefined
-    multi = @redis.multi()
-    multi.rpush @key('SOURCE'), JSON.stringify([uuid.v4(), args..., Date.now()])
-    multi.sadd @key('GROUPS'), args[0]
-    multi.hincrby @key('STATISTICS'), 'total', 1
-    multi.exec callback
+    @redis.multi()
+      .rpush(@key('SOURCE'), JSON.stringify([uuid.v4(), args..., Date.now()]))
+      .sadd(@key('GROUPS'), args[0])
+      .hincrby(@key('STATISTICS'), 'TOTAL', 1)
+      .exec(callback)
 
   # ### Register Handler
 
@@ -353,7 +347,7 @@ class Queue
     process.on 'uncaughtException', (err) =>
       if @_handler_callback
         console.log "Worker [#{worker_id.split('-')[0]}] registered for Task [#{@name}] will block its current processing group" 
-        @_handler_callback {do: 'block', message: err.stack}, null
+        @_handler_callback {do: 'block', message: err.stack}
       else
         @_try_exit()
 
@@ -383,15 +377,12 @@ class Queue
     @redis.lindex @key('SOURCE'), 0, (err, res) =>
       if res
         task = JSON.parse res
-        @processing_id = task[0]
-        @redis.llen "#{@key('QUEUED')}:#{task[1]}", (err, len) =>
-          multi = @redis.multi()
-          multi.lpop @key('SOURCE')
-          multi.rpush "#{@key('QUEUED')}:#{task[1]}", res
-          multi.hset @key('PROCESSING'), task[0], JSON.stringify [task..., Date.now()] unless len
-          multi.exec (multi_err, multi_res) =>
-            return @_poll() if not multi_res or multi_res[1] isnt 1
-            @_process task
+        @redis.multi()
+        .lpop(@key('SOURCE'))
+        .rpush("#{@key('QUEUED')}:#{task[1]}", res)
+        .exec (multi_err, multi_res) =>
+          return @_poll() unless multi_res and multi_res[1] is 1
+          @_process task
       else
         @redis.unwatch()
         setTimeout @_poll, @polling_interval
@@ -421,27 +412,13 @@ class Queue
   # `Fairy` will stop dispatching tasks.
   _process: (task) =>
 
-    # When the process is exiting, re-queue all task in the `QUEUED` list into
-    # `SOURCE` list. To ensure the correct processing order, `lpush` tasks in
-    # the `QUEUED` list in their reverse order. The `lrange` and `lpush` is
-    # protected by a transaction to atomicity.
-    if exiting
-      return do requeue = =>
-        @redis.watch "#{@key('QUEUED')}:#{task[1]}"
-        @redis.lrange "#{@key('QUEUED')}:#{task[1]}", 0, -1, (err, res) =>
-          multi = @redis.multi()
-          multi.lpush "#{@key('SOURCE')}", res.reverse()...
-          multi.del "#{@key('QUEUED')}:#{task[1]}"
-          multi.exec (err, res) =>
-            return requeue() unless res
-            return @_try_exit()
-    
-    # Make sure each time 
+    @redis.hset @key('PROCESSING'), task[0], JSON.stringify([task..., start_time = Date.now()])
+
+    # Before Processing the Task:
     #
     #   1. Keep start time of processing.
     #   2. Set `PROCESSING` hash in Redis.
     #   3. Allow `retry_limit` times of retries.
-    start_time  = Date.now()
     processing = task[0]
     retry_count = @retry_limit
     errors = []
@@ -527,29 +504,40 @@ class Queue
     @redis.watch "#{@key('QUEUED')}:#{group}"
     @redis.lindex "#{@key('QUEUED')}:#{group}", 1, (err, res) =>
       if res
-        task = JSON.parse(res)
-        multi = @redis.multi()
-        multi.lpop "#{@key('QUEUED')}:#{group}"
-        multi.hset @key('PROCESSING'), task[0], JSON.stringify [task..., Date.now()]
-        multi.exec (multi_err, multi_res) =>
-          return @_continue_group group unless multi_res   
-          @_process task, true
+        task = JSON.parse res
+        @redis.unwatch()
+        @redis.lpop "#{@key('QUEUED')}:#{group}"
+        return @_requeue_group group if exiting
+        @_process task
       else
-        multi = @redis.multi()
-        multi.lpop "#{@key('QUEUED')}:#{group}"
-        multi.exec (multi_err, multi_res) =>
+        @redis.multi()
+        .lpop("#{@key('QUEUED')}:#{group}")
+        .exec (multi_err, multi_res) =>
           return @_continue_group group unless multi_res   
+          return @_try_exit() if exiting
           @_poll()
+  
 
-          #multi = @redis.multi()
-          #multi.lpop "#{@key('QUEUED')}:#{group}"
-          #multi.lindex "#{@key('QUEUED')}:#{group}", 0
-          #multi.exec (multi_err, multi_res) =>
-          #  return @_continue_group group unless multi_res   
-          #  if multi_res[1]
-          #    @_process JSON.parse(multi_res[1]), true
-          #  else
-          #    @_poll()
+  # ### Requeue Tasks on Exit
+
+  # **Private** method. Before exiting, requeue all tasks in the processing
+  # `QUEUED` list back into `SOURCE` list to **prevent blocking** the group.
+  #
+  # To ensure the correct order of tasks, `lpush` tasks in the `QUEUED` list
+  # in their reverse order. The `lrange` and `lpush` is protected by a
+  # transaction for atomicity since other workers may still shifting tasks in
+  # the `SOURCE` list into `QUEUED` list.
+  #
+  # When tasks are requeued successfully, `_try_exit` the process.
+  _requeue_group: (group) =>
+    @redis.watch "#{@key('QUEUED')}:#{group}"
+    @redis.lrange "#{@key('QUEUED')}:#{group}", 0, -1, (err, res) =>
+      @redis.multi()
+      .lpush("#{@key('SOURCE')}", res.reverse()...)
+      .del("#{@key('QUEUED')}:#{group}")
+      .exec (multi_err, multi_res) =>
+        return @_requeue_group group unless multi_res
+        return @_try_exit()
 
   # ### Re-Schedule Failed and Blocked Tasks
 
@@ -639,6 +627,7 @@ class Queue
                   start_transaction() unless --total_groups
             else start_transaction()
 
+
   # ### Get Recently Finished Tasks Asynchronously
 
   # Recently finished tasks are tasks stored in the `RECENT` list (in the
@@ -668,6 +657,7 @@ class Queue
         params: entry[1..-3]
         finished: new Date entry.pop()
         queued: new Date entry.pop()
+
 
   # ### Get Failed Tasks Asynchronously
   
@@ -699,6 +689,7 @@ class Queue
         failed: new Date entry.pop()
         queued: new Date entry.pop()
 
+
   # ### Get Blocked Groups Asynchronously
   
   # Blocked groups' identifiers are stored in the `BLOCKED` set.
@@ -718,7 +709,6 @@ class Queue
       return callback err if err
       callback null, res.map (entry) ->
         entry = JSON.parse entry
-
 
 
   # ### Get Slowest Tasks Asynchronously
@@ -756,7 +746,6 @@ class Queue
         time: entry.pop()
         started: new Date entry.pop()
         queued: new Date entry.pop()
-
 
 
   # ### Get Processing Tasks Asynchronously
@@ -830,7 +819,6 @@ class Queue
         queued: new Date entry.pop()
 
 
-
   # ### Get Workers Asynchronously
 
   # Asynchronous method to get all **live** workers of the queue. **Live**
@@ -868,7 +856,6 @@ class Queue
         since: new Date parseInt entry[3]
 
 
-
   # ### Clear A Queue
   
   # Remove **all** tasks of the queue, and reset statistics.
@@ -878,12 +865,11 @@ class Queue
       return callback err if err
       multi = @redis.multi()
       multi.del @key('GROUPS'), @key('RECENT'), @key('FAILED'), @key('SOURCE'), @key('STATISTICS'), @key('SLOWEST'), @key('BLOCKED'), res...
-      multi.hmset @key('STATISTICS'), 'total', 0, 'finished', 0, 'total_pending_time', 0, 'total_process_time', 0
+      multi.hmset @key('STATISTICS'), 'TOTAL', 0, 'finished', 0, 'total_pending_time', 0, 'total_process_time', 0
       multi.exec (err, res) =>
         return callback err if err
         return @clear callback unless res
         @statistics callback
-
 
 
   # ### Get Statistics of a Queue Asynchronously
@@ -965,7 +951,7 @@ class Queue
         name: @name
         total:
           groups: multi_res[0]
-          tasks: parseInt(statistics.total) or 0
+          tasks: parseInt(statistics.TOTAL) or 0
         finished_tasks: parseInt(statistics.finished) or 0
         average_pending_time: Math.round(statistics.total_pending_time * 100 / statistics.finished) / 100
         average_process_time: Math.round(statistics.total_process_time * 100 / statistics.finished) / 100
