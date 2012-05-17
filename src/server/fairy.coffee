@@ -8,7 +8,7 @@ arr = [
   '</tr>',
   '<%})%>',
   '<tr>',
-  '<td>Total</td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.workers); }, 0)%></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.average_pending_time); }, 0)%></td><td><span><%= _.reduce(data, function(memo, item){ return memo + Number(item.total.tasks); }, 0)%></span><span>/</span><span><%= _.reduce(data, function(memo, item){ return memo + Number(item.total.groups); }, 0) %></span></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.finished_tasks); }, 0)%></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.processing_tasks); }, 0)%></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.pending_tasks); }, 0)%></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.failed_tasks); }, 0)%></td><td><span><%= _.reduce(data, function(memo, item){ return memo + Number(item.blocked.tasks); }, 0)%></span><span>/</span><span><%= _.reduce(data, function(memo, item){ return memo + Number(item.blocked.groups); }, 0)%></span></td><td></td><td></td>',
+  '<td>Total</td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.workers); }, 0)%></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.average_pending_time); }, 0)%></td><td><span><%= _.reduce(data, function(memo, item){ return memo + Number(item.total.tasks); }, 0)%></span><span>/</span><span><%= _.reduce(data, function(memo, item){ return memo + Number(item.total.groups); }, 0) %></span></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.finished_tasks); }, 0)%></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.processing_tasks); }, 0)%></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.pending_tasks); }, 0)%></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.failed_tasks); }, 0)%></td><td><span><%= _.reduce(data, function(memo, item){ return memo + Number(item.blocked.tasks); }, 0)%></span><span>/</span><span><%= _.reduce(data, function(memo, item){ return memo + Number(item.blocked.groups); }, 0)%></span></td><td>&nbsp;</td><td>&nbsp;</td>',
   '</tr>',
   '</tbody>',
   '</table>'
@@ -46,6 +46,7 @@ bind = () ->
     name = $($(that).find('td')[0]).html()
     console.log name
     data_bind_detail name
+  
     $('#queque_detail').show()
 
   $('#statistics .btn_schedule').live 'click', (event)-> 
@@ -102,6 +103,8 @@ data_bind_detail = (name)->
     url: '/api/queues/' + name + '/failed_tasks'
     success: (task)->
       $('#failed_tasks').html _.template($('#tb_failed_template').html(), { failed_tasks: task })
+      $(".failed_popover").find(".nav-tabs>li:first").addClass("active")
+      $(".failed_popover").find(".tab-content>div:first").addClass("active")
   })
   $.ajax({
     type: 'GET'
@@ -130,4 +133,6 @@ $('#queque_detail').hide()
   return Math.floor(second)+'s' if(1<second<60)
   Math.floor(second/60)+'m'+':'+Math.floor(second%60)+'s' if second > 60
 
-
+@id_factory = () ->
+  i = 0
+  return {new: () -> return i++ }

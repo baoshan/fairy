@@ -1,7 +1,4 @@
 body{/*width:1024px;*/ margin:auto auto; overflow-y:scroll; font-family:Palatino, "Palatino Linotype", Georgia, serif;}
-
-
-
 /*h1*/
 h1{
   position:fixed;
@@ -69,6 +66,7 @@ h1+.table_title{ margin-top:120px;}
   -o-transition: background-color 0.1s ease;
   transition: background-color 0.1s ease;
 }
+.overview td,.overview th{ white-space:nowrap;}
 .overview tr td:hover{ cursor:default;}
 .overview tr th{ min-width:50px;}
 .overview tr th:nth-child(1){ min-width:85px;}
@@ -112,13 +110,25 @@ table[class*="workers"]{
 table[class*="glance"] tr th:nth-child(1){ 
   background:#F5F5F5;
 }
-.table_title i{
+.table_title>i{
   position:absolute;
   top:50%;
   margin-top:-8px;
   filter: Alpha(opacity=40);
   opacity: 0.4;
   cursor:pointer;
+}
+.table_title .control-group{
+  position:absolute;
+  right:0px;
+  top:-3px;
+  font-size:14px;
+}
+.table_title .control-group select{
+  margin-left:-5px;
+}
+.table_title .control-group i{
+  margin-top:2px;
 }
 .table_title i:hover{
   filter: Alpha(opacity=100);
@@ -160,11 +170,17 @@ table[class*="glance"] tr th:nth-child(1){
   display:none;
   position:absolute;
   left : -400px;
-  top:-10px;
+  top:-20px;
   text-align:left !important;
+  z-index:1000;
 }
 .failed_popover .tab-content{
-  overflow:visible;
+  overflow:visible !important;
+  padding:5px;
+  font-size:13px;
+}
+.tab-content{
+  overflow:visible !important;
 }
 td:hover .failed_popover{
   display:block;
@@ -176,7 +192,7 @@ td:hover .failed_popover{
 .failed_popover:after{
   position:absolute;
   right:-10px;
-  top:10px;
+  top:20px;
   content:"▶";
   font-size:14px;
   color:#333;
@@ -187,20 +203,6 @@ td:hover .failed_popover{
   overflow:none !important;
 }
 .failed_popover .nav-tabs > li a{
-  overflow:none important;
+  overflow:hidden important;
   /*font-size:0px;*/
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
