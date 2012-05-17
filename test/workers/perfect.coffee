@@ -1,6 +1,6 @@
 {exec} = require 'child_process'
 
-task      = 'TEST0'
+task      = process.argv[2]
 fairy     = require("#{__dirname}/../..").connect()
 queue     = fairy.queue task
 

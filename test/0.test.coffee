@@ -1,60 +1,66 @@
+
 {exec} = require 'child_process'
-fs = require 'fs'
-require 'should'
-task = 'TEST0'
-fairy = require("#{__dirname}/..").connect()
-queue = fairy.queue task
-total = 2000
-groups = 10
-generated = 0
-group_sequence = [0 .. groups - 1].map -> 0
+fs     = require 'fs'
+should = require 'should'
+fairy  = require("..").connect()
+
+task_name = 'TEST0'
+queue     = fairy.queue task_name
+
+total_groups = 10
+total_tasks  = 2000
+total_workers = require('os').cpus().length
 child_processes = []
 
-module.exports = 
+describe ["Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_workers} Perfect Workers"], ->
 
-  'should clear the queue first': (done) ->
+  it "Should Clear the Queue First", (done) ->
     queue.clear (err, statistics) ->
       statistics.total.groups.should.equal 0
       statistics.total.tasks.should.equal 0
       done()
 
-  'should successfully enqueued': (done) ->
+  it "Should Enqueue #{total_tasks} Tasks Successfully", (done) ->
+    generated = 0
+    group_sequence = [0 .. total_groups - 1].map -> 0
     do generate = ->
-      if generated++ is total
-        queue.statistics (err, statistics) ->
-          statistics.total.groups.should.equal groups
-          statistics.total.tasks.should.equal total
+      if generated++ is total_tasks
+        return queue.statistics (err, statistics) ->
+          statistics.total.groups.should.equal total_groups
+          statistics.total.tasks.should.equal total_tasks
           done()
-      else
-        group = parseInt Math.random() * groups
-        sequence = group_sequence[group]++
-        queue.enqueue group, sequence, generate
+      group = parseInt Math.random() * total_groups
+      sequence = group_sequence[group]++
+      queue.enqueue group, sequence, generate
 
-  'should all be processed': (done) ->
+  it "Should All Be Processed", (done) ->
     exec "rm -f #{__dirname}/workers/*.dmp", (err, stdout, stderr) ->
-      total_process = 8
-      child_processes = while total_process--
-        exec "coffee #{__dirname}/workers/perfect.coffee" # , (err, stdout, stderr) -> console.log err, stdout, stderr
+      workers_left = total_workers
+      child_processes = while workers_left--
+        exec "coffee #{__dirname}/workers/perfect.coffee #{task_name}"
       do probe = ->
         queue.statistics (err, statistics) ->
-          if statistics.finished_tasks is total
+          if statistics.finished_tasks is total_tasks
             statistics.pending_tasks.should.equal 0
             statistics.processing_tasks.should.equal 0
             done()
           else
             setTimeout probe, 10
 
-  'should cleanup elegantly on interruption': (done) ->
-    child_processes.forEach (process) -> process.kill 'SIGINT'
-    setTimeout ->
+  it "Should Cleanup Elegantly on Interruption", (done) ->
+    allowed_signals = ['SIGINT', 'SIGHUP', 'SIGUSR2']
+    random_signal = -> allowed_signals[parseInt Math.random() * allowed_signals.length]
+    process.kill random_signal() for process in child_processes
+    do get_statistics = ->
       queue.statistics (err, statistics) ->
-        statistics.workers.should.equal 0
-        done()
-    , 100
+        return get_statistics() unless statistics.workers is 0
+        setTimeout ->
+          queue.statistics (err, statistics) ->
+            done() if statistics.workers is 0
+        , 10
 
-  'should produce sequential results': (done) ->
-    [0..groups-1].forEach (group) ->
-      dump_file = fs.readFileSync("#{__dirname}/workers/#{group}.dmp").toString()
-      dump_file.split('\n')[0..-2].forEach (content, line) ->
-        content.should.equal line + ''
-    exec "rm -f #{__dirname}/workers/*.dmp", -> done()
+  it "Should Dump Incremental Numbers", (done) ->
+    for group in [0 .. total_groups - 1]
+      for content, line in fs.readFileSync("#{__dirname}/workers/#{group}.dmp").toString().split('\n')[0..-2]
+        content.should.equal "#{line}"
+    exec "rm -f #{__dirname}/workers/*.dmp", done
