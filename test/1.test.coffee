@@ -36,16 +36,27 @@ module.exports =
       child_processes = while total_process--
         exec "coffee #{__dirname}/workers/fail-and-block.coffee" # , (err, stdout, stderr) -> console.log err, stdout, stderr
       do probe = ->
+        queue.reschedule (err, statistics) ->
+        setTimeout probe, 50
+
+      do stats = ->
         queue.statistics (err, statistics) ->
-          if statistics.pending_tasks is 0 and statistics.processing_tasks is 0 and statistics.finished_tasks isnt total
-            queue.reschedule (err, statistics) ->
-              setTimeout probe, 10
-          else if statistics.finished_tasks is total
-            statistics.pending_tasks.should.equal 0
-            statistics.processing_tasks.should.equal 0
+          if statistics.finished_tasks is total
             done()
           else
-            setTimeout probe, 10
+            setTimeout stats, 10
+          #  queue.statistics (err, statistics) ->
+          #    if statistics.pending_tasks is 0 and statistics.processing_tasks is 0 and statistics.finished_tasks isnt total
+          #      console.log 'R'
+          #      queue.reschedule (err, statistics) ->
+          #        console.log statistics.pending_tasks
+          #        setTimeout probe, 10
+          #    if statistics.finished_tasks is total
+          #      statistics.pending_tasks.should.equal 0
+          #      statistics.processing_tasks.should.equal 0
+          #      done()
+          #    else
+          #      setTimeout probe, 10
 
   'should cleanup elegantly on interruption': (done) ->
     child_processes.forEach (process) -> process.kill 'SIGINT'
