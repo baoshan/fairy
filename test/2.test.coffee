@@ -83,16 +83,17 @@ describe "Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_work
             setTimeout stats, 10
 
   it "Should Cleanup Elegantly on Interruption", (done) ->
-    allowed_signals = ['SIGINT', 'SIGHUP', 'SIGUSR2']
-    random_signal = -> allowed_signals[parseInt Math.random() * allowed_signals.length]
-    process.kill random_signal() for process in child_processes
-    do get_statistics = ->
-      queue.statistics (err, statistics) ->
-        return get_statistics() unless statistics.workers is 0
-        setTimeout ->
-          queue.statistics (err, statistics) ->
-            done() if statistics.workers is 0
-        , 10
+    queue.workers (err, workers) ->
+      allowed_signals = ['SIGINT', 'SIGHUP', 'SIGUSR2']
+      random_signal = -> allowed_signals[parseInt Math.random() * allowed_signals.length]
+      process.kill worker.pid, random_signal() for worker in workers
+      do get_statistics = ->
+        queue.statistics (err, statistics) ->
+          return get_statistics() unless statistics.workers is 0
+          setTimeout ->
+            queue.statistics (err, statistics) ->
+              done() if statistics.workers is 0
+          , 10
 
   it "Should Dump Incremental Numbers", (done) ->
     for group in [0 .. total_groups - 1]
