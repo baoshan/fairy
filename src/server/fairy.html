@@ -37,14 +37,14 @@
 
 
 </div>
-<div id="statistics"></div>
+<div id="m_statistics"></div>
 <div id="queque_detail">
 
   <div class="table_title">Glance<i class="icon-th"></i><i class="icon-th-large active"></i></div>
-  <div id="statistic"></div>
+  <div id="s_statistics"></div>
   
   <div class="table_title">Workers</div>
-  <div id="workers"></div>
+  <div id="s_workers"></div>
   
   <!--最近处理任务---失败任务汇总---周期最长-->
   <div class="tabbable">
@@ -58,40 +58,35 @@
 	  
       <div class="tab-pane-title">最近处理任务</div>
       <div class="tab-pane active" id="tab1">
-        <div id="recently_finished_tasks"></div>
+        <div id="s_recently_finished_tasks"></div>
       </div>
     
       <div class="tab-pane-title">失败任务汇总</div>
       <div class="tab-pane" id="tab2">
-        <div id="failed_tasks"></div>
+        <div id="s_failed_tasks"></div>
       </div>
      
       <div class="tab-pane-title">当前处理任务</div>
       <div class="tab-pane" id="tab3">
-        <div id="processing_tasks"></div>
+        <div id="s_processing_tasks"></div>
       </div>
 
       <div class="tab-pane-title">周期最长</div>
       <div class="tab-pane" id="tab4">
-        <div id="slowest_tasks"></div>
+        <div id="s_slowest_tasks"></div>
       </div>
     
     </div>
   </div>
-  
-  
-  
 </div>
 
-
-
 <!--template-->
-<script id="tb_statistic_template" type = "template/underscore" >
+<script id="tb_statistics_template" type = "template/underscore" >
   <table class="table table-bordered glance">
-    <tr><th>Toalt</td><th><%= statistic.finished_tasks %></td></tr>
-    <tr><th>Avg. Waiting In</th><td><%= statistic.average_pending_time %></td></tr>
-    <tr><th>Avg. Processing In</th><td><%= statistic.average_process_time %></td></tr>
-    <tr><th>Avg. Finished In</th><td><%= Number(statistic.average_pending_time) + Number(statistic.average_process_time) %></td></tr>
+    <tr><th>Toalt</td><th><%= statistics.finished_tasks %></td></tr>
+    <tr><th>Avg. Waiting In</th><td><%= statistics.average_pending_time %></td></tr>
+    <tr><th>Avg. Processing In</th><td><%= statistics.average_process_time %></td></tr>
+    <tr><th>Avg. Finished In</th><td><%= Number(statistics.average_pending_time) + Number(statistics.average_process_time) %></td></tr>
   </table>
 </script>
 
@@ -101,13 +96,13 @@
    <thead>
      <tr>
       <th> 编号</th>
-      <th colspan = <%= finished_tasks.length?finished_tasks[0].params.length:0 %>> 参数</th>
+      <th colspan = <%= recently_finished_tasks.length?recently_finished_tasks[0].params.length:0 %>> 参数</th>
       <th> 进入堆栈时间</th>
       <th> 完成时间</th>
      </tr>
    </thead>
    <tbody>
-     <% _.each(finished_tasks, function(item) { %>
+     <% _.each(recently_finished_tasks, function(item) { %>
      <tr>
       <td><%= item.id.substring(0,8) %></td>
       <%_.each(item.params, function(value){ %>
@@ -122,7 +117,7 @@
 </script>
 
 
-<script id="tb_failed_template" type = "template/underscore" >
+<script id="tb_failed_tasks_template" type = "template/underscore" >
   <table class="table table-bordered">
    <thead>
      <tr>
@@ -172,7 +167,7 @@
   </table>
 </script>
 
-<script id="tb_slowest_template" type = "template/underscore" >
+<script id="tb_slowest_tasks_template" type = "template/underscore" >
   <table class="table table-bordered">
    <thead>
      <tr>
