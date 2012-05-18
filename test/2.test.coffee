@@ -63,11 +63,15 @@ describe "Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_work
         setTimeout reschedule, 100
 
       do killone = ->
-        victim_index = parseInt Math.random() * (child_processes.length - 1)
-        allowed_signals = ['SIGINT', 'SIGHUP', 'SIGUSR2']
-        random_signal = -> allowed_signals[parseInt Math.random() * allowed_signals.length]
-        child_processes[victim_index].kill random_signal()
-        setTimeout killone, 100
+        queue.workers (err, workers) ->
+                  
+          return setTimeout killone, 100 unless workers.length
+          victim_index = parseInt Math.random() * workers.length
+          allowed_signals = ['SIGINT', 'SIGHUP', 'SIGUSR2']
+          random_signal = -> allowed_signals[parseInt Math.random() * allowed_signals.length]
+          #console.log workers, victim_index
+          process.kill workers[victim_index].pid, random_signal()
+          setTimeout killone, 100
 
       do stats = ->
         queue.statistics (err, statistics) ->
@@ -93,7 +97,7 @@ describe "Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_work
           setTimeout ->
             queue.statistics (err, statistics) ->
               done() if statistics.workers is 0
-          , 10
+          , 20
 
   it "Should Dump Incremental Numbers", (done) ->
     for group in [0 .. total_groups - 1]
