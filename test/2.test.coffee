@@ -55,8 +55,6 @@ describe "Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_work
               killed++
               return if exiting
               respawn(workers_left)
-            #child_processes[workers_left] = exec "coffee #{__dirname}/workers/fail-and-block.coffee #{task_name}"
-
 
       do reschedule = ->
         queue.reschedule (err, statistics) ->
@@ -69,7 +67,6 @@ describe "Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_work
           victim_index = parseInt Math.random() * workers.length
           allowed_signals = ['SIGINT', 'SIGHUP', 'SIGUSR2']
           random_signal = -> allowed_signals[parseInt Math.random() * allowed_signals.length]
-          #console.log workers, victim_index
           process.kill workers[victim_index].pid, random_signal()
           setTimeout killone, 100
 
@@ -87,17 +84,16 @@ describe "Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_work
             setTimeout stats, 10
 
   it "Should Cleanup Elegantly on Interruption", (done) ->
+    checked_times = 0
     queue.workers (err, workers) ->
       allowed_signals = ['SIGINT', 'SIGHUP', 'SIGUSR2']
       random_signal = -> allowed_signals[parseInt Math.random() * allowed_signals.length]
       process.kill worker.pid, random_signal() for worker in workers
       do get_statistics = ->
         queue.statistics (err, statistics) ->
-          return get_statistics() unless statistics.workers is 0
-          setTimeout ->
-            queue.statistics (err, statistics) ->
-              done() if statistics.workers is 0
-          , 20
+          return setTimeout get_statistics, 100 unless statistics.workers is 0
+          return setTimeout get_statistics, 100 unless checked_times++ is 3
+          done()
 
   it "Should Dump Incremental Numbers", (done) ->
     for group in [0 .. total_groups - 1]
