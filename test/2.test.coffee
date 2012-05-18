@@ -36,14 +36,27 @@ describe "Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_work
   it "Should All Be Processed on a Interrupt and Respawn Environment", (done) ->
     exiting = off
     exec "rm -f #{__dirname}/workers/*.dmp", (err, stdout, stderr) ->
+      killed = 0
       workers_left = total_workers
       child_processes = []
       while --workers_left >= 0
         do (workers_left) ->
           child_processes[workers_left] = exec "coffee #{__dirname}/workers/fail-and-block.coffee #{task_name}"
-          child_processes[workers_left].on 'exit', ->
-            return if exiting
+          respawn = (workers_left) ->
             child_processes[workers_left] = exec "coffee #{__dirname}/workers/fail-and-block.coffee #{task_name}"
+            child_processes[workers_left].on 'exit', do (workers_left) ->
+              ->
+                killed++
+                return if exiting
+                respawn(workers_left)
+
+          child_processes[workers_left].on 'exit', do (workers_left) ->
+            ->
+              killed++
+              return if exiting
+              respawn(workers_left)
+            #child_processes[workers_left] = exec "coffee #{__dirname}/workers/fail-and-block.coffee #{task_name}"
+
 
       do reschedule = ->
         queue.reschedule (err, statistics) ->
@@ -51,7 +64,9 @@ describe "Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_work
 
       do killone = ->
         victim_index = parseInt Math.random() * (child_processes.length - 1)
-        child_processes[victim_index].kill 'SIGHUP'
+        allowed_signals = ['SIGINT', 'SIGHUP', 'SIGUSR2']
+        random_signal = -> allowed_signals[parseInt Math.random() * allowed_signals.length]
+        child_processes[victim_index].kill random_signal()
         setTimeout killone, 100
 
       do stats = ->
@@ -61,7 +76,7 @@ describe "Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_work
               queue.statistics (err, statistics) ->
                 if statistics.finished_tasks is total_tasks and statistics.pending_tasks is 0
                   exiting = on
-                  # child_processes.forEach (process) -> process.kill 'SIGHUP'
+                  console.log ", #{killed} workers killed, #{statistics.workers} alive"
                   done()
             , 100
           else
