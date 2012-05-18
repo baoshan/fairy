@@ -4,7 +4,7 @@ fs     = require 'fs'
 should = require 'should'
 fairy  = require("..").connect()
 
-task_name = 'TEST1'
+task_name = 'TEST2'
 queue     = fairy.queue task_name
 
 total_groups = 10
@@ -12,7 +12,7 @@ total_tasks  = 2000
 total_workers = require('os').cpus().length
 child_processes = []
 
-describe ["Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_workers} Fail-n-Block Workers"], ->
+describe "Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_workers} Fail-n-Block Workers, Kill and Respawn Periodically", ->
 
   it "Should Clear the Queue First", (done) ->
     queue.clear (err, statistics) ->
@@ -33,22 +33,58 @@ describe ["Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_wor
       sequence = group_sequence[group]++
       queue.enqueue group, sequence, generate
 
-  it "Should All Be Processed", (done) ->
+  it "Should All Be Processed on a Interrupt and Respawn Environment", (done) ->
+    exiting = off
     exec "rm -f #{__dirname}/workers/*.dmp", (err, stdout, stderr) ->
+      killed = 0
       workers_left = total_workers
-      child_processes = while workers_left--
-        exec "coffee #{__dirname}/workers/fail-and-block.coffee #{task_name}"
+      child_processes = []
+      while --workers_left >= 0
+        do (workers_left) ->
+          child_processes[workers_left] = exec "coffee #{__dirname}/workers/fail-and-block.coffee #{task_name}"
+          respawn = (workers_left) ->
+            child_processes[workers_left] = exec "coffee #{__dirname}/workers/fail-and-block.coffee #{task_name}"
+            child_processes[workers_left].on 'exit', do (workers_left) ->
+              ->
+                killed++
+                return if exiting
+                respawn(workers_left)
+
+          child_processes[workers_left].on 'exit', do (workers_left) ->
+            ->
+              killed++
+              return if exiting
+              respawn(workers_left)
+            #child_processes[workers_left] = exec "coffee #{__dirname}/workers/fail-and-block.coffee #{task_name}"
+
+
       do reschedule = ->
         queue.reschedule (err, statistics) ->
         setTimeout reschedule, 100
-      do probe = ->
+
+      do killone = ->
+        queue.workers (err, workers) ->
+                  
+          return setTimeout killone, 100 unless workers.length
+          victim_index = parseInt Math.random() * workers.length
+          allowed_signals = ['SIGINT', 'SIGHUP', 'SIGUSR2']
+          random_signal = -> allowed_signals[parseInt Math.random() * allowed_signals.length]
+          #console.log workers, victim_index
+          process.kill workers[victim_index].pid, random_signal()
+          setTimeout killone, 100
+
+      do stats = ->
         queue.statistics (err, statistics) ->
           if statistics.finished_tasks is total_tasks
-            statistics.pending_tasks.should.equal 0
-            statistics.processing_tasks.should.equal 0
-            done()
+            setTimeout ->
+              queue.statistics (err, statistics) ->
+                if statistics.finished_tasks is total_tasks and statistics.pending_tasks is 0
+                  exiting = on
+                  console.log ", #{killed} workers killed, #{statistics.workers} alive"
+                  done()
+            , 100
           else
-            setTimeout probe, 10
+            setTimeout stats, 10
 
   it "Should Cleanup Elegantly on Interruption", (done) ->
     queue.workers (err, workers) ->
@@ -61,7 +97,7 @@ describe ["Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_wor
           setTimeout ->
             queue.statistics (err, statistics) ->
               done() if statistics.workers is 0
-          , 10
+          , 20
 
   it "Should Dump Incremental Numbers", (done) ->
     for group in [0 .. total_groups - 1]
