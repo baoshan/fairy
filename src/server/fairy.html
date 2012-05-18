@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <link href="http://twitter.github.com/bootstrap/assets/css/bootstrap.css" rel="stylesheet">
 <link href="fairy.css" rel="stylesheet">
-<title>Fairy Statistics</title>
+<title>Fairy Dashboard</title>
 </head>
 
 <body>
@@ -49,7 +49,7 @@
       <li><a href="#tab4" data-toggle="tab">周期最长</a></li>
     </ul>
     <div class="tab-content">
-	  
+
       <div class="tab-pane-title">最近处理任务</div>
       <div class="tab-pane active" id="tab1">
         <div id="s_recently_finished_tasks"></div>
@@ -77,7 +77,7 @@
 <!--template-->
 <script id="tb_statistics_template" type = "template/underscore" >
   <table class="table table-bordered glance">
-    <tr><th>Toalt</td><th><%= statistics.finished_tasks %></td></tr>
+    <tr><th>Total</td><th><%= statistics.finished_tasks %></td></tr>
     <tr><th>Avg. Waiting In</th><td><%= statistics.average_pending_time %></td></tr>
     <tr><th>Avg. Processing In</th><td><%= statistics.average_process_time %></td></tr>
     <tr><th>Avg. Finished In</th><td><%= Number(statistics.average_pending_time) + Number(statistics.average_process_time) %></td></tr>
@@ -89,10 +89,10 @@
   <table class="table table-bordered">
    <thead>
      <tr>
-      <th> 编号</th>
-      <th colspan = <%= recently_finished_tasks.length?recently_finished_tasks[0].params.length:0 %>> 参数</th>
-      <th> 进入堆栈时间</th>
-      <th> 完成时间</th>
+      <th>编号</th>
+      <th colspan = <%= recently_finished_tasks.length?recently_finished_tasks[0].params.length:0 %>>参数</th>
+      <th>进入堆栈时间</th>
+      <th>完成时间</th>
      </tr>
    </thead>
    <tbody>
@@ -115,11 +115,11 @@
   <table class="table table-bordered">
    <thead>
      <tr>
-      <th> 编号</th>
-      <th colspan = <%= failed_tasks.length?failed_tasks[0].params.length:0 %>> 参数</th>
-      <th> 进入堆栈时间</th>
-      <th> 完成时间</th>
-      <th colspan = <%= failed_tasks.length?failed_tasks[0].reason.length:0%>> 失败原因</th>
+      <th>编号</th>
+      <th colspan = <%= failed_tasks.length?failed_tasks[0].params.length:0 %>>参数</th>
+      <th>进入堆栈时间</th>
+      <th>完成时间</th>
+      <th colspan = <%= failed_tasks.length?failed_tasks[0].reason.length:0%>>失败原因</th>
      </tr>
    </thead>
    <tbody>
@@ -132,32 +132,27 @@
     <td> <%= moment.duration((new Date).valueOf()-(new Date(item.queued)).valueOf()).humanize()%></td>
     <td> <%= moment.duration((new Date).valueOf()-(new Date(item.failed)).valueOf()).humanize()%></td>
     <td>
-    
-       <div class="failed_popover_position">more ...<div class="failed_popover"><div class="arrow"></div><div class="popover-inner"><div class="popover-content">
-		   
-			<div class='tabbable'>
-			  <ul class='nav nav-tabs'>
-				<%i =0 %>
-				<%_.each(item.reason, function(value, i){ %>
-				<% item.reason["id"+i] = id.new() %>
-				<li class=''><a href='#click<%= item.reason["id"+i] %>' data-toggle='tab'><%= ++i %></a></li>
-				<% })%>
-			  </ul>
+      <div class="failed_popover_position">more ...<div class="failed_popover"><div class="arrow"></div><div class="popover-inner"><div class="popover-content"> 
+       <div class='tabbable'>
+        <ul class='nav nav-tabs'>
+         <%_.each(item.reason, function(value, i){ %>
+           <% item.reason["id"+i] = id.new() %>
+           <li class=''><a href='#click<%= item.reason["id"+i] %>' data-toggle='tab'><%= ++i %></a></li>
+        <% })%>
+        </ul>
 			  <div class='tab-content'>
-				<%_.each(item.reason, function(value, i){ %>
-				<div class='tab-pane' id='click<%= item.reason["id"+i]%>'>
-				  <%= value %>
-				</div>
-				<% })%>
-			  </div>
-			</div>		
-			
-	   </div></div></div></div>
-    
+				  <%_.each(item.reason, function(value, i){ %>
+				    <div class='tab-pane' id='click<%= item.reason["id"+i]%>'>
+				    <%= value %>
+				    </div>
+          <% })%>
+        </div>
+      </div>		
+     </div></div></div></div>
     </td>
    </tr>
-   <% }) %>
-   </tbody>
+  <% }) %>
+  </tbody>
   </table>
 </script>
 
@@ -165,11 +160,11 @@
   <table class="table table-bordered">
    <thead>
      <tr>
-      <th> 编号</th>
-      <th colspan = <%= slowest_tasks.length?slowest_tasks[0].params.length:0 %>> 参数</th>
-      <th> 进入堆栈时间</th>
-      <th> 开始时间</th>
-      <th> 完成时间</th>
+      <th>编号</th>
+      <th colspan = <%= slowest_tasks.length?slowest_tasks[0].params.length:0 %>>参数</th>
+      <th>进入堆栈时间</th>
+      <th>开始时间</th>
+      <th>完成时间</th>
      </tr>
    </thead>
    <% _.each(slowest_tasks, function(item) { %>
@@ -192,10 +187,10 @@
   <table class="table table-bordered">
    <thead>
      <tr>
-      <th> 编号</th>
-      <th colspan = <%= processing_tasks.length?processing_tasks[0].params.length:0 %>> 参数</th>
-      <th> 进入堆栈时间</th>
-      <th> 开始时间</th>
+      <th>编号</th>
+      <th colspan = <%= processing_tasks.length?processing_tasks[0].params.length:0 %>>参数</th>
+      <th>进入堆栈时间</th>
+      <th>开始时间</th>
      </tr>
    </thead>
    <% _.each(processing_tasks, function(item) { %>
