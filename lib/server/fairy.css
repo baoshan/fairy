@@ -1,7 +1,4 @@
 body{/*width:1024px;*/ margin:auto auto; overflow-y:scroll; font-family:Palatino, "Palatino Linotype", Georgia, serif;}
-
-
-
 /*h1*/
 h1{
   position:fixed;
@@ -69,9 +66,10 @@ h1+.table_title{ margin-top:120px;}
   -o-transition: background-color 0.1s ease;
   transition: background-color 0.1s ease;
 }
-
+.overview td,.overview th{ white-space:nowrap;}
+.overview tr td:hover{ cursor:default;}
 .overview tr th{ min-width:50px;}
-.overview tr th:nth-child(1){ min-width:100px;}
+.overview tr th:nth-child(1){ min-width:85px;}
 .overview tr th:nth-child(10){ width:40px;}
 .overview tr th:nth-child(11){ width:40px;}
 .overview tr th:nth-child(7){ background:#ffeded; color:red;}
@@ -104,21 +102,33 @@ thead tr{ background:#F5F5F5; color:#666}
 
 /*Glance and Worders*/
 table[class*="glance"]{
-  width:500px;
+  width:300px;
 }
 table[class*="workers"]{
-  width:500px;
+  width:600px;
 }
 table[class*="glance"] tr th:nth-child(1){ 
   background:#F5F5F5;
 }
-.table_title i{
+.table_title>i{
   position:absolute;
   top:50%;
   margin-top:-8px;
   filter: Alpha(opacity=40);
   opacity: 0.4;
   cursor:pointer;
+}
+.table_title .control-group{
+  position:absolute;
+  right:0px;
+  top:-3px;
+  font-size:14px;
+}
+.table_title .control-group select{
+  margin-left:-5px;
+}
+.table_title .control-group i{
+  margin-top:2px;
 }
 .table_title i:hover{
   filter: Alpha(opacity=100);
@@ -149,4 +159,50 @@ table[class*="glance"] tr th:nth-child(1){
 .table_title i[class*="active"]{
   filter: Alpha(opacity=100);
   opacity: 1;
+}
+/*失败原因*/
+.failed_popover_position{
+  position:relative;
+  width:100%;
+  height:100%;
+}
+.failed_popover{
+  display:none;
+  position:absolute;
+  left : -400px;
+  top:-20px;
+  text-align:left !important;
+  z-index:1000;
+}
+.failed_popover .tab-content{
+  overflow:visible !important;
+  padding:5px;
+  font-size:13px;
+}
+.tab-content{
+  overflow:visible !important;
+}
+td:hover .failed_popover{
+  display:block;
+}
+.failed_popover .popover-inner{
+  width:400px !important;
+  overflow:visible;
+}
+.failed_popover:after{
+  position:absolute;
+  right:-10px;
+  top:20px;
+  content:"▶";
+  font-size:14px;
+  color:#333;
+}
+.failed_popover .nav-tabs > li{
+  width:50px !important;
+  height:36px !important;
+  overflow:none !important;
+}
+.failed_popover .nav-tabs > li a{
+  overflow:hidden important;
+  /*font-size:0px;*/
 }

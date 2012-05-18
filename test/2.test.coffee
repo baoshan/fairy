@@ -1,98 +1,102 @@
+
 {exec} = require 'child_process'
-fs = require 'fs'
-require 'should'
-task = 'TEST0'
-fairy = require("#{__dirname}/..").connect()
-queue = fairy.queue task
-total = 2000
-groups = 10
-generated = 0
-group_sequence = [0 .. groups - 1].map -> 0
+fs     = require 'fs'
+should = require 'should'
+fairy  = require("..").connect()
+
+task_name = 'TEST2'
+queue     = fairy.queue task_name
+
+total_groups = 10
+total_tasks  = 2000
+total_workers = require('os').cpus().length
 child_processes = []
 
-module.exports = 
+describe "Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_workers} Fail-n-Block Workers, Kill and Respawn Periodically", ->
 
-  'abc' :
+  it "Should Clear the Queue First", (done) ->
+    queue.clear (err, statistics) ->
+      statistics.total.groups.should.equal 0
+      statistics.total.tasks.should.equal 0
+      done()
 
-    'should clear the queue first': (done) ->
-      queue.clear (err, statistics) ->
-        statistics.total.groups.should.equal 0
-        statistics.total.tasks.should.equal 0
-        done()
-
-    'should successfully enqueued': (done) ->
-      do generate = ->
-        if generated++ is total
-          queue.statistics (err, statistics) ->
-            statistics.total.groups.should.equal groups
-            statistics.total.tasks.should.equal total
-            done()
-        else
-          group = parseInt Math.random() * groups
-          sequence = group_sequence[group]++
-          queue.enqueue group, sequence, generate
-
-    'should all be processed': (done) ->
-
-      exiting = off
-
-      exec "rm -f #{__dirname}/workers/*.dmp", (err, stdout, stderr) ->
-        total_process = 8
-        child_processes = []
-        while --total_process >= 0
-          do (total_process) ->
-            child_processes[total_process] = exec "coffee #{__dirname}/workers/fail-and-block.coffee" # , (err, stdout, stderr) -> console.log err, stdout, stderr
-            child_processes[total_process].on 'exit', ->
-              return if exiting
-              child_processes[total_process] = exec "coffee #{__dirname}/workers/fail-and-block.coffee"
-
-        do probe = ->
-          queue.reschedule (err, statistics) ->
-          setTimeout probe, 100
-
-        do killone = ->
-          victim_index = Math.round (Math.random() * (child_processes.length - 1))
-          child_processes[victim_index].kill 'SIGHUP'
-          #child_processes[victim_index].on 'exit', ->
-          #  child_processes[victim_index] = exec "coffee #{__dirname}/workers/fail-and-block.coffee"
-          #  setTimeout killone, 200
-
-        do stats = ->
-          queue.statistics (err, statistics) ->
-            if statistics.finished_tasks is total
-              setTimeout ->
-                queue.statistics (err, statistics) ->
-                  if statistics.finished_tasks is total and statistics.pending_tasks is 0
-                    exiting = on
-                    child_processes.forEach (process) -> process.kill 'SIGHUP'
-                    done()
-              , 100
-            else
-              setTimeout stats, 10
-            #  queue.statistics (err, statistics) ->
-            #    if statistics.pending_tasks is 0 and statistics.processing_tasks is 0 and statistics.finished_tasks isnt total
-            #      console.log 'R'
-            #      queue.reschedule (err, statistics) ->
-            #        console.log statistics.pending_tasks
-            #        setTimeout probe, 10
-            #    if statistics.finished_tasks is total
-            #      statistics.pending_tasks.should.equal 0
-            #      statistics.processing_tasks.should.equal 0
-            #      done()
-            #    else
-            #      setTimeout probe, 10
-
-    'should cleanup elegantly on interruption': (done) ->
-      child_processes.forEach (process) -> process.kill 'SIGINT'
-      setTimeout ->
-        queue.statistics (err, statistics) ->
-          statistics.workers.should.equal 0
+  it "Should Enqueue #{total_tasks} Tasks Successfully", (done) ->
+    generated = 0
+    group_sequence = [0 .. total_groups - 1].map -> 0
+    do generate = ->
+      if generated++ is total_tasks
+        return queue.statistics (err, statistics) ->
+          statistics.total.groups.should.equal total_groups
+          statistics.total.tasks.should.equal total_tasks
           done()
-      , 100
+      group = parseInt Math.random() * total_groups
+      sequence = group_sequence[group]++
+      queue.enqueue group, sequence, generate
 
-    'should produce sequential results': (done) ->
-      [0..groups-1].forEach (group) ->
-        dump_file = fs.readFileSync("#{__dirname}/workers/#{group}.dmp").toString()
-        dump_file.split('\n')[0..-2].forEach (content, line) ->
-          content.should.equal line + ''
-      exec "rm -f #{__dirname}/workers/*.dmp", -> done()
+  it "Should All Be Processed on a Interrupt and Respawn Environment", (done) ->
+    exiting = off
+    exec "rm -f #{__dirname}/workers/*.dmp", (err, stdout, stderr) ->
+      killed = 0
+      workers_left = total_workers
+      child_processes = []
+      while --workers_left >= 0
+        do (workers_left) ->
+          child_processes[workers_left] = exec "coffee #{__dirname}/workers/fail-and-block.coffee #{task_name}"
+          respawn = (workers_left) ->
+            child_processes[workers_left] = exec "coffee #{__dirname}/workers/fail-and-block.coffee #{task_name}"
+            child_processes[workers_left].on 'exit', do (workers_left) ->
+              ->
+                killed++
+                return if exiting
+                respawn(workers_left)
+
+          child_processes[workers_left].on 'exit', do (workers_left) ->
+            ->
+              killed++
+              return if exiting
+              respawn(workers_left)
+            #child_processes[workers_left] = exec "coffee #{__dirname}/workers/fail-and-block.coffee #{task_name}"
+
+
+      do reschedule = ->
+        queue.reschedule (err, statistics) ->
+        setTimeout reschedule, 100
+
+      do killone = ->
+        victim_index = parseInt Math.random() * (child_processes.length - 1)
+        allowed_signals = ['SIGINT', 'SIGHUP', 'SIGUSR2']
+        random_signal = -> allowed_signals[parseInt Math.random() * allowed_signals.length]
+        child_processes[victim_index].kill random_signal()
+        setTimeout killone, 100
+
+      do stats = ->
+        queue.statistics (err, statistics) ->
+          if statistics.finished_tasks is total_tasks
+            setTimeout ->
+              queue.statistics (err, statistics) ->
+                if statistics.finished_tasks is total_tasks and statistics.pending_tasks is 0
+                  exiting = on
+                  console.log ", #{killed} workers killed, #{statistics.workers} alive"
+                  done()
+            , 100
+          else
+            setTimeout stats, 10
+
+  it "Should Cleanup Elegantly on Interruption", (done) ->
+    queue.workers (err, workers) ->
+      allowed_signals = ['SIGINT', 'SIGHUP', 'SIGUSR2']
+      random_signal = -> allowed_signals[parseInt Math.random() * allowed_signals.length]
+      process.kill worker.pid, random_signal() for worker in workers
+      do get_statistics = ->
+        queue.statistics (err, statistics) ->
+          return get_statistics() unless statistics.workers is 0
+          setTimeout ->
+            queue.statistics (err, statistics) ->
+              done() if statistics.workers is 0
+          , 10
+
+  it "Should Dump Incremental Numbers", (done) ->
+    for group in [0 .. total_groups - 1]
+      for content, line in fs.readFileSync("#{__dirname}/workers/#{group}.dmp").toString().split('\n')[0..-2]
+        content.should.equal "#{line}"
+    exec "rm -f #{__dirname}/workers/*.dmp", done
