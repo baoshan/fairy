@@ -982,3 +982,8 @@ class Queue
         result.blocked.tasks = multi2_res.reduce(((a, b) -> a + b), - result.blocked.groups)
         result.pending_tasks = result.total.tasks - result.finished_tasks - result.processing_tasks - result.failed_tasks - result.blocked.tasks
         callback null, result
+
+
+# Known Bugs:
+#
+#   1. Clear lead to negative pending tasks.
