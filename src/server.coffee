@@ -23,7 +23,6 @@ exports = module.exports = (options) ->
 
   for method, commands of singular_commands
     for command in commands
-      console.log command
       router.route method, "/api/queues/:name/#{command}", do (command) ->
         (req, res) ->
           queue = fairy.queue req.params.name
