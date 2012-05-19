@@ -867,9 +867,9 @@ class Queue
       multi.del @key('GROUPS'), @key('RECENT'), @key('FAILED'), @key('SOURCE'), @key('STATISTICS'), @key('SLOWEST'), @key('BLOCKED'), res...
       multi.hmset @key('STATISTICS'), 'TOTAL', 0, 'finished', 0, 'total_pending_time', 0, 'total_process_time', 0
       multi.exec (err, res) =>
-        return callback err if err
+        return callback? err if err
         return @clear callback unless res
-        @statistics callback
+        @statistics callback if callback
 
 
   # ### Get Statistics of a Queue Asynchronously
