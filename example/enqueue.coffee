@@ -1,8 +1,8 @@
 # Enqueue Jobs
 
 task      = 'task'
-yamg      = require("#{__dirname}/..").connect()
-queue     = yamg.queue task
+fairy     = require("#{__dirname}/..").connect()
+queue     = fairy.queue task
 total     = process.argv[2] or 10000
 groups    = 10
 generated = 0
