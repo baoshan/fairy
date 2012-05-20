@@ -1,7 +1,8 @@
 {exec} = require 'child_process'
 should = require 'should'
-fairy  = require("..").connect()
 {clear_queue, enqueue_tasks, clean_up, check_result}= require './shared_steps'
+
+fairy  = require("..").connect()
 task_name = 'TEST1'
 queue     = fairy.queue task_name
 
