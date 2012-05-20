@@ -3,7 +3,7 @@ fs     = require 'fs'
 should = require 'should'
 
 allowed_signals = ['SIGINT', 'SIGHUP', 'SIGUSR1', 'SIGUSR2', 'SIGTERM', 'SIGQUIT', 'SIGTERM', 'SIGABRT']
-random_signal = -> allowed_signals[parseInt Math.random() * allowed_signals.length]
+random_signal   = -> allowed_signals[parseInt Math.random() * allowed_signals.length]
 
 exports = module.exports =
 

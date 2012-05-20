@@ -8,6 +8,7 @@ build:
 	@cp src/server/fairy_active.js lib/server/fairy_active.js
 	@coffee -c$(opt) -o lib src  
 test:
+	@rm -f test/workers/*.dmp
 	@NODE_ENV=test ./node_modules/.bin/mocha  --compilers coffee:coffee-script \
 		--ui exports \
 		--reporter $(REPORTER) \
