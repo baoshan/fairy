@@ -9,7 +9,6 @@ queue     = fairy.queue task_name
 total_groups = 10
 total_tasks  = 2000
 total_workers = require('os').cpus().length
-child_processes = []
 
 describe ["Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_workers} Fail-n-Block Workers"], ->
 
