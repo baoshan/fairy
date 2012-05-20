@@ -110,8 +110,8 @@ enter_cleanup_mode = ->
 # When `SIGINT` (e.g. `Control-C`), `SIGHUP` or `SIGUSR2` is received,
 # gracefully exit by notifying all workers entering cleanup mode and exit after
 # all cleaned up.
-process.on 'SIGINT',  enter_cleanup_mode
-process.on 'SIGHUP',  enter_cleanup_mode
+process.on 'SIGINT', enter_cleanup_mode
+process.on 'SIGHUP', enter_cleanup_mode
 process.on 'SIGQUIT', enter_cleanup_mode
 process.on 'SIGSTOP', enter_cleanup_mode
 process.on 'SIGUSR1', enter_cleanup_mode
