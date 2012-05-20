@@ -1,7 +1,7 @@
 {exec} = require 'child_process'
 should = require 'should'
 fairy  = require("..").connect()
-{clear_queue, enqueue_tasks, clean_up, check_result} = require './shared_steps'
+{clear_queue, enqueue_tasks, kill_one, wait_until_done, clean_up, check_result} = require './shared_steps'
 
 task_name = 'TEST2'
 queue     = fairy.queue task_name
@@ -21,53 +21,26 @@ describe "Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_work
 
   it "Should All Be Processed on a Interrupt and Respawn Environment", (done) ->
     exiting = off
-    exec "rm -f #{__dirname}/workers/*.dmp", (err, stdout, stderr) ->
-      killed = 0
-      workers_left = total_workers
-      child_processes = []
-      while --workers_left >= 0
-        do (workers_left) ->
-          child_processes[workers_left] = exec "coffee #{__dirname}/workers/fail-and-block.coffee #{task_name}"
-          respawn = (workers_left) ->
-            child_processes[workers_left] = exec "coffee #{__dirname}/workers/fail-and-block.coffee #{task_name}"
-            child_processes[workers_left].on 'exit', do (workers_left) ->
-              ->
-                killed++
-                return if exiting
-                respawn(workers_left)
+    killed = 0
 
-          child_processes[workers_left].on 'exit', do (workers_left) ->
-            ->
-              killed++
-              return if exiting
-              respawn(workers_left)
+    while total_workers-- > 0
+      do create_worker = ->
+        exec("coffee #{__dirname}/workers/fail-and-block.coffee #{task_name}").on 'exit', ->
+          return if exiting
+          killed++
+          create_worker()
 
-      do reschedule = ->
-        queue.reschedule (err, statistics) ->
+    do reschedule = ->
+      queue.reschedule (err, statistics) ->
         setTimeout reschedule, 100
 
-      do killone = ->
-        queue.workers (err, workers) ->
-                  
-          return setTimeout killone, 100 unless workers.length
-          victim_index = parseInt Math.random() * workers.length
-          allowed_signals = ['SIGINT', 'SIGHUP', 'SIGUSR2']
-          random_signal = -> allowed_signals[parseInt Math.random() * allowed_signals.length]
-          process.kill workers[victim_index].pid, random_signal()
-          setTimeout killone, 100
+    do kill_one_periodically = ->
+      kill_one queue, ->
+        setTimeout kill_one_periodically, 100
 
-      do stats = ->
-        queue.statistics (err, statistics) ->
-          if statistics.finished_tasks is total_tasks
-            setTimeout ->
-              queue.statistics (err, statistics) ->
-                if statistics.finished_tasks is total_tasks and statistics.pending_tasks is 0
-                  exiting = on
-                  console.log ", #{killed} workers killed, #{statistics.workers} alive"
-                  done()
-            , 100
-          else
-            setTimeout stats, 10
+    wait_until_done queue, total_tasks, ->
+      exiting = on
+      done()
 
   it "Should Cleanup Elegantly on Interruption", (done) ->
     clean_up queue, done
