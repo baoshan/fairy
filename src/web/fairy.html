@@ -80,7 +80,7 @@
     <tr><th>Total</td><th><%= statistics.finished_tasks %></td></tr>
     <tr><th>Avg. Waiting In</th><td><%= statistics.average_pending_time %></td></tr>
     <tr><th>Avg. Processing In</th><td><%= statistics.average_process_time %></td></tr>
-    <tr><th>Avg. Finished In</th><td><%= ((Number(statistics.average_pending_time)+Number(statistics.average_process_time))/statistics.finished_tasks).toFixed(2)%></td></tr>
+    <tr><th>Avg. Finished In</th><td><%= (Number(statistics.average_pending_time)+Number(statistics.average_process_time)).toFixed(2)%></td></tr>
   </table>
 </script>
 

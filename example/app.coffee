@@ -1,5 +1,6 @@
 express   = require 'express'
-fairy_web = require 'fairy/web'
+#fairy_web = require 'fairy/web'
+fairy_web = require '../web'
 
 app = express.createServer()
 app.use fairy_web.middleware

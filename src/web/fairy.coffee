@@ -38,12 +38,11 @@ $ ->
 render_master = () ->
   console.log (new Date).toString()
   $('button').die("click")
-  console.log(111111111)
   $.get('/api/queues/statistics', (data) ->
     $('#m_statistics').html _.template(statistics_template.join(''), { data : data})
     if $('#queque_detail').is(":visible")
-      $($('#m_statistics tbody tr')[select_index]).attr("id","active")
-      name = $($($('#m_statistics').find('tbody tr')[select_index]).find('td:first')).html()
+      $($('#m_statistics tbody tr')[select_index]).attr("class","active")
+      name = $($($('#m_statistics tbody tr')[select_index]).find('td:first')).html()
       render_slave name
     setTimeout render_master, interval*1000
   )
@@ -72,10 +71,10 @@ render_slave = (name) ->
 # 注册reschedule和clear事件
 events_bind = () ->
   $('#m_statistics').find('tbody tr').live 'click', () ->
-    $($('#m_statistics').find('tr')).removeAttr('id')
-    $(this).attr("id","active")
-    name = $($(this).find('td')[0]).html()
+    $('#m_statistics tr').removeAttr('class')
+    $(this).attr("class","active")
     select_index = $(this).index()
+    name = $($(this).find('td')[0]).html()
     render_slave name
     $('#queque_detail').show()
 
