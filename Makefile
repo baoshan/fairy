@@ -1,5 +1,10 @@
 TESTS = test/*.test.coffee
 REPORTER = spec
+NAME    := $(shell node -e "console.log(JSON.parse(require(\
+  'fs').readFileSync('package.json', 'utf8')).name)")
+VERSION := $(shell node -e "console.log(JSON.parse(require(\
+  'fs').readFileSync('package.json', 'utf8')).version)")
+TARBALL := $(NAME)-$(VERSION).tgz
 
 build:
 	@NODE_ENV=build mkdir -p lib/web
@@ -16,4 +21,14 @@ test:
 		--slow 50000 \
 		--ui bdd \
 		$(TESTS)
+
+publish:
+	@rm -Rf package
+	@mkdir package
+	@cp -R lib package/lib
+	@cp -R web package/web
+	@cp package.json package
+	@tar czf $(TARBALL) package
+	@rm -r package
+
 .PHONY: test build

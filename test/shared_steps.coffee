@@ -2,22 +2,25 @@ fs     = require 'fs'
 {exec} = require 'child_process'
 should = require 'should'
 
-allowed_signals = ['SIGINT', 'SIGHUP', 'SIGUSR1', 'SIGUSR2', 'SIGTERM', 'SIGQUIT', 'SIGTERM', 'SIGABRT']
-random_signal   = -> allowed_signals[parseInt Math.random() * allowed_signals.length]
+Array::random = -> @[parseInt Math.random() * @length]
+
+soft_kill_signals = [
+  'SIGINT'
+  'SIGHUP'
+  'SIGQUIT'
+  'SIGUSR1'
+  'SIGUSR2'
+  'SIGTERM'
+  'SIGABRT'
+]
 
 exports = module.exports =
-
-  kill_one: (queue, done) ->
-    queue.workers (err, workers) ->
-      return done() unless workers.length
-      process.kill workers[parseInt Math.random() * workers.length].pid, random_signal()
-      done()
 
   clear_queue: (queue, done) ->
     queue.clear (err, statistics) ->
       should.not.exist err
-      statistics.total.groups.should.equal  0
-      statistics.total.tasks.should.equal   0
+      statistics.total.groups.should.equal 0
+      statistics.total.tasks.should.equal 0
       statistics.pending_tasks.should.equal 0
       done()
 
@@ -36,28 +39,35 @@ exports = module.exports =
       sequence = group_sequence[group]++
       queue.enqueue group, sequence, generate
 
+  kill_one: (queue, done) ->
+    queue.workers (err, workers) ->
+      return done() unless workers.length
+      process.kill workers.random().pid, soft_kill_signals.random()
+      done()
+
   wait_until_done: (queue, total_tasks, done) ->
+    success_counter = 0
     do probe = ->
       queue.statistics (err, statistics) ->
         if statistics.finished_tasks is total_tasks
           statistics.pending_tasks.should.equal 0
           statistics.processing_tasks.should.equal 0
-          return done()
+          return done() if success_counter++ is 3
         setTimeout probe, 100
 
   clean_up: (queue, done) ->
-    checked_times = 0
+    success_counter = 0
     queue.workers (err, workers) ->
-      process.kill worker.pid, random_signal() for worker in workers
+      process.kill worker.pid, soft_kill_signals.random() for worker in workers
       do get_statistics = ->
         queue.statistics (err, statistics) ->
           return setTimeout get_statistics, 100 unless statistics.workers is 0
-          return setTimeout get_statistics, 100 unless checked_times++ is 3
+          return setTimeout get_statistics, 100 unless success_counter++ is 3
           statistics.pending_tasks.should.equal 0
           done()
 
   check_result: (total_groups, done) ->
     for group in [0 .. total_groups - 1]
-      for content, line in fs.readFileSync("#{__dirname}/workers/#{group}.dmp").toString().split('\n')[0..-2]
+      for content, line in fs.readFileSync("#{__dirname}/workers/#{group}.dmp").toString().split('\n')[0...-1]
         content.should.equal "#{line}"
     exec "rm -f #{__dirname}/workers/*.dmp", done
