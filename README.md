@@ -40,31 +40,41 @@ concurrency which breaks the processing order of tasks in the same group.
 
     npm install fairy
 
-## Enqueue Tasks
+## Get Started
 
-Provide as many parameters as you want, and an optional callback function.
+The minimium set of APIs you need to learn in order to bootstrap a task queue
+system are:
+
+  + `enqueue` tasks, and
+  + `regist` a function for processing them.
+
+### Enqueue Tasks
+
+Provide as many parameters as you want (and an optional callback function).
 The first argument will be used for message grouping.
 
     queue = require('fairy').connect().queue('task_name')
     queue.enqueue 'foo', 'bar', ->
-      console.log 'more tasks please, sir'
+      console.log 'your order has been placed, sir.'
 
-## Register Task Handler
+### Register Task Handler
 
 When registered a task handler, the **Fairy** queue becomes a worker
 automatically.
 
 The registered handler function will be called when there're tasks to be
-processed, with the enqueued parameters. The last argument will be a callback
-function. Arguments of the callback function follow node.js error handling
-convention: `err` and `res`.
+processed, with the enqueued parameters of the task. The last argument will be a
+**non**-optional callback function.
+
+Arguments of the callback function follow node.js error handling convention:
+`err` and `res`.
 
 Calling the callback function is your responsibility (or **Fairy** will not
 dispatch tasks to the worker and block tasks of the same group forever!)
 
     queue = require('fairy').connect().queue('task_name')
     queue.regist (param1, param2, callback) ->
-      # Do your work here, whether synchronous or asynchronous.
+      # Do your work here, be it synchronous or asynchronous.
       callback err, res
 
 ## Web Front-End
@@ -73,33 +83,59 @@ dispatch tasks to the worker and block tasks of the same group forever!)
 
     app = require('express').createServer()
     fairy_web = require 'fairy/web'
-    app.use fairy_web.middleware
+    app.use fairy_web.connect().middleware
     app.listen 3000
 
 ## More APIs
 
-More APIs including:
+More APIs include:
 
-Objects of Class `Queue`:
+1. Objects of Class `Queue`:
 
-+ Placing tasks -- `enqueue`
-+ Regist handlers -- `regist`
-+ Reschedule tasks -- `reschedule`
-+ Query status --
-  - `recently_finished_tasks`
-  - `failed_tasks`
-  - `blocked_groups`
-  - `slowest_tasks`
-  - `processing_tasks`
-  - `workers`
-  - `statistics`, etc.
+  + Placing tasks -- `enqueue`
+  + Regist handlers -- `regist`
+  + Reschedule tasks -- `reschedule`
+  + Query status --
+    - `recently_finished_tasks`
+    - `failed_tasks`
+    - `blocked_groups`
+    - `slowest_tasks`
+    - `processing_tasks`
+    - `workers`
+    - `statistics`, etc.
 
-Objects of Class `Fairy`:
+2. Objects of Class `Fairy`:
 
-+ `queues`, return all queues.
-+ `statistics`, return statistics of all queues.
+  + `queues`, return all queues.
+  + `statistics`, return statistics of all queues.
 
-See **[example folder]** for demos. Or explorer the **[annotated source]**.
+See **[Example Folder]** for demos. Or review the **[Annotated Source Code]**
+for complete API explanations.
 
-[example folder]:   https://github.com/baoshan/fairy/tree/master/example
-[annotated source]: http://baoshan.github.com/fairy/src/fairy.html
+[Example Folder]:        https://github.com/baoshan/fairy/tree/master/example
+[Annotated Source Code]: http://baoshan.github.com/fairy/src/fairy.html
+
+## License
+
+Copyright (c) 2012 Baoshan Sheng
+
+Permission is hereby granted, free of charge, to any person
+obtaining a copy of this software and associated documentation
+files (the "Software"), to deal in the Software without
+restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.

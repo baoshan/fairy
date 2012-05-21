@@ -2,5 +2,5 @@
 *.dmp
 *.rdb
 node_modules
-lib/*.js
+lib
 *.tgz
