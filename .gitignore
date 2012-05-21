@@ -2,5 +2,4 @@
 *.dmp
 *.rdb
 node_modules
-lib/server.js
-lib/fairy.js
+lib/*.js
