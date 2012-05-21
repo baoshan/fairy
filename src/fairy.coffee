@@ -865,12 +865,17 @@ class Queue
   workers: (callback) =>
     @redis.hvals @key('WORKERS'), (err, res) ->
       return callback err if err
-      callback null, res.map (entry) ->
+      callback null, res.map((entry) ->
         entry = entry.split '|'
         host: entry[0]
         ip: entry[1]
         pid: parseInt entry[2]
         since: new Date parseInt entry[3]
+      ).sort (a, b) ->
+        return  1 if a.ip  > b.ip
+        return -1 if a.ip  < b.ip
+        return  1 if a.pid > b.pid
+        return -1 if a.pid < b.pid
 
 
   # ### Clear A Queue
