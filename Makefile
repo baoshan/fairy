@@ -27,6 +27,7 @@ publish:
 	@cp -R lib package/lib
 	@cp -R web package/web
 	@cp package.json package
+	@cp LICENSE package
 	@tar czf $(TARBALL) package
 	@rm -r package
 
