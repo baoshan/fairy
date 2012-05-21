@@ -1,4 +1,4 @@
-<!DOiCTYPE HTML>
+<!DOiCTYPE HTML> 
 <html>
 <head>
 <meta charset="utf-8">
@@ -19,11 +19,11 @@
       <div class="input-prepend">
         <span class="add-on"><i class="icon-refresh"></i> Refresh</span>
         <select class="span1">
-        <option>10 s</option>
-        <option>20 s</option>
-        <option>30 s</option>
-        <option>40 s</option>
-        <option>50 s</option>
+        <option value="10">10 s</option>
+        <option value="20">20 s</option>
+        <option value="30">30 s</option>
+        <option value="40">40 s</option>
+        <option value="50">50 s</option>
       </select>
       </div>
     </div>
@@ -80,7 +80,7 @@
     <tr><th>Total</td><th><%= statistics.finished_tasks %></td></tr>
     <tr><th>Avg. Waiting In</th><td><%= statistics.average_pending_time %></td></tr>
     <tr><th>Avg. Processing In</th><td><%= statistics.average_process_time %></td></tr>
-    <tr><th>Avg. Finished In</th><td><%= Number(statistics.average_pending_time) + Number(statistics.average_process_time) %></td></tr>
+    <tr><th>Avg. Finished In</th><td><%= ((Number(statistics.average_pending_time)+Number(statistics.average_process_time))/statistics.finished_tasks).toFixed(2)%></td></tr>
   </table>
 </script>
 
