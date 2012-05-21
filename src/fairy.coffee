@@ -1011,6 +1011,4 @@ class Queue
           callback null, result
 
 
-# Known Bugs:
-#
-#   1. Clear lead to negative pending tasks.
+# ### Known Bugs:
