@@ -30,8 +30,8 @@ The design philosophy makes **Fairy** ideal for the following requirements:
 tasks of a same group be routed to the same consumer, **Fairy** route a task to
 any worker when there's no **processing** tasks of the **same group**.
 
-When the number of workers is small compared to the number of groups, this makes
-sense.
+When the number of workers is much smaller compared to the number of groups,
+**Fairy**'s approach makes sense.
 
 **[Resque]** cannot guarantee the processing order of the tasks although the task
 queue is FIFO. The more workers you have, the more possible you'll encountering
