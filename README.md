@@ -38,38 +38,68 @@ concurrency which breaks the processing order of tasks in the same group.
 
 ## Installation
 
-```bash
-npm install fairy
-```
+    npm install fairy
 
 ## Enqueue Tasks
 
-```coffee-script
-queue = require('fairy').connect().queue('foo')
-# Provide as many parameters as you needed, the last parameter should be a
-# callback.
-queue.enqueue 'param_1', 'param_2', 'param_3', -> console.log 'queued'
-```
+Provide as many parameters as you want, and an optional callback function.
+The first argument will be used for message grouping.
 
-The first element of the 2nd parameter will be used as the group key.
+    queue = require('fairy').connect().queue('task_name')
+    queue.enqueue 'foo', 'bar', ->
+      console.log 'more tasks please, sir'
 
 ## Register Task Handler
 
-```coffee-script
-queue = require('fairy').connect().queue('foo')
-# The registered handler function should keep the same signature as you just
-# enqueued, plus the last two argument should be 2 callbacks for success and
-# fail. Calling them is your responsibility!
-queue.regist (param_1, param_2, param_3, callback) ->
-  # Do your work here
-  setTimeout ->
-    err = null
-    res = {}
-    callback err, res
-  , 5
-```
+When registered a task handler, the **Fairy** queue becomes a worker
+automatically.
 
-See [example folder] for demos. And also the [annotated source].
+The registered handler function will be called when there're tasks to be
+processed, with the enqueued parameters. The last argument will be a callback
+function. Arguments of the callback function follow node.js error handling
+convention: `err` and `res`.
 
-[example folder]: https://github.com/baoshan/fairy/tree/master/example
+Calling the callback function is your responsibility (or **Fairy** will not
+dispatch tasks to the worker and block tasks of the same group forever!)
+
+    queue = require('fairy').connect().queue('task_name')
+    queue.regist (param1, param2, callback) ->
+      # Do your work here, whether synchronous or asynchronous.
+      callback err, res
+
+## Web Front-End
+
+**Fairy** comes with a web front-end. Use it as a express/connect middleware:
+
+    app = require('express').createServer()
+    fairy_web = require 'fairy/web'
+    app.use fairy_web.middleware
+    app.listen 3000
+
+## More APIs
+
+More APIs including:
+
+Objects of Class `Queue`:
+
++ Placing tasks -- `enqueue`
++ Regist handlers -- `regist`
++ Reschedule tasks -- `reschedule`
++ Query status --
+  - `recently_finished_tasks`
+  - `failed_tasks`
+  - `blocked_groups`
+  - `slowest_tasks`
+  - `processing_tasks`
+  - `workers`
+  - `statistics`, etc.
+
+Objects of Class `Fairy`:
+
++ `queues`, return all queues.
++ `statistics`, return statistics of all queues.
+
+See **[example folder]** for demos. Or explorer the **[annotated source]**.
+
+[example folder]:   https://github.com/baoshan/fairy/tree/master/example
 [annotated source]: http://baoshan.github.com/fairy/src/fairy.html

@@ -3,3 +3,4 @@
 *.rdb
 node_modules
 lib/*.js
+*.tgz
