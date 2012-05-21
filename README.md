@@ -24,7 +24,6 @@ The design philosophy makes **Fairy** ideal for the following requirements:
 
   1. Tasks of a same groups need be processed in sequence.
   2. Each worker processes tasks in serial.
-  3. Worker spawns child process (e.g., a shell script) to handle the real job.
 
 **Fairy** takes a different approach than Message Groups. Instead of making all
 tasks of a same group be routed to the same consumer, **Fairy** route a task to
