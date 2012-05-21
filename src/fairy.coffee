@@ -6,8 +6,8 @@
 #
 # [Message Groups]: http://activemq.apache.org/message-groups.html
 #
-# But, unkile **message groups**, **Fairy** doesn't always route tasks of a
-# group to a same worker, which can lead to unwanted waiting time when:
+# But, unlike **message groups**, **Fairy** doesn't always route tasks of a
+# group to a same worker, which will introduce unwanted waiting time when:
 #
 #   1. Tasks of group `X` and `Y` are appointed to worker `A`.
 #   2. Worker `A` is processing tasks of group `X` **sequentially**.
@@ -24,6 +24,7 @@
 #
 #   + Tasks of a same groups need be processed in order.
 #   + Each worker processes tasks sequentially.
+#   + Multiple workers need be instantiated to increase throughput.
 #
 # Copyright © 2012, Baoshan Sheng.
 # Released under the MIT License.

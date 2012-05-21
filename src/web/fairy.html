@@ -40,32 +40,31 @@
   <div class="table_title">Workers</div>
   <div id="s_workers"></div>
   
-  <!--最近处理任务---失败任务汇总---周期最长-->
   <div class="tabbable">
     <ul class="nav nav-tabs">
-      <li class="active"><a href="#tab1" data-toggle="tab">最近处理任务</a></li>
-      <li><a href="#tab2" data-toggle="tab">失败任务汇总</a></li>
-      <li><a href="#tab3" data-toggle="tab">当前处理任务</a></li>
-      <li><a href="#tab4" data-toggle="tab">周期最长</a></li>
+      <li class="active"><a href="#tab1" data-toggle="tab">Recently Finished Tasks</a></li>
+      <li><a href="#tab2" data-toggle="tab">Failed Tasks</a></li>
+      <li><a href="#tab3" data-toggle="tab">Processing Tasks</a></li>
+      <li><a href="#tab4" data-toggle="tab">Slowest Tasks</a></li>
     </ul>
     <div class="tab-content">
 
-      <div class="tab-pane-title">最近处理任务</div>
+      <div class="tab-pane-title">Recently Finished Tasks</div>
       <div class="tab-pane active" id="tab1">
         <div id="s_recently_finished_tasks"></div>
       </div>
     
-      <div class="tab-pane-title">失败任务汇总</div>
+      <div class="tab-pane-title">Failed Tasks</div>
       <div class="tab-pane" id="tab2">
         <div id="s_failed_tasks"></div>
       </div>
      
-      <div class="tab-pane-title">当前处理任务</div>
+      <div class="tab-pane-title">Processing Tasks</div>
       <div class="tab-pane" id="tab3">
         <div id="s_processing_tasks"></div>
       </div>
 
-      <div class="tab-pane-title">周期最长</div>
+      <div class="tab-pane-title">Slowest Tasks</div>
       <div class="tab-pane" id="tab4">
         <div id="s_slowest_tasks"></div>
       </div>
@@ -89,10 +88,10 @@
   <table class="table table-bordered">
    <thead>
      <tr>
-      <th>编号</th>
-      <th colspan = <%= recently_finished_tasks.length?recently_finished_tasks[0].params.length:0 %>>参数</th>
-      <th>进入堆栈时间</th>
-      <th>完成时间</th>
+      <th>ID</th>
+      <th colspan = <%= recently_finished_tasks.length?recently_finished_tasks[0].params.length:0 %>>Params</th>
+      <th>Queued</th>
+      <th>Finished</th>
      </tr>
    </thead>
    <tbody>
@@ -115,11 +114,11 @@
   <table class="table table-bordered">
    <thead>
      <tr>
-      <th>编号</th>
-      <th colspan = <%= failed_tasks.length?failed_tasks[0].params.length:0 %>>参数</th>
-      <th>进入堆栈时间</th>
-      <th>完成时间</th>
-      <th colspan = <%= failed_tasks.length?failed_tasks[0].reason.length:0%>>失败原因</th>
+      <th>ID</th>
+      <th colspan = <%= failed_tasks.length?failed_tasks[0].params.length:0 %>>Params</th>
+      <th>Queued</th>
+      <th>Finished</th>
+      <th colspan = <%= failed_tasks.length?failed_tasks[0].reason.length:0%>>Failed Reason</th>
      </tr>
    </thead>
    <tbody>
@@ -160,11 +159,11 @@
   <table class="table table-bordered">
    <thead>
      <tr>
-      <th>编号</th>
-      <th colspan = <%= slowest_tasks.length?slowest_tasks[0].params.length:0 %>>参数</th>
-      <th>进入堆栈时间</th>
-      <th>开始时间</th>
-      <th>完成时间</th>
+      <th>ID</th>
+      <th colspan = <%= slowest_tasks.length?slowest_tasks[0].params.length:0 %>>Params</th>
+      <th>Queued</th>
+      <th>Started</th>
+      <th>Finished</th>
      </tr>
    </thead>
    <% _.each(slowest_tasks, function(item) { %>
@@ -187,10 +186,10 @@
   <table class="table table-bordered">
    <thead>
      <tr>
-      <th>编号</th>
-      <th colspan = <%= processing_tasks.length?processing_tasks[0].params.length:0 %>>参数</th>
-      <th>进入堆栈时间</th>
-      <th>开始时间</th>
+      <th>ID</th>
+      <th colspan = <%= processing_tasks.length?processing_tasks[0].params.length:0 %>>Params</th>
+      <th>Queued</th>
+      <th>Started</th>
      </tr>
    </thead>
    <% _.each(processing_tasks, function(item) { %>

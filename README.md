@@ -6,8 +6,8 @@ the sequential processing order of tasks belong to a same group.
 
 [Message Groups]: http://activemq.apache.org/message-groups.html
 
-But, unkile **message groups**, **Fairy** doesn't always route tasks of a
-group to a same worker, which can lead to unwanted waiting time when:
+But, unlike **message groups**, **Fairy** doesn't always route tasks of a
+group to a same worker, which will introduce unwanted waiting time when:
 
   1. Tasks of group `X` and `Y` are appointed to worker `A`.
   2. Worker `A` is processing tasks of group `X` **sequentially**.
@@ -22,12 +22,16 @@ task to any worker when there's no **processing** tasks of the same group.
 
 The design philosophy makes **Fairy** ideal for the following requirements:
 
-  1. Tasks of a same groups need be processed in sequence.
-  2. Each worker processes tasks in serial.
+  + Tasks of a same groups need be processed in sequence.
+  + Each worker processes tasks in serial.
+  + Multiple workers need be instantiated to increase throughput.
 
 **Fairy** takes a different approach than Message Groups. Instead of making all
 tasks of a same group be routed to the same consumer, **Fairy** route a task to
-any worker when there's no **processing** tasks of the same group.
+any worker when there's no **processing** tasks of the **same group**.
+
+When the number of workers is small compared to the number of groups, this makes
+sense.
 
 **[Resque]** cannot guarantee the processing order of the tasks although the task
 queue is FIFO. The more workers you have, the more possible you'll encountering
