@@ -112,7 +112,12 @@ enter_cleanup_mode = ->
 # all cleaned up.
 process.on 'SIGINT', enter_cleanup_mode
 process.on 'SIGHUP', enter_cleanup_mode
+process.on 'SIGQUIT', enter_cleanup_mode
+process.on 'SIGSTOP', enter_cleanup_mode
+process.on 'SIGUSR1', enter_cleanup_mode
 process.on 'SIGUSR2', enter_cleanup_mode
+process.on 'SIGTERM', enter_cleanup_mode
+process.on 'SIGABRT', enter_cleanup_mode
 
 # When `uncaughtException` captured, **Fairy** can not tell if this is caught by
 # the handling function, as well as which queue cause the exception. **Fairy**
@@ -867,9 +872,9 @@ class Queue
       multi.del @key('GROUPS'), @key('RECENT'), @key('FAILED'), @key('SOURCE'), @key('STATISTICS'), @key('SLOWEST'), @key('BLOCKED'), res...
       multi.hmset @key('STATISTICS'), 'TOTAL', 0, 'finished', 0, 'total_pending_time', 0, 'total_process_time', 0
       multi.exec (err, res) =>
-        return callback err if err
+        return callback? err if err
         return @clear callback unless res
-        @statistics callback
+        @statistics callback if callback
 
 
   # ### Get Statistics of a Queue Asynchronously
@@ -982,3 +987,8 @@ class Queue
         result.blocked.tasks = multi2_res.reduce(((a, b) -> a + b), - result.blocked.groups)
         result.pending_tasks = result.total.tasks - result.finished_tasks - result.processing_tasks - result.failed_tasks - result.blocked.tasks
         callback null, result
+
+
+# Known Bugs:
+#
+#   1. Clear lead to negative pending tasks.

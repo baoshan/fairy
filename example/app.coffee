@@ -1,6 +1,8 @@
-express = require 'express'
-server  = new (require('../lib/server.js'))({host: '127.0.0.1'})
-app     = express.createServer()
-app.use server
-app.listen(3004)
-console.log 'run servering'
+express   = require 'express'
+fairy_web = require 'fairy/web'
+
+app = express.createServer()
+app.use fairy_web.middleware
+app.listen 8765
+
+console.log "'fairy-web' is running at http://0.0.0.0:8765"

@@ -24,7 +24,11 @@ exports = module.exports = (options) ->
 
   for method, commands of singular_commands
     for command in commands
+<<<<<<< HEAD
       router.route method, "/api/queues/:name/#{command}", no_cache, do (command) ->
+=======
+      router.route method, "/api/queues/:name/#{command}", do (command) ->
+>>>>>>> f834d4e6b52186da911b01aa9dddd192133daef5
         (req, res) ->
           queue = fairy.queue req.params.name
           queue[command] (err, results) ->

@@ -1,8 +1,7 @@
-
 {exec} = require 'child_process'
-fs     = require 'fs'
 should = require 'should'
 fairy  = require("..").connect()
+{clear_queue, enqueue_tasks, kill_one, wait_until_done, clean_up, check_result} = require './shared_steps'
 
 task_name = 'TEST2'
 queue     = fairy.queue task_name
@@ -15,92 +14,36 @@ child_processes = []
 describe "Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_workers} Fail-n-Block Workers, Kill and Respawn Periodically", ->
 
   it "Should Clear the Queue First", (done) ->
-    queue.clear (err, statistics) ->
-      statistics.total.groups.should.equal 0
-      statistics.total.tasks.should.equal 0
-      done()
+    clear_queue queue, done
 
   it "Should Enqueue #{total_tasks} Tasks Successfully", (done) ->
-    generated = 0
-    group_sequence = [0 .. total_groups - 1].map -> 0
-    do generate = ->
-      if generated++ is total_tasks
-        return queue.statistics (err, statistics) ->
-          statistics.total.groups.should.equal total_groups
-          statistics.total.tasks.should.equal total_tasks
-          done()
-      group = parseInt Math.random() * total_groups
-      sequence = group_sequence[group]++
-      queue.enqueue group, sequence, generate
+    enqueue_tasks queue, total_groups, total_tasks, done
 
   it "Should All Be Processed on a Interrupt and Respawn Environment", (done) ->
     exiting = off
-    exec "rm -f #{__dirname}/workers/*.dmp", (err, stdout, stderr) ->
-      killed = 0
-      workers_left = total_workers
-      child_processes = []
-      while --workers_left >= 0
-        do (workers_left) ->
-          child_processes[workers_left] = exec "coffee #{__dirname}/workers/fail-and-block.coffee #{task_name}"
-          respawn = (workers_left) ->
-            child_processes[workers_left] = exec "coffee #{__dirname}/workers/fail-and-block.coffee #{task_name}"
-            child_processes[workers_left].on 'exit', do (workers_left) ->
-              ->
-                killed++
-                return if exiting
-                respawn(workers_left)
+    killed = 0
 
-          child_processes[workers_left].on 'exit', do (workers_left) ->
-            ->
-              killed++
-              return if exiting
-              respawn(workers_left)
-            #child_processes[workers_left] = exec "coffee #{__dirname}/workers/fail-and-block.coffee #{task_name}"
+    while total_workers-- > 0
+      do create_worker = ->
+        exec("coffee #{__dirname}/workers/fail-and-block.coffee #{task_name}").on 'exit', ->
+          return if exiting
+          killed++
+          create_worker()
 
-
-      do reschedule = ->
-        queue.reschedule (err, statistics) ->
+    do reschedule = ->
+      queue.reschedule (err, statistics) ->
         setTimeout reschedule, 100
 
-      do killone = ->
-        queue.workers (err, workers) ->
-                  
-          return setTimeout killone, 100 unless workers.length
-          victim_index = parseInt Math.random() * workers.length
-          allowed_signals = ['SIGINT', 'SIGHUP', 'SIGUSR2']
-          random_signal = -> allowed_signals[parseInt Math.random() * allowed_signals.length]
-          #console.log workers, victim_index
-          process.kill workers[victim_index].pid, random_signal()
-          setTimeout killone, 100
+    do kill_one_periodically = ->
+      kill_one queue, ->
+        setTimeout kill_one_periodically, 100
 
-      do stats = ->
-        queue.statistics (err, statistics) ->
-          if statistics.finished_tasks is total_tasks
-            setTimeout ->
-              queue.statistics (err, statistics) ->
-                if statistics.finished_tasks is total_tasks and statistics.pending_tasks is 0
-                  exiting = on
-                  console.log ", #{killed} workers killed, #{statistics.workers} alive"
-                  done()
-            , 100
-          else
-            setTimeout stats, 10
+    wait_until_done queue, total_tasks, ->
+      exiting = on
+      done()
 
   it "Should Cleanup Elegantly on Interruption", (done) ->
-    queue.workers (err, workers) ->
-      allowed_signals = ['SIGINT', 'SIGHUP', 'SIGUSR2']
-      random_signal = -> allowed_signals[parseInt Math.random() * allowed_signals.length]
-      process.kill worker.pid, random_signal() for worker in workers
-      do get_statistics = ->
-        queue.statistics (err, statistics) ->
-          return get_statistics() unless statistics.workers is 0
-          setTimeout ->
-            queue.statistics (err, statistics) ->
-              done() if statistics.workers is 0
-          , 20
+    clean_up queue, done
 
   it "Should Dump Incremental Numbers", (done) ->
-    for group in [0 .. total_groups - 1]
-      for content, line in fs.readFileSync("#{__dirname}/workers/#{group}.dmp").toString().split('\n')[0..-2]
-        content.should.equal "#{line}"
-    exec "rm -f #{__dirname}/workers/*.dmp", done
+    check_result total_groups, done
