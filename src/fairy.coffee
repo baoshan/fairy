@@ -6,8 +6,8 @@
 #
 # [Message Groups]: http://activemq.apache.org/message-groups.html
 #
-# But, unkile **message groups**, **Fairy** doesn't always route tasks of a
-# group to a same worker, which can lead to unwanted waiting time when:
+# But, unlike **message groups**, **Fairy** doesn't always route tasks of a
+# group to a same worker, which will introduce unwanted waiting time when:
 #
 #   1. Tasks of group `X` and `Y` are appointed to worker `A`.
 #   2. Worker `A` is processing tasks of group `X` **sequentially**.
@@ -24,6 +24,7 @@
 #
 #   + Tasks of a same groups need be processed in order.
 #   + Each worker processes tasks sequentially.
+#   + Multiple workers need be instantiated to increase throughput.
 #
 # Copyright © 2012, Baoshan Sheng.
 # Released under the MIT License.
@@ -865,12 +866,17 @@ class Queue
   workers: (callback) =>
     @redis.hvals @key('WORKERS'), (err, res) ->
       return callback err if err
-      callback null, res.map (entry) ->
+      callback null, res.map((entry) ->
         entry = entry.split '|'
         host: entry[0]
         ip: entry[1]
         pid: parseInt entry[2]
         since: new Date parseInt entry[3]
+      ).sort (a, b) ->
+        return  1 if a.ip  > b.ip
+        return -1 if a.ip  < b.ip
+        return  1 if a.pid > b.pid
+        return -1 if a.pid < b.pid
 
 
   # ### Clear A Queue
@@ -1005,6 +1011,4 @@ class Queue
           callback null, result
 
 
-# Known Bugs:
-#
-#   1. Clear lead to negative pending tasks.
+# ### Known Bugs:

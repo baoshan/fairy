@@ -6,8 +6,8 @@ the sequential processing order of tasks belong to a same group.
 
 [Message Groups]: http://activemq.apache.org/message-groups.html
 
-But, unkile **message groups**, **Fairy** doesn't always route tasks of a
-group to a same worker, which can lead to unwanted waiting time when:
+But, unlike **message groups**, **Fairy** doesn't always route tasks of a
+group to a same worker, which will introduce unwanted waiting time when:
 
   1. Tasks of group `X` and `Y` are appointed to worker `A`.
   2. Worker `A` is processing tasks of group `X` **sequentially**.
@@ -22,13 +22,16 @@ task to any worker when there's no **processing** tasks of the same group.
 
 The design philosophy makes **Fairy** ideal for the following requirements:
 
-  1. Tasks of a same groups need be processed in sequence.
-  2. Each worker processes tasks in serial.
-  3. Worker spawns child process (e.g., a shell script) to handle the real job.
+  + Tasks of a same groups need be processed in sequence.
+  + Each worker processes tasks in serial.
+  + Multiple workers need be instantiated to increase throughput.
 
 **Fairy** takes a different approach than Message Groups. Instead of making all
 tasks of a same group be routed to the same consumer, **Fairy** route a task to
-any worker when there's no **processing** tasks of the same group.
+any worker when there's no **processing** tasks of the **same group**.
+
+When the number of workers is much smaller compared to the number of groups,
+**Fairy**'s approach makes sense.
 
 **[Resque]** cannot guarantee the processing order of the tasks although the task
 queue is FIFO. The more workers you have, the more possible you'll encountering
@@ -42,7 +45,7 @@ concurrency which breaks the processing order of tasks in the same group.
 
 ## Get Started
 
-The minimium set of APIs you need to learn in order to bootstrap a task queue
+The minimium set of APIs you need to learn in order to implement a task queue
 system are:
 
   + `enqueue` tasks, and
@@ -79,7 +82,8 @@ dispatch tasks to the worker and block tasks of the same group forever!)
 
 ## Web Front-End
 
-**Fairy** comes with a web front-end. Use it as a express/connect middleware:
+**Fairy** comes with a ready-to-use web front-end. Simply insert the middleware into
+the pipeline:
 
     app = require('express').createServer()
     fairy_web = require 'fairy/web'
@@ -119,23 +123,4 @@ for complete API explanations.
 
 Copyright (c) 2012 Baoshan Sheng
 
-Permission is hereby granted, free of charge, to any person
-obtaining a copy of this software and associated documentation
-files (the "Software"), to deal in the Software without
-restriction, including without limitation the rights to use,
-copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following
-conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
+Released under the MIT license.
