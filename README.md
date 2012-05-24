@@ -95,7 +95,6 @@ the pipeline:
 More APIs include:
 
 1. Objects of Class `Queue`:
-
   + Placing tasks -- `enqueue`
   + Regist handlers -- `regist`
   + Reschedule tasks -- `reschedule`
@@ -107,9 +106,7 @@ More APIs include:
     - `processing_tasks`
     - `workers`
     - `statistics`, etc.
-
 2. Objects of Class `Fairy`:
-
   + `queues`, return all queues.
   + `statistics`, return statistics of all queues.
 
