@@ -1,0 +1,51 @@
+<!DOCTYPE html>  <html> <head>   <title>2.test.coffee</title>   <meta http-equiv="content-type" content="text/html; charset=UTF-8">   <meta name="generator" content="Docco">   <link rel="stylesheet" media="all" href="../stylesheets/docco.css" /> </head> <body>   <div id="container">     <div id="background"></div>     <table cellpadding="0" cellspacing="0">       <thead>         <tr>           <th class="docs">             <h1>               2.test.coffee             </h1>           </th>           <th class="code">           </th>         </tr>       </thead>       <tbody>                               <tr id="section-1">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-1">&#182;</a>               </div>                            </td>             <td class="code">               <div class="highlight"><pre><span class="p">{</span><span class="nx">exec</span><span class="p">}</span> <span class="o">=</span> <span class="nx">require</span> <span class="s">&#39;child_process&#39;</span>
+<span class="nv">should = </span><span class="nx">require</span> <span class="s">&#39;should&#39;</span>
+<span class="nv">fairy  = </span><span class="nx">require</span><span class="p">(</span><span class="s">&quot;..&quot;</span><span class="p">).</span><span class="nx">connect</span><span class="p">()</span>
+<span class="p">{</span><span class="nx">clear_queue</span><span class="p">,</span> <span class="nx">enqueue_tasks</span><span class="p">,</span> <span class="nx">kill_one</span><span class="p">,</span> <span class="nx">wait_until_done</span><span class="p">,</span> <span class="nx">clean_up</span><span class="p">,</span> <span class="nx">check_result</span><span class="p">}</span> <span class="o">=</span> <span class="nx">require</span> <span class="s">&#39;./shared_steps&#39;</span>
+
+<span class="nv">task_name = </span><span class="s">&#39;TEST2&#39;</span>
+<span class="nv">queue     = </span><span class="nx">fairy</span><span class="p">.</span><span class="nx">queue</span> <span class="nx">task_name</span>
+
+<span class="nv">total_groups = </span><span class="mi">10</span>
+<span class="nv">total_tasks  = </span><span class="mi">2000</span>
+<span class="nv">total_workers = </span><span class="nx">require</span><span class="p">(</span><span class="s">&#39;os&#39;</span><span class="p">).</span><span class="nx">cpus</span><span class="p">().</span><span class="nx">length</span>
+<span class="nv">child_processes = </span><span class="p">[]</span>
+
+<span class="nx">describe</span> <span class="s">&quot;Process </span><span class="si">#{</span><span class="nx">total_tasks</span><span class="si">}</span><span class="s"> Tasks of </span><span class="si">#{</span><span class="nx">total_groups</span><span class="si">}</span><span class="s"> Groups by </span><span class="si">#{</span><span class="nx">total_workers</span><span class="si">}</span><span class="s"> Fail-n-Block Workers, Kill and Respawn Periodically&quot;</span><span class="p">,</span> <span class="o">-&gt;</span>
+
+  <span class="nx">it</span> <span class="s">&quot;Should Clear the Queue First&quot;</span><span class="p">,</span> <span class="nf">(done) -&gt;</span>
+    <span class="nx">clear_queue</span> <span class="nx">queue</span><span class="p">,</span> <span class="nx">done</span>
+
+  <span class="nx">it</span> <span class="s">&quot;Should Enqueue </span><span class="si">#{</span><span class="nx">total_tasks</span><span class="si">}</span><span class="s"> Tasks Successfully&quot;</span><span class="p">,</span> <span class="nf">(done) -&gt;</span>
+    <span class="nx">enqueue_tasks</span> <span class="nx">queue</span><span class="p">,</span> <span class="nx">total_groups</span><span class="p">,</span> <span class="nx">total_tasks</span><span class="p">,</span> <span class="nx">done</span>
+
+  <span class="nx">it</span> <span class="s">&quot;Should All Be Processed on a Interrupt and Respawn Environment&quot;</span><span class="p">,</span> <span class="nf">(done) -&gt;</span>
+    <span class="nv">exiting = </span><span class="kc">off</span>
+    <span class="nv">killed = </span><span class="mi">0</span>
+
+    <span class="k">while</span> <span class="nx">total_workers</span><span class="o">--</span> <span class="o">&gt;</span> <span class="mi">0</span>
+      <span class="nx">do</span> <span class="nv">create_worker = </span><span class="o">-&gt;</span>
+        <span class="nx">exec</span><span class="p">(</span><span class="s">&quot;coffee </span><span class="si">#{</span><span class="nx">__dirname</span><span class="si">}</span><span class="s">/workers/fail-and-block.coffee </span><span class="si">#{</span><span class="nx">task_name</span><span class="si">}</span><span class="s">&quot;</span><span class="p">).</span><span class="kc">on</span> <span class="s">&#39;exit&#39;</span><span class="p">,</span> <span class="o">-&gt;</span>
+          <span class="k">return</span> <span class="k">if</span> <span class="nx">exiting</span>
+          <span class="nx">killed</span><span class="o">++</span>
+          <span class="nx">create_worker</span><span class="p">()</span>
+
+    <span class="nx">do</span> <span class="nv">reschedule = </span><span class="o">-&gt;</span>
+      <span class="nx">queue</span><span class="p">.</span><span class="nx">reschedule</span> <span class="nf">(err, statistics) -&gt;</span>
+        <span class="nx">setTimeout</span> <span class="nx">reschedule</span><span class="p">,</span> <span class="mi">100</span>
+
+    <span class="nx">do</span> <span class="nv">kill_one_periodically = </span><span class="o">-&gt;</span>
+      <span class="nx">kill_one</span> <span class="nx">queue</span><span class="p">,</span> <span class="o">-&gt;</span>
+        <span class="nx">setTimeout</span> <span class="nx">kill_one_periodically</span><span class="p">,</span> <span class="mi">100</span>
+
+    <span class="nx">wait_until_done</span> <span class="nx">queue</span><span class="p">,</span> <span class="nx">total_tasks</span><span class="p">,</span> <span class="o">-&gt;</span>
+      <span class="nv">exiting = </span><span class="kc">on</span>
+      <span class="nx">done</span><span class="p">()</span>
+
+  <span class="nx">it</span> <span class="s">&quot;Should Cleanup Elegantly on Interruption&quot;</span><span class="p">,</span> <span class="nf">(done) -&gt;</span>
+    <span class="nx">clean_up</span> <span class="nx">queue</span><span class="p">,</span> <span class="nx">done</span>
+
+  <span class="nx">it</span> <span class="s">&quot;Should Dump Incremental Numbers&quot;</span><span class="p">,</span> <span class="nf">(done) -&gt;</span>
+    <span class="nx">check_result</span> <span class="nx">total_groups</span><span class="p">,</span> <span class="nx">done</span>
+
+</pre></div>             </td>           </tr>                </tbody>     </table>   </div> </body> </html> 

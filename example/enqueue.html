@@ -1,0 +1,23 @@
+<!DOCTYPE html>  <html> <head>   <title>enqueue.coffee</title>   <meta http-equiv="content-type" content="text/html; charset=UTF-8">   <meta name="generator" content="Docco">   <link rel="stylesheet" media="all" href="../stylesheets/docco.css" /> </head> <body>   <div id="container">     <div id="background"></div>     <table cellpadding="0" cellspacing="0">       <thead>         <tr>           <th class="docs">             <h1>               enqueue.coffee             </h1>           </th>           <th class="code">           </th>         </tr>       </thead>       <tbody>                               <tr id="section-1">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-1">&#182;</a>               </div>               <p>Enqueue Jobs</p>             </td>             <td class="code">               <div class="highlight"><pre><span class="nv">task      = </span><span class="s">&#39;task&#39;</span>
+<span class="nv">fairy     = </span><span class="nx">require</span><span class="p">(</span><span class="s">&quot;</span><span class="si">#{</span><span class="nx">__dirname</span><span class="si">}</span><span class="s">/..&quot;</span><span class="p">).</span><span class="nx">connect</span><span class="p">()</span>
+<span class="nv">queue     = </span><span class="nx">fairy</span><span class="p">.</span><span class="nx">queue</span> <span class="nx">task</span>
+<span class="nv">total     = </span><span class="nx">process</span><span class="p">.</span><span class="nx">argv</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">or</span> <span class="mi">10000</span>
+<span class="nv">groups    = </span><span class="mi">10</span>
+<span class="nv">generated = </span><span class="mi">0</span>
+
+<span class="nv">group_sequence = </span><span class="p">[</span><span class="mi">0</span> <span class="p">..</span> <span class="nx">groups</span> <span class="o">-</span> <span class="mi">1</span><span class="p">].</span><span class="nx">map</span> <span class="o">-&gt;</span> <span class="mi">0</span>
+
+<span class="nv">start = </span><span class="k">new</span> <span class="nb">Date</span>
+
+<span class="nx">do</span> <span class="nv">generate = </span><span class="o">-&gt;</span>
+  <span class="k">if</span> <span class="nx">generated</span><span class="o">++</span> <span class="o">&gt;=</span> <span class="nx">total</span>
+    <span class="nv">elapsed = </span><span class="k">new</span> <span class="nb">Date</span> <span class="o">-</span> <span class="nx">start</span>
+    <span class="nx">console</span><span class="p">.</span><span class="nx">log</span> <span class="s">&#39;finished in&#39;</span><span class="p">,</span> <span class="nx">elapsed</span><span class="p">,</span> <span class="s">&#39;milliseconds&#39;</span>
+    <span class="nx">console</span><span class="p">.</span><span class="nx">log</span> <span class="s">&#39;speed: &#39;</span><span class="p">,</span> <span class="nx">total</span> <span class="o">/</span> <span class="nx">elapsed</span> <span class="o">*</span> <span class="mi">1000</span><span class="p">,</span> <span class="s">&#39;jobs / s&#39;</span>
+    <span class="nx">process</span><span class="p">.</span><span class="nx">exit</span><span class="p">()</span>
+  <span class="k">else</span>
+    <span class="nv">group = </span><span class="nb">parseInt</span> <span class="nb">Math</span><span class="p">.</span><span class="nx">random</span><span class="p">()</span> <span class="o">*</span> <span class="nx">groups</span>
+    <span class="nv">sequence = </span><span class="nx">group_sequence</span><span class="p">[</span><span class="nx">group</span><span class="p">]</span><span class="o">++</span>
+    <span class="nx">queue</span><span class="p">.</span><span class="nx">enqueue</span> <span class="nx">group</span><span class="p">,</span> <span class="nx">sequence</span><span class="p">,</span> <span class="nx">generate</span>
+
+</pre></div>             </td>           </tr>                </tbody>     </table>   </div> </body> </html> 

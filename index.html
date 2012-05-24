@@ -1,0 +1,130 @@
+<!DOCTYPE html>  <html> <head>   <title>fairy</title>   <meta http-equiv="content-type" content="text/html; charset=UTF-8">   <link rel="stylesheet" media="all" href="stylesheets/index.css" /> </head> <body>   <div id="container">     <div class="left">     <div id="background"></div>     <h1>fairy</h1>     <p>Queue System Treats Tasks Fairly.</p>     <!--readme-->   <div class="readme"><h2>Redis Queue Battles Message Groups!</h2>
+
+<p><strong>Fairy</strong> is a lightweight queue engine for node.js based on Redis. <strong>Fairy</strong>
+offers ActiveMQ's <strong><a href="http://activemq.apache.org/message-groups.html">message groups</a></strong> alike feature which can guarantee
+the sequential processing order of tasks belong to a same group.</p>
+
+<p>But, unlike <strong>message groups</strong>, <strong>Fairy</strong> doesn't always route tasks of a
+group to a same worker, which will introduce unwanted waiting time when:</p>
+
+<ol>
+<li>Tasks of group <code>X</code> and <code>Y</code> are appointed to worker <code>A</code>.</li>
+<li>Worker <code>A</code> is processing tasks of group <code>X</code> <strong>sequentially</strong>.</li>
+<li>Tasks of group <code>Y</code> are pending, while:</li>
+<li>Worker <code>B</code> is still idling because of 1.</li>
+</ol>
+
+<p><strong>Fairy</strong> will route the task of group <code>Y</code> to worker <code>B</code> in this scenario.</p>
+
+<p><strong>Fairy</strong> takes a different approach than Message Groups. Instead of making
+all tasks of a same group be routed to the same consumer, <strong>Fairy</strong> route a
+task to any worker when there's no <strong>processing</strong> tasks of the same group.</p>
+
+<p>The design philosophy makes <strong>Fairy</strong> ideal for the following requirements:</p>
+
+<ul>
+<li>Tasks of a same groups need be processed in sequence.</li>
+<li>Each worker processes tasks in serial.</li>
+<li>Multiple workers need be instantiated to increase throughput.</li>
+</ul>
+
+<p><strong>Fairy</strong> takes a different approach than Message Groups. Instead of making all
+tasks of a same group be routed to the same consumer, <strong>Fairy</strong> route a task to
+any worker when there's no <strong>processing</strong> tasks of the <strong>same group</strong>.</p>
+
+<p>When the number of workers is much smaller compared to the number of groups,
+<strong>Fairy</strong>'s approach makes sense.</p>
+
+<p><strong><a href="https://github.com/defunkt/resque">Resque</a></strong> cannot guarantee the processing order of the tasks although the task
+queue is FIFO. The more workers you have, the more possible you'll encountering
+concurrency which breaks the processing order of tasks in the same group.</p>
+
+<h2>Installation</h2>
+
+<pre><code>npm install fairy
+</code></pre>
+
+<h2>Get Started</h2>
+
+<p>The minimium set of APIs you need to learn in order to implement a task queue
+system are:</p>
+
+<ul>
+<li><code>enqueue</code> tasks, and</li>
+<li><code>regist</code> a function for processing them.</li>
+</ul>
+
+<h3>Enqueue Tasks</h3>
+
+<p>Provide as many parameters as you want (and an optional callback function).
+The first argument will be used for message grouping.</p>
+
+<pre><code>queue = require('fairy').connect().queue('task_name')
+queue.enqueue 'foo', 'bar', -&gt;
+  console.log 'your order has been placed, sir.'
+</code></pre>
+
+<h3>Register Task Handler</h3>
+
+<p>When registered a task handler, the <strong>Fairy</strong> queue becomes a worker
+automatically.</p>
+
+<p>The registered handler function will be called when there're tasks to be
+processed, with the enqueued parameters of the task. The last argument will be a
+<strong>non</strong>-optional callback function.</p>
+
+<p>Arguments of the callback function follow node.js error handling convention:
+<code>err</code> and <code>res</code>.</p>
+
+<p>Calling the callback function is your responsibility (or <strong>Fairy</strong> will not
+dispatch tasks to the worker and block tasks of the same group forever!)</p>
+
+<pre><code>queue = require('fairy').connect().queue('task_name')
+queue.regist (param1, param2, callback) -&gt;
+  # Do your work here, be it synchronous or asynchronous.
+  callback err, res
+</code></pre>
+
+<h2>Web Front-End</h2>
+
+<p><strong>Fairy</strong> comes with a ready-to-use web front-end. Simply insert the middleware into
+the pipeline:</p>
+
+<pre><code>app = require('express').createServer()
+fairy_web = require 'fairy/web'
+app.use fairy_web.connect().middleware
+app.listen 3000
+</code></pre>
+
+<h2>More APIs</h2>
+
+<p>More APIs include:</p>
+
+<ol>
+<li><p>Objects of Class <code>Queue</code>:</p>
+
+<ul><li>Placing tasks -- <code>enqueue</code></li>
+<li>Regist handlers -- <code>regist</code></li>
+<li>Reschedule tasks -- <code>reschedule</code></li>
+<li>Query status --</li>
+<li><code>recently_finished_tasks</code></li>
+<li><code>failed_tasks</code></li>
+<li><code>blocked_groups</code></li>
+<li><code>slowest_tasks</code></li>
+<li><code>processing_tasks</code></li>
+<li><code>workers</code></li>
+<li><code>statistics</code>, etc.</li></ul></li>
+<li><p>Objects of Class <code>Fairy</code>:</p>
+
+<ul><li><code>queues</code>, return all queues.</li>
+<li><code>statistics</code>, return statistics of all queues.</li></ul></li>
+</ol>
+
+<p>See <strong><a href="https://github.com/baoshan/fairy/tree/master/example">Example Folder</a></strong> for demos. Or review the <strong><a href="http://baoshan.github.com/fairy/src/fairy.html">Annotated Source Code</a></strong>
+for complete API explanations.</p>
+
+<h2>License</h2>
+
+<p>Copyright (c) 2012 Baoshan Sheng</p>
+
+<p>Released under the MIT license.</p></div>     </div>     <!--content-->   <div class="content">        <table class="code_stats">                  <tr>           <td>100%</td>           <td>CoffeeScript</td>           <td><span data-lang="CoffeeScript"></span></td>    <td style="width:400px;"><div><span data-lang="CoffeeScript" percent="100%" style="width: 0%;"></span><span>1256 sloc</span></div></td>         </tr>         <tr>                  <tr>           <td>0%</td>           <td>JavaScript</td>           <td><span data-lang="JavaScript"></span></td>    <td style="width:400px;"><div><span data-lang="JavaScript" percent="0%" style="width: 0%;"></span><span>1 sloc</span></div></td>         </tr>         <tr>                </table>             <ol>                           <li>Thu, 24 May 2012 09:33:00 +0800, Wang Ling, update</li>                           <li>Tue, 22 May 2012 14:24:05 +0800, Wang Ling, update</li>                           <li>Tue, 22 May 2012 09:34:56 +0800, Wang Ling, Merge branch 'master' of github.com:baoshan/fairy</li>                           <li>Tue, 22 May 2012 09:34:20 +0800, Wang Ling, update</li>                           <li>Tue, 22 May 2012 01:28:06 +0800, Baoshan Sheng, Clean up</li>                </ol>         <div id="filebrowser">       <div id="breadcrumb"></div>       <div id="filelists"></div>     </div>        </div>   </div>   <script src="javascript/jquery.min.js" type="text/javascript"></script>   <script src="javascript/underscore-min.js" type="text/javascript"></script>   <script src="javascript/moment.min.js" type="text/javascript"></script>   <script src="javascript/filesize.js" type="text/javascript"></script>   <script src="javascript/langstats.js" type="text/javascript"></script>   <script src="javascript/file_browser.js" type="text/javascript"></script>   <script type="text/javascript">     $(function() { new file_browser("baoshan", "fairy", "docas/tree/docas.index"); })     </script> </body> </html> 

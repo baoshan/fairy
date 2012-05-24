@@ -1,0 +1,75 @@
+<!DOCTYPE html>  <html> <head>   <title>shared_steps.coffee</title>   <meta http-equiv="content-type" content="text/html; charset=UTF-8">   <meta name="generator" content="Docco">   <link rel="stylesheet" media="all" href="../stylesheets/docco.css" /> </head> <body>   <div id="container">     <div id="background"></div>     <table cellpadding="0" cellspacing="0">       <thead>         <tr>           <th class="docs">             <h1>               shared_steps.coffee             </h1>           </th>           <th class="code">           </th>         </tr>       </thead>       <tbody>                               <tr id="section-1">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-1">&#182;</a>               </div>                            </td>             <td class="code">               <div class="highlight"><pre><span class="nv">fs     = </span><span class="nx">require</span> <span class="s">&#39;fs&#39;</span>
+<span class="p">{</span><span class="nx">exec</span><span class="p">}</span> <span class="o">=</span> <span class="nx">require</span> <span class="s">&#39;child_process&#39;</span>
+<span class="nv">should = </span><span class="nx">require</span> <span class="s">&#39;should&#39;</span>
+
+<span class="nb">Array</span><span class="o">::</span><span class="nv">random = </span><span class="o">-&gt;</span> <span class="nx">@</span><span class="p">[</span><span class="nb">parseInt</span> <span class="nb">Math</span><span class="p">.</span><span class="nx">random</span><span class="p">()</span> <span class="o">*</span> <span class="nx">@length</span><span class="p">]</span>
+
+<span class="nv">soft_kill_signals = </span><span class="p">[</span>
+  <span class="s">&#39;SIGINT&#39;</span>
+  <span class="s">&#39;SIGHUP&#39;</span>
+  <span class="s">&#39;SIGQUIT&#39;</span>
+  <span class="s">&#39;SIGUSR1&#39;</span>
+  <span class="s">&#39;SIGUSR2&#39;</span>
+  <span class="s">&#39;SIGTERM&#39;</span>
+  <span class="s">&#39;SIGABRT&#39;</span>
+<span class="p">]</span>
+
+<span class="nv">exports = module.exports =</span>
+
+  <span class="nv">clear_queue: </span><span class="nf">(queue, done) -&gt;</span>
+    <span class="nx">queue</span><span class="p">.</span><span class="nx">clear</span> <span class="nf">(err, statistics) -&gt;</span>
+      <span class="nx">should</span><span class="p">.</span><span class="o">not</span><span class="p">.</span><span class="nx">exist</span> <span class="nx">err</span>
+      <span class="nx">statistics</span><span class="p">.</span><span class="nx">total</span><span class="p">.</span><span class="nx">groups</span><span class="p">.</span><span class="nx">should</span><span class="p">.</span><span class="nx">equal</span> <span class="mi">0</span>
+      <span class="nx">statistics</span><span class="p">.</span><span class="nx">total</span><span class="p">.</span><span class="nx">tasks</span><span class="p">.</span><span class="nx">should</span><span class="p">.</span><span class="nx">equal</span> <span class="mi">0</span>
+      <span class="nx">statistics</span><span class="p">.</span><span class="nx">pending_tasks</span><span class="p">.</span><span class="nx">should</span><span class="p">.</span><span class="nx">equal</span> <span class="mi">0</span>
+      <span class="nx">done</span><span class="p">()</span>
+
+  <span class="nv">enqueue_tasks: </span><span class="nf">(queue, total_groups, total_tasks, done) -&gt;</span>
+    <span class="nv">generated = </span><span class="mi">0</span>
+    <span class="nv">group_sequence = </span><span class="p">[</span><span class="mi">0</span> <span class="p">..</span> <span class="nx">total_groups</span> <span class="o">-</span> <span class="mi">1</span><span class="p">].</span><span class="nx">map</span> <span class="o">-&gt;</span> <span class="mi">0</span>
+    <span class="nx">do</span> <span class="nv">generate = </span><span class="o">-&gt;</span>
+      <span class="k">if</span> <span class="nx">generated</span><span class="o">++</span> <span class="o">is</span> <span class="nx">total_tasks</span>
+        <span class="k">return</span> <span class="nx">queue</span><span class="p">.</span><span class="nx">statistics</span> <span class="nf">(err, statistics) -&gt;</span>
+          <span class="nx">should</span><span class="p">.</span><span class="o">not</span><span class="p">.</span><span class="nx">exist</span> <span class="nx">err</span>
+          <span class="nx">statistics</span><span class="p">.</span><span class="nx">total</span><span class="p">.</span><span class="nx">groups</span><span class="p">.</span><span class="nx">should</span><span class="p">.</span><span class="nx">equal</span> <span class="nx">total_groups</span>
+          <span class="nx">statistics</span><span class="p">.</span><span class="nx">total</span><span class="p">.</span><span class="nx">tasks</span><span class="p">.</span><span class="nx">should</span><span class="p">.</span><span class="nx">equal</span> <span class="nx">total_tasks</span>
+          <span class="nx">statistics</span><span class="p">.</span><span class="nx">pending_tasks</span><span class="p">.</span><span class="nx">should</span><span class="p">.</span><span class="nx">equal</span> <span class="nx">total_tasks</span>
+          <span class="nx">done</span><span class="p">()</span>
+      <span class="nv">group = </span><span class="nb">parseInt</span> <span class="nb">Math</span><span class="p">.</span><span class="nx">random</span><span class="p">()</span> <span class="o">*</span> <span class="nx">total_groups</span>
+      <span class="nv">sequence = </span><span class="nx">group_sequence</span><span class="p">[</span><span class="nx">group</span><span class="p">]</span><span class="o">++</span>
+      <span class="nx">queue</span><span class="p">.</span><span class="nx">enqueue</span> <span class="nx">group</span><span class="p">,</span> <span class="nx">sequence</span><span class="p">,</span> <span class="nx">generate</span>
+
+  <span class="nv">kill_one: </span><span class="nf">(queue, done) -&gt;</span>
+    <span class="nx">queue</span><span class="p">.</span><span class="nx">workers</span> <span class="nf">(err, workers) -&gt;</span>
+      <span class="k">return</span> <span class="nx">done</span><span class="p">()</span> <span class="nx">unless</span> <span class="nx">workers</span><span class="p">.</span><span class="nx">length</span>
+      <span class="nx">process</span><span class="p">.</span><span class="nx">kill</span> <span class="nx">workers</span><span class="p">.</span><span class="nx">random</span><span class="p">().</span><span class="nx">pid</span><span class="p">,</span> <span class="nx">soft_kill_signals</span><span class="p">.</span><span class="nx">random</span><span class="p">()</span>
+      <span class="nx">done</span><span class="p">()</span>
+
+  <span class="nv">wait_until_done: </span><span class="nf">(queue, total_tasks, done) -&gt;</span>
+    <span class="nv">success_counter = </span><span class="mi">0</span>
+    <span class="nx">do</span> <span class="nv">probe = </span><span class="o">-&gt;</span>
+      <span class="nx">queue</span><span class="p">.</span><span class="nx">statistics</span> <span class="nf">(err, statistics) -&gt;</span>
+        <span class="k">if</span> <span class="nx">statistics</span><span class="p">.</span><span class="nx">finished_tasks</span> <span class="o">is</span> <span class="nx">total_tasks</span>
+          <span class="nx">statistics</span><span class="p">.</span><span class="nx">pending_tasks</span><span class="p">.</span><span class="nx">should</span><span class="p">.</span><span class="nx">equal</span> <span class="mi">0</span>
+          <span class="nx">statistics</span><span class="p">.</span><span class="nx">processing_tasks</span><span class="p">.</span><span class="nx">should</span><span class="p">.</span><span class="nx">equal</span> <span class="mi">0</span>
+          <span class="k">return</span> <span class="nx">done</span><span class="p">()</span> <span class="k">if</span> <span class="nx">success_counter</span><span class="o">++</span> <span class="o">is</span> <span class="mi">3</span>
+        <span class="nx">setTimeout</span> <span class="nx">probe</span><span class="p">,</span> <span class="mi">100</span>
+
+  <span class="nv">clean_up: </span><span class="nf">(queue, done) -&gt;</span>
+    <span class="nv">success_counter = </span><span class="mi">0</span>
+    <span class="nx">queue</span><span class="p">.</span><span class="nx">workers</span> <span class="nf">(err, workers) -&gt;</span>
+      <span class="nx">process</span><span class="p">.</span><span class="nx">kill</span> <span class="nx">worker</span><span class="p">.</span><span class="nx">pid</span><span class="p">,</span> <span class="nx">soft_kill_signals</span><span class="p">.</span><span class="nx">random</span><span class="p">()</span> <span class="k">for</span> <span class="nx">worker</span> <span class="k">in</span> <span class="nx">workers</span>
+      <span class="nx">do</span> <span class="nv">get_statistics = </span><span class="o">-&gt;</span>
+        <span class="nx">queue</span><span class="p">.</span><span class="nx">statistics</span> <span class="nf">(err, statistics) -&gt;</span>
+          <span class="k">return</span> <span class="nx">setTimeout</span> <span class="nx">get_statistics</span><span class="p">,</span> <span class="mi">100</span> <span class="nx">unless</span> <span class="nx">statistics</span><span class="p">.</span><span class="nx">workers</span> <span class="o">is</span> <span class="mi">0</span>
+          <span class="k">return</span> <span class="nx">setTimeout</span> <span class="nx">get_statistics</span><span class="p">,</span> <span class="mi">100</span> <span class="nx">unless</span> <span class="nx">success_counter</span><span class="o">++</span> <span class="o">is</span> <span class="mi">3</span>
+          <span class="nx">statistics</span><span class="p">.</span><span class="nx">pending_tasks</span><span class="p">.</span><span class="nx">should</span><span class="p">.</span><span class="nx">equal</span> <span class="mi">0</span>
+          <span class="nx">done</span><span class="p">()</span>
+
+  <span class="nv">check_result: </span><span class="nf">(total_groups, done) -&gt;</span>
+    <span class="k">for</span> <span class="nx">group</span> <span class="k">in</span> <span class="p">[</span><span class="mi">0</span> <span class="p">..</span> <span class="nx">total_groups</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+      <span class="k">for</span> <span class="nx">content</span><span class="p">,</span> <span class="nx">line</span> <span class="k">in</span> <span class="nx">fs</span><span class="p">.</span><span class="nx">readFileSync</span><span class="p">(</span><span class="s">&quot;</span><span class="si">#{</span><span class="nx">__dirname</span><span class="si">}</span><span class="s">/workers/</span><span class="si">#{</span><span class="nx">group</span><span class="si">}</span><span class="s">.dmp&quot;</span><span class="p">).</span><span class="nx">toString</span><span class="p">().</span><span class="nx">split</span><span class="p">(</span><span class="s">&#39;\n&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">...</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="nx">content</span><span class="p">.</span><span class="nx">should</span><span class="p">.</span><span class="nx">equal</span> <span class="s">&quot;</span><span class="si">#{</span><span class="nx">line</span><span class="si">}</span><span class="s">&quot;</span>
+    <span class="nx">exec</span> <span class="s">&quot;rm -f </span><span class="si">#{</span><span class="nx">__dirname</span><span class="si">}</span><span class="s">/workers/*.dmp&quot;</span><span class="p">,</span> <span class="nx">done</span>
+
+</pre></div>             </td>           </tr>                </tbody>     </table>   </div> </body> </html> 

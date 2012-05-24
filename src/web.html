@@ -1,0 +1,46 @@
+<!DOCTYPE html>  <html> <head>   <title>web.coffee</title>   <meta http-equiv="content-type" content="text/html; charset=UTF-8">   <meta name="generator" content="Docco">   <link rel="stylesheet" media="all" href="../stylesheets/docco.css" /> </head> <body>   <div id="container">     <div id="background"></div>     <table cellpadding="0" cellspacing="0">       <thead>         <tr>           <th class="docs">             <h1>               web.coffee             </h1>           </th>           <th class="code">           </th>         </tr>       </thead>       <tbody>                               <tr id="section-1">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-1">&#182;</a>               </div>                            </td>             <td class="code">               <div class="highlight"><pre><span class="nv">express     = </span><span class="nx">require</span> <span class="s">&#39;express&#39;</span>
+<span class="nv">router      = </span><span class="k">new</span> <span class="nx">express</span><span class="p">.</span><span class="nx">Router</span><span class="p">()</span>
+<span class="nv">staticCache = </span><span class="nx">express</span><span class="p">.</span><span class="nx">staticCache</span><span class="p">()</span>
+<span class="nv">static_     = </span><span class="nx">express</span><span class="p">.</span><span class="nx">static</span> <span class="nx">__dirname</span> <span class="o">+</span> <span class="s">&#39;/web&#39;</span>
+
+<span class="nv">plural_commands = </span>
+  <span class="nv">get: </span><span class="p">[</span><span class="s">&#39;statistics&#39;</span><span class="p">]</span>
+
+<span class="nv">singular_commands = </span>
+  <span class="nv">get: </span><span class="p">[</span><span class="s">&#39;statistics&#39;</span><span class="p">,</span> <span class="s">&#39;recently_finished_tasks&#39;</span><span class="p">,</span> <span class="s">&#39;failed_tasks&#39;</span><span class="p">,</span> <span class="s">&#39;slowest_tasks&#39;</span><span class="p">,</span> <span class="s">&#39;processing_tasks&#39;</span><span class="p">,</span> <span class="s">&#39;workers&#39;</span><span class="p">]</span>
+  <span class="nx">post</span><span class="o">:</span><span class="p">[</span><span class="s">&#39;reschedule&#39;</span><span class="p">,</span> <span class="s">&#39;clear&#39;</span><span class="p">]</span>
+
+<span class="nv">exports.connect = </span><span class="nf">(options = {}) -&gt;</span>
+  <span class="k">new</span> <span class="nx">Connect</span><span class="p">(</span><span class="nx">options</span><span class="p">)</span>
+
+<span class="k">class</span> <span class="nx">Connect</span>
+  <span class="nv">constructor: </span><span class="nf">(@options) -&gt;</span>
+    <span class="vi">@fairy = </span><span class="nx">require</span><span class="p">(</span><span class="s">&#39;../.&#39;</span><span class="p">).</span><span class="nx">connect</span><span class="p">(</span><span class="nx">options</span><span class="p">)</span>
+    <span class="vi">@no_cache = </span><span class="nf">(req, res, next) -&gt;</span>
+      <span class="nx">res</span><span class="p">.</span><span class="nx">setHeader</span> <span class="s">&quot;Cache-Control&quot;</span><span class="p">,</span> <span class="s">&quot;no-cache&quot;</span>
+      <span class="nx">next</span><span class="p">()</span>
+    <span class="nx">@__defineGetter__</span> <span class="s">&#39;middleware&#39;</span><span class="p">,</span> <span class="o">=&gt;</span>
+      <span class="k">for</span> <span class="nx">method</span><span class="p">,</span> <span class="nx">commands</span> <span class="k">of</span> <span class="nx">plural_commands</span>
+        <span class="k">for</span> <span class="nx">command</span> <span class="k">in</span> <span class="nx">commands</span>
+          <span class="nx">router</span><span class="p">.</span><span class="nx">route</span> <span class="nx">method</span><span class="p">,</span> <span class="s">&quot;/api/queues/</span><span class="si">#{</span><span class="nx">command</span><span class="si">}</span><span class="s">&quot;</span><span class="p">,</span> <span class="nx">@no_cache</span><span class="p">,</span> <span class="nx">do</span> <span class="p">(</span><span class="nx">command</span><span class="p">)</span> <span class="o">=&gt;</span>
+            <span class="p">(</span><span class="nx">req</span><span class="p">,</span> <span class="nx">res</span><span class="p">)</span> <span class="o">=&gt;</span>
+              <span class="nx">@fairy</span><span class="p">[</span><span class="nx">command</span><span class="p">]</span> <span class="nf">(err, results) -&gt;</span>
+                <span class="k">return</span> <span class="nx">res</span><span class="p">.</span><span class="nx">send</span> <span class="mi">500</span><span class="p">,</span> <span class="nx">err</span><span class="p">.</span><span class="nx">stack</span> <span class="k">if</span> <span class="nx">err</span>
+                <span class="nx">res</span><span class="p">.</span><span class="nx">send</span> <span class="nx">results</span>
+
+      <span class="k">for</span> <span class="nx">method</span><span class="p">,</span> <span class="nx">commands</span> <span class="k">of</span> <span class="nx">singular_commands</span>
+        <span class="k">for</span> <span class="nx">command</span> <span class="k">in</span> <span class="nx">commands</span>
+          <span class="nx">router</span><span class="p">.</span><span class="nx">route</span> <span class="nx">method</span><span class="p">,</span> <span class="s">&quot;/api/queues/:name/</span><span class="si">#{</span><span class="nx">command</span><span class="si">}</span><span class="s">&quot;</span><span class="p">,</span> <span class="nx">@no_cache</span><span class="p">,</span> <span class="nx">do</span> <span class="p">(</span><span class="nx">command</span><span class="p">)</span> <span class="o">=&gt;</span>
+            <span class="p">(</span><span class="nx">req</span><span class="p">,</span> <span class="nx">res</span><span class="p">)</span> <span class="o">=&gt;</span>
+              <span class="nv">queue = </span><span class="nx">@fairy</span><span class="p">.</span><span class="nx">queue</span> <span class="nx">req</span><span class="p">.</span><span class="nx">params</span><span class="p">.</span><span class="nx">name</span>
+              <span class="nx">queue</span><span class="p">[</span><span class="nx">command</span><span class="p">]</span> <span class="nf">(err, results) -&gt;</span>
+                <span class="k">return</span> <span class="nx">res</span><span class="p">.</span><span class="nx">send</span> <span class="mi">500</span><span class="p">,</span> <span class="nx">err</span><span class="p">.</span><span class="nx">stack</span> <span class="k">if</span> <span class="nx">err</span>
+                <span class="nx">res</span><span class="p">.</span><span class="nx">send</span> <span class="nx">results</span>
+      
+      <span class="nf">(req, res, next) -&gt;</span>
+        <span class="nx">router</span><span class="p">.</span><span class="nx">middleware</span> <span class="nx">req</span><span class="p">,</span> <span class="nx">res</span><span class="p">,</span> <span class="o">-&gt;</span>
+          <span class="nv">req.url = </span><span class="s">&#39;/fairy.html&#39;</span> <span class="k">if</span> <span class="nx">req</span><span class="p">.</span><span class="nx">url</span> <span class="o">is</span> <span class="s">&#39;/fairy&#39;</span>
+          <span class="nx">staticCache</span> <span class="nx">req</span><span class="p">,</span> <span class="nx">res</span><span class="p">,</span> <span class="o">-&gt;</span>
+            <span class="nx">static_</span> <span class="nx">req</span><span class="p">,</span> <span class="nx">res</span><span class="p">,</span> <span class="nx">next</span>
+
+</pre></div>             </td>           </tr>                </tbody>     </table>   </div> </body> </html> 

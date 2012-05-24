@@ -1,0 +1,839 @@
+<!DOCTYPE html>  <html> <head>   <title>fairy.coffee</title>   <meta http-equiv="content-type" content="text/html; charset=UTF-8">   <meta name="generator" content="Docco">   <link rel="stylesheet" media="all" href="../stylesheets/docco.css" /> </head> <body>   <div id="container">     <div id="background"></div>     <table cellpadding="0" cellspacing="0">       <thead>         <tr>           <th class="docs">             <h1>               fairy.coffee             </h1>           </th>           <th class="code">           </th>         </tr>       </thead>       <tbody>                               <tr id="section-1">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-1">&#182;</a>               </div>               <p><em>Queue System Treats Tasks Fairly.</em></p>
+
+<p><strong>Fairy</strong> is a lightweight queue engine for node.js based on Redis. Fairy
+offers ActiveMQ's <strong><a href="http://activemq.apache.org/message-groups.html">message groups</a></strong> alike feature which can guarantee
+the sequential processing order of tasks belong to a same group.</p>
+
+<p>But, unlike <strong>message groups</strong>, <strong>Fairy</strong> doesn't always route tasks of a
+group to a same worker, which will introduce unwanted waiting time when:</p>
+
+<ol>
+<li>Tasks of group <code>X</code> and <code>Y</code> are appointed to worker <code>A</code>.</li>
+<li>Worker <code>A</code> is processing tasks of group <code>X</code> <strong>sequentially</strong>.</li>
+<li>Tasks of group <code>Y</code> are pending, while:</li>
+<li>Worker <code>B</code> is snoozing! <em>(because of 1)</em></li>
+</ol>
+
+<p><strong>Fairy</strong> will route the task of group <code>Y</code> to worker <code>B</code> in this scenario.</p>
+
+<p><strong>Fairy</strong> takes a different approach than Message Groups. Instead of making
+all tasks of a same group be routed to the same consumer, <strong>Fairy</strong> route a
+task to any worker when there's no <strong>processing</strong> tasks of the same group.</p>
+
+<p>The design philosophy makes <strong>Fairy</strong> ideal for the following requirements:</p>
+
+<ul>
+<li>Tasks of a same groups need be processed in order.</li>
+<li>Each worker processes tasks sequentially.</li>
+<li>Multiple workers need be instantiated to increase throughput.</li>
+</ul>
+
+<p>Copyright © 2012, Baoshan Sheng.
+Released under the MIT License.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-2">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-2">&#182;</a>               </div>               <h2>Fairy in a Nutshell</h2>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-3">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-3">&#182;</a>               </div>               <p><strong>Fairy</strong> depends on:</p>
+
+<ul>
+<li><strong><a href="https://github.com/mranney/node_redis">redis</a></strong>, node.js driver for Redis, of course!</li>
+<li><strong><a href="https://github.com/broofa/node-uuid">node-uuid</a></strong>, generate an unique identifier for each task.</li>
+<li><strong><a href="https://github.com/visionmedia/express">express</a></strong>, required by the <a href="fairy_web.html">http api</a> and <a href="fairy_web.html">web front-end</a> middleware.</li>
+</ul>             </td>             <td class="code">               <div class="highlight"><pre><span class="nv">uuid  = </span><span class="nx">require</span> <span class="s">&#39;node-uuid&#39;</span>
+<span class="nv">redis = </span><span class="nx">require</span> <span class="s">&#39;redis&#39;</span>
+<span class="nv">os    = </span><span class="nx">require</span> <span class="s">&#39;os&#39;</span></pre></div>             </td>           </tr>                               <tr id="section-4">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-4">&#182;</a>               </div>               <p>A constant prefix will be applied to all Redis keys for safety and
+ease-of-management reasons.</p>             </td>             <td class="code">               <div class="highlight"><pre><span class="nv">prefix = </span><span class="s">&#39;FAIRY&#39;</span></pre></div>             </td>           </tr>                               <tr id="section-5">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-5">&#182;</a>               </div>               <h3>CommonJS Module Definition</h3>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-6">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-6">&#182;</a>               </div>               <p>The only exposed object is a <code>connect</code> method, which returns a <strong>Fairy</strong>
+client on invocation. <strong>Usage:</strong></p>
+
+<pre><code>fairy = require('fairy').connect()
+</code></pre>
+
+<p>The <code>connect</code> method use the passed-in options object to create a Redis
+client. Then use the Redis client to initiate a new object of class <code>Fairy</code>.
+The options object could have below keys:</p>
+
+<ul>
+<li><code>port</code>, defaults to <code>6379</code>.</li>
+<li><code>host</code>, defaults to <code>127.0.0.1</code>.</li>
+<li><code>password</code>, if the Redis server requires authentication.</li>
+<li><code>options</code>, read <a href="https://github.com/mranney/node_redis">node_redis documents</a> for more detail.</li>
+</ul>             </td>             <td class="code">               <div class="highlight"><pre><span class="nv">exports.connect = </span><span class="nf">(options = {}) -&gt;</span>
+  <span class="k">new</span> <span class="nx">Fairy</span> <span class="nx">options</span></pre></div>             </td>           </tr>                               <tr id="section-7">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-7">&#182;</a>               </div>               <h3>Exception / Interruption Handling</h3>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-8">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-8">&#182;</a>               </div>               <p>Use <code>uncaughtException</code> and <code>SIGINT</code> to provide elegant exception and user
+interruption handling.</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-9">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-9">&#182;</a>               </div>               <p>Module wide variable to instruct all queues exit after processing current
+task.</p>             </td>             <td class="code">               <div class="highlight"><pre><span class="nv">exiting = </span><span class="kc">off</span></pre></div>             </td>           </tr>                               <tr id="section-10">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-10">&#182;</a>               </div>               <p>Keep current process's all registered workers an array, rely on this array to
+count cleaned workers on exiting.</p>             </td>             <td class="code">               <div class="highlight"><pre><span class="nv">registered_workers = </span><span class="p">[]</span></pre></div>             </td>           </tr>                               <tr id="section-11">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-11">&#182;</a>               </div>               <p>Log active workers while waiting for all workers to clean-up.</p>             </td>             <td class="code">               <div class="highlight"><pre><span class="nv">log_registered_workers = </span><span class="o">-&gt;</span>
+  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span> <span class="s">&quot;\nFairy is waiting for </span><span class="si">#{</span><span class="nx">registered_workers</span><span class="p">.</span><span class="nx">length</span><span class="si">}</span><span class="s"> workers to clean-up before exit:&quot;</span>
+  <span class="k">for</span> <span class="nx">registered_worker</span> <span class="k">in</span> <span class="nx">registered_workers</span>
+    <span class="nv">worker_info = </span><span class="nx">registered_worker</span><span class="p">.</span><span class="nx">split</span> <span class="s">&#39;|&#39;</span>
+    <span class="nx">console</span><span class="p">.</span><span class="nx">log</span> <span class="s">&quot;  * Client Id: [</span><span class="si">#{</span><span class="nx">worker_info</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s">], Task: [</span><span class="si">#{</span><span class="nx">worker_info</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s">]&quot;</span>
+
+<span class="nv">cleanup_required = </span><span class="kc">off</span></pre></div>             </td>           </tr>                               <tr id="section-12">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-12">&#182;</a>               </div>               <p>Fairy will enter cleanup mode before exit when:</p>
+
+<ul>
+<li>Received <code>SIGINT</code>, <code>SIGHUP</code>, or <code>SIGUSR2</code>.</li>
+<li><code>uncaughtException</code> captured.</li>
+</ul>
+
+<p>If there's no registered workers, exit directly.</p>             </td>             <td class="code">               <div class="highlight"><pre><span class="nv">enter_cleanup_mode = </span><span class="o">-&gt;</span>
+  <span class="k">if</span> <span class="nx">registered_workers</span><span class="p">.</span><span class="nx">length</span>
+    <span class="nx">log_registered_workers</span><span class="p">()</span>
+    <span class="nv">cleanup_required = </span><span class="kc">on</span>
+    <span class="nv">exiting = </span><span class="kc">on</span>
+  <span class="k">else</span>
+    <span class="k">return</span> <span class="nx">process</span><span class="p">.</span><span class="nx">exit</span><span class="p">()</span></pre></div>             </td>           </tr>                               <tr id="section-13">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-13">&#182;</a>               </div>               <p>When below signals are captured, gracefully exit the program by notifying all
+workers entering cleanup mode and exit after all are cleaned up.</p>
+
+<ul>
+<li><code>SIGINT</code> (e.g. <code>Control-C</code>)</li>
+<li><code>SIGHUP</code></li>
+<li><code>SIGQUIT</code></li>
+<li><code>SIGUSR1</code></li>
+<li><code>SIGUSR2</code></li>
+<li><code>SIGTERM</code></li>
+<li><code>SIGABRT</code></li>
+</ul>             </td>             <td class="code">               <div class="highlight"><pre><span class="nx">process</span><span class="p">.</span><span class="kc">on</span> <span class="s">&#39;SIGINT&#39;</span><span class="p">,</span> <span class="nx">enter_cleanup_mode</span>
+<span class="nx">process</span><span class="p">.</span><span class="kc">on</span> <span class="s">&#39;SIGHUP&#39;</span><span class="p">,</span> <span class="nx">enter_cleanup_mode</span>
+<span class="nx">process</span><span class="p">.</span><span class="kc">on</span> <span class="s">&#39;SIGQUIT&#39;</span><span class="p">,</span> <span class="nx">enter_cleanup_mode</span>
+<span class="nx">process</span><span class="p">.</span><span class="kc">on</span> <span class="s">&#39;SIGUSR1&#39;</span><span class="p">,</span> <span class="nx">enter_cleanup_mode</span>
+<span class="nx">process</span><span class="p">.</span><span class="kc">on</span> <span class="s">&#39;SIGUSR2&#39;</span><span class="p">,</span> <span class="nx">enter_cleanup_mode</span>
+<span class="nx">process</span><span class="p">.</span><span class="kc">on</span> <span class="s">&#39;SIGTERM&#39;</span><span class="p">,</span> <span class="nx">enter_cleanup_mode</span>
+<span class="nx">process</span><span class="p">.</span><span class="kc">on</span> <span class="s">&#39;SIGABRT&#39;</span><span class="p">,</span> <span class="nx">enter_cleanup_mode</span></pre></div>             </td>           </tr>                               <tr id="section-14">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-14">&#182;</a>               </div>               <p>When <code>uncaughtException</code> is captured, <strong>Fairy</strong> can not tell if this is caught
+by the handling function, as well as which queue cause the exception.
+<strong>Fairy</strong> will fail all processing tasks and block the according group.</p>             </td>             <td class="code">               <div class="highlight"><pre><span class="nx">process</span><span class="p">.</span><span class="kc">on</span> <span class="s">&#39;uncaughtException&#39;</span><span class="p">,</span> <span class="nf">(err) -&gt;</span>
+  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span> <span class="s">&#39;Exception:&#39;</span><span class="p">,</span> <span class="nx">err</span><span class="p">.</span><span class="nx">stack</span>
+  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span> <span class="s">&#39;Fairy workers will block their processing groups before exit.&#39;</span> <span class="k">if</span> <span class="nx">registered_workers</span><span class="p">.</span><span class="nx">length</span>
+  <span class="nx">enter_cleanup_mode</span><span class="p">()</span></pre></div>             </td>           </tr>                               <tr id="section-15">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-15">&#182;</a>               </div>               <p>Say goodbye on exit.</p>             </td>             <td class="code">               <div class="highlight"><pre><span class="nx">process</span><span class="p">.</span><span class="kc">on</span> <span class="s">&#39;exit&#39;</span><span class="p">,</span> <span class="o">-&gt;</span>
+  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span> <span class="s">&quot;Fairy cleaned up, exiting...&quot;</span> <span class="k">if</span> <span class="nx">cleanup_required</span></pre></div>             </td>           </tr>                               <tr id="section-16">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-16">&#182;</a>               </div>               <h2>Helper Methods</h2>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-17">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-17">&#182;</a>               </div>               <h3>Get Public IP</h3>
+
+<p><strong>Fairy</strong> embed public IP address of workers' environment in workers' name to
+facilitate management.</p>             </td>             <td class="code">               <div class="highlight"><pre><span class="nv">server_ip = </span><span class="o">-&gt;</span>
+  <span class="k">for</span> <span class="nx">card</span><span class="p">,</span> <span class="nx">addresses</span> <span class="k">of</span> <span class="nx">os</span><span class="p">.</span><span class="nx">networkInterfaces</span><span class="p">()</span>
+    <span class="k">for</span> <span class="nx">address</span> <span class="k">in</span> <span class="nx">addresses</span>
+      <span class="k">return</span> <span class="nx">address</span><span class="p">.</span><span class="nx">address</span> <span class="k">if</span> <span class="o">not</span> <span class="nx">address</span><span class="p">.</span><span class="nx">internal</span> <span class="o">and</span> <span class="nx">address</span><span class="p">.</span><span class="nx">family</span> <span class="o">is</span> <span class="s">&#39;IPv4&#39;</span>
+  <span class="k">return</span> <span class="s">&#39;UNKNOWN_IP&#39;</span></pre></div>             </td>           </tr>                               <tr id="section-18">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-18">&#182;</a>               </div>               <h2>Create Redis Client</h2>             </td>             <td class="code">               <div class="highlight"><pre><span class="nv">create_client = </span><span class="nf">(options) -&gt;</span>
+  <span class="nv">client = </span><span class="nx">redis</span><span class="p">.</span><span class="nx">createClient</span> <span class="nx">options</span><span class="p">.</span><span class="nx">port</span><span class="p">,</span> <span class="nx">options</span><span class="p">.</span><span class="nx">host</span><span class="p">,</span> <span class="nx">options</span><span class="p">.</span><span class="nx">options</span>
+  <span class="nx">client</span><span class="p">.</span><span class="nx">auth</span> <span class="nx">options</span><span class="p">.</span><span class="nx">password</span> <span class="k">if</span> <span class="nx">options</span><span class="p">.</span><span class="nx">password</span><span class="o">?</span>
+  <span class="nx">client</span></pre></div>             </td>           </tr>                               <tr id="section-19">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-19">&#182;</a>               </div>               <h2>Class Fairy</h2>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-20">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-20">&#182;</a>               </div>               <p>Model wide variable used for allocating an increasing integer <code>id</code> for each
+<strong>Fairy</strong> client of current process.</p>             </td>             <td class="code">               <div class="highlight"><pre><span class="nv">fairy_id = </span><span class="mi">0</span></pre></div>             </td>           </tr>                               <tr id="section-21">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-21">&#182;</a>               </div>               <p>Object of class <code>Fairy</code> keeps a Redis connection and a pool of named queues
+(objects of class <code>Queue</code>) responsible for enqueuing and dispatching tasks,
+etc.</p>             </td>             <td class="code">               <div class="highlight"><pre><span class="k">class</span> <span class="nx">Fairy</span></pre></div>             </td>           </tr>                               <tr id="section-22">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-22">&#182;</a>               </div>               <h3>Constructor</h3>
+
+<p>Class <code>Fairy</code> is not exposed outside the commonjs module. To get an object
+of class <code>Fairy</code>, use the <code>connect</code> method to connect to the Redis server.
+<strong>Usage:</strong></p>
+
+<pre><code>fairy = require('fairy').connect()
+</code></pre>             </td>             <td class="code">               <div class="highlight"><pre>  </pre></div>             </td>           </tr>                               <tr id="section-23">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-23">&#182;</a>               </div>               <p>The constructor of class <code>Fairy</code> stores the passed-in Redis client as an
+instance property.</p>
+
+<p>A <code>queue_pool</code> caches named queued as a hashtable. Keys are names of queues,
+values are according objects of class <code>Queue</code>.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">constructor: </span><span class="nf">(@options) -&gt;</span>
+    <span class="vi">@redis = </span><span class="nx">create_client</span> <span class="nx">options</span>
+    <span class="vi">@id = </span><span class="nx">fairy_id</span><span class="o">++</span>
+    <span class="vi">@queue_pool = </span><span class="p">{}</span></pre></div>             </td>           </tr>                               <tr id="section-24">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-24">&#182;</a>               </div>               <h3>Function to Resolve Key Name</h3>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-25">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-25">&#182;</a>               </div>               <p><strong>Private</strong> method to generate prefixed keys. Keys used by objects of class <code>Fairy</code>
+include:</p>
+
+<ul>
+<li><code>QUEUES</code>, Redis set, containing names of all registered queues.</li>
+</ul>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">key: </span><span class="nf">(key) -&gt;</span> <span class="s">&quot;</span><span class="si">#{</span><span class="nx">prefix</span><span class="si">}</span><span class="s">:</span><span class="si">#{</span><span class="nx">key</span><span class="si">}</span><span class="s">&quot;</span></pre></div>             </td>           </tr>                               <tr id="section-26">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-26">&#182;</a>               </div>               <h3>Get a Named Queue</h3>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-27">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-27">&#182;</a>               </div>               <p>If the named queue can be found in the <code>queue_pool</code> cache, return the cached
+queue. Otherwise, create an object of class <code>Queue</code> using the Redis client
+and the name of the queue. Add the queue name into the <code>QUEUES</code> set for
+listing purpose. <strong>Usage:</strong></p>
+
+<pre><code>foo = fairy.queue 'foo'
+</code></pre>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">queue: </span><span class="nf">(name) -&gt;</span>
+    <span class="k">return</span> <span class="nx">@queue_pool</span><span class="p">[</span><span class="nx">name</span><span class="p">]</span> <span class="k">if</span> <span class="nx">@queue_pool</span><span class="p">[</span><span class="nx">name</span><span class="p">]</span>
+    <span class="nx">@redis</span><span class="p">.</span><span class="nx">sadd</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;QUEUES&#39;</span><span class="p">),</span> <span class="nx">name</span>
+    <span class="nx">@queue_pool</span><span class="p">[</span><span class="nx">name</span><span class="p">]</span> <span class="o">=</span> <span class="k">new</span> <span class="nx">Queue</span> <span class="nx">@</span><span class="p">,</span> <span class="nx">name</span></pre></div>             </td>           </tr>                               <tr id="section-28">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-28">&#182;</a>               </div>               <h3>Get All Queues Asynchronously</h3>             </td>             <td class="code">               <div class="highlight"><pre>  </pre></div>             </td>           </tr>                               <tr id="section-29">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-29">&#182;</a>               </div>               <p>Return named queues whose names are stored in the <code>QUEUES</code> set.</p>
+
+<pre><code>queues = fairy.queues()
+console.log "#{queues.length} queues: ", queues.map (queue) -&gt;
+  queue.name
+</code></pre>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">queues: </span><span class="p">(</span><span class="nx">callback</span><span class="p">)</span> <span class="o">=&gt;</span>
+    <span class="nx">@redis</span><span class="p">.</span><span class="nx">smembers</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;QUEUES&#39;</span><span class="p">),</span> <span class="p">(</span><span class="nx">err</span><span class="p">,</span> <span class="nx">res</span><span class="p">)</span> <span class="o">=&gt;</span>
+      <span class="k">return</span> <span class="nx">callback</span> <span class="nx">err</span> <span class="k">if</span> <span class="nx">err</span>
+      <span class="nx">callback</span> <span class="kc">null</span><span class="p">,</span> <span class="nx">res</span><span class="p">.</span><span class="nx">map</span> <span class="p">(</span><span class="nx">name</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="nx">@queue</span> <span class="nx">name</span></pre></div>             </td>           </tr>                               <tr id="section-30">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-30">&#182;</a>               </div>               <h3>Get Statistics for All Queues Asynchronously</h3>             </td>             <td class="code">               <div class="highlight"><pre>  </pre></div>             </td>           </tr>                               <tr id="section-31">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-31">&#182;</a>               </div>               <p><code>statistics</code> is an asynchronous method. The only arg of the callback
+function is an array containing statistics of all queues. The actual dirty
+work is handed to objects of class <code>Queue</code>'s <code>statistics</code> method.</p>
+
+<pre><code>fairy.statistics (stats) -&gt;
+  console.log "Stats of #{stats.length} queues: ", stats
+</code></pre>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">statistics: </span><span class="p">(</span><span class="nx">callback</span><span class="p">)</span> <span class="o">=&gt;</span>
+    <span class="nx">@queues</span> <span class="nf">(err, queues) -&gt;</span>
+      <span class="k">return</span> <span class="nx">callback</span> <span class="nx">err</span> <span class="k">if</span> <span class="nx">err</span>
+      <span class="k">return</span> <span class="nx">callback</span> <span class="kc">null</span><span class="p">,</span> <span class="p">[]</span> <span class="nx">unless</span> <span class="nv">total_queues = </span><span class="nx">queues</span><span class="p">.</span><span class="nx">length</span>
+      <span class="nv">result = </span><span class="p">[]</span>
+      <span class="k">for</span> <span class="nx">queue</span><span class="p">,</span> <span class="nx">i</span> <span class="k">in</span> <span class="nx">queues</span>
+        <span class="nx">do</span> <span class="nf">(queue, i) -&gt;</span>
+          <span class="nx">queue</span><span class="p">.</span><span class="nx">statistics</span> <span class="nf">(err, statistics) -&gt;</span>
+            <span class="k">return</span> <span class="nx">callback</span> <span class="nx">err</span> <span class="k">if</span> <span class="nx">err</span>
+            <span class="nx">result</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span> <span class="o">=</span> <span class="nx">statistics</span>
+            <span class="nx">callback</span> <span class="kc">null</span><span class="p">,</span> <span class="nx">result</span> <span class="k">if</span> <span class="nx">callback</span> <span class="nx">unless</span> <span class="o">--</span><span class="nx">total_queues</span></pre></div>             </td>           </tr>                               <tr id="section-32">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-32">&#182;</a>               </div>               <h2>Class Queue</h2>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-33">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-33">&#182;</a>               </div>               <p>Objects of class <code>Queue</code> handles:</p>
+
+<ul>
+<li>Placing tasks -- <code>enqueue</code></li>
+<li>Regist handlers -- <code>regist</code></li>
+<li>Reschedule tasks -- <code>reschedule</code></li>
+<li>Query status --
+<ul><li><code>recently_finished_tasks</code></li>
+<li><code>failed_tasks</code></li>
+<li><code>blocked_groups</code></li>
+<li><code>slowest_tasks</code></li>
+<li><code>processing_tasks</code></li>
+<li><code>workers</code></li>
+<li><code>statistics</code>, etc.</li></ul></li>
+</ul>
+
+<p>Class <code>Queue</code> is not exposed outside the commonjs module. To get an object of
+class <code>Queue</code>, use the <code>queue</code> or <code>queues</code> method of an object of class
+<code>Fairy</code>. <strong>Usage:</strong></p>
+
+<pre><code>foo    = fairy.queue 'foo'
+queues = fairy.queues()
+</code></pre>             </td>             <td class="code">               <div class="highlight"><pre><span class="k">class</span> <span class="nx">Queue</span></pre></div>             </td>           </tr>                               <tr id="section-34">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-34">&#182;</a>               </div>               <h3>Constructor</h3>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-35">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-35">&#182;</a>               </div>               <p>The constructor of class <code>Queue</code> stores the Redis connection and the name
+of the queue as instance properties.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">constructor: </span><span class="nf">(@fairy, @name) -&gt;</span>
+    <span class="vi">@redis = </span><span class="nx">fairy</span><span class="p">.</span><span class="nx">redis</span></pre></div>             </td>           </tr>                               <tr id="section-36">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-36">&#182;</a>               </div>               <h3>Function to Resolve Key Name</h3>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-37">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-37">&#182;</a>               </div>               <p><strong>Private</strong> method to generate (<code>FAIRY</code>) prefixed and (queue name) suffixed keys. Keys
+used by objects of class <code>Queue</code> include:</p>
+
+<ul>
+<li><code>SOURCE</code>, Redis list, tasks reside in <code>SOURCE</code> when enqueued.</li>
+<li><code>QUEUED</code>, Redis lists, each group has a separate <code>QUEUED</code> list, tasks
+enter <code>QUEUED</code> lists are prepared for processing in a first-come-first-
+serve manner.</li>
+<li><code>RECENT</code>, Redis list, keeps (limited size) recently finished tasks.</li>
+<li><code>FAILED</code>, Redis list, keeps all failed tasks.</li>
+<li><code>SLOWEST</code>, Redis list, keeps (limited size) tasks take the longest
+processing time.</li>
+<li><code>BLOCKED</code>, Redis set, keeps names of blocked group.</li>
+<li><code>PROCESSING</code>, Redis hash, tracks tasks in processing.</li>
+<li><code>STATISTICS</code>, Redis hash, tracks basic statistics for the queue.</li>
+</ul>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">key: </span><span class="nf">(key) -&gt;</span> <span class="s">&quot;</span><span class="si">#{</span><span class="nx">prefix</span><span class="si">}</span><span class="s">:</span><span class="si">#{</span><span class="nx">key</span><span class="si">}</span><span class="s">:</span><span class="si">#{</span><span class="nx">@name</span><span class="si">}</span><span class="s">&quot;</span></pre></div>             </td>           </tr>                               <tr id="section-38">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-38">&#182;</a>               </div>               <h3>Configurable Parameters</h3>
+
+<p>Prototypal inherited parameters which can be overriden by instance
+properties include:</p>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-39">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-39">&#182;</a>               </div>               <ul>
+<li>Polling interval in milliseconds</li>
+<li>Maximum times of retries</li>
+<li>Retry interval in milliseconds</li>
+<li>Storage capacity for newly finished tasks </li>
+<li>Storage capacity for slowest tasks</li>
+</ul>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">polling_interval : </span><span class="mi">5</span>
+  <span class="nv">retry_limit      : </span><span class="mi">2</span>
+  <span class="nv">retry_delay      : </span><span class="mf">0.1</span> <span class="o">*</span> <span class="mi">1000</span>
+  <span class="nv">recent_size      : </span><span class="mi">10</span>
+  <span class="nv">slowest_size     : </span><span class="mi">10</span>
+  </pre></div>             </td>           </tr>                               <tr id="section-40">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-40">&#182;</a>               </div>               <h3>Placing Tasks</h3>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-41">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-41">&#182;</a>               </div>               <p>Tasks will be pushed into <code>SOURCE</code> Redis lists:</p>
+
+<ul>
+<li><code>foo</code> tasks will be queued at <code>SOURCE:foo</code> list.</li>
+<li>A callback is optional.</li>
+<li>Arguments except the (optional) callback function will be serialized as
+a JSON array.</li>
+<li><strong>The first argument will be served as the group identifier</strong> to ensure
+sequential processing for all tasks of the same group (aka. first-come,
+first-serve, first-done). Current time is appended at the argument array
+for monitoring purpose.</li>
+</ul>
+
+<p><strong>Usage:</strong></p>
+
+<pre><code>queue.enqueue 'group_id', 'param2', (err, res) -&gt; # YOUR CODE
+</code></pre>
+
+<p>A transaction ensures the atomicity.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">enqueue: </span><span class="p">(</span><span class="nx">args</span><span class="p">...,</span> <span class="nx">callback</span><span class="p">)</span> <span class="o">=&gt;</span>
+    <span class="k">if</span> <span class="k">typeof</span> <span class="nx">callback</span> <span class="o">isnt</span> <span class="s">&#39;function&#39;</span>
+      <span class="nx">args</span><span class="p">.</span><span class="nx">push</span> <span class="nx">callback</span>
+      <span class="nv">callback = </span><span class="kc">undefined</span>
+    <span class="nx">@redis</span><span class="p">.</span><span class="nx">multi</span><span class="p">()</span>
+      <span class="p">.</span><span class="nx">rpush</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;SOURCE&#39;</span><span class="p">),</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">([</span><span class="nx">uuid</span><span class="p">.</span><span class="nx">v4</span><span class="p">(),</span> <span class="nx">args</span><span class="p">...,</span> <span class="nb">Date</span><span class="p">.</span><span class="nx">now</span><span class="p">()]))</span>
+      <span class="p">.</span><span class="nx">sadd</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;GROUPS&#39;</span><span class="p">),</span> <span class="nx">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+      <span class="p">.</span><span class="nx">hincrby</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;STATISTICS&#39;</span><span class="p">),</span> <span class="s">&#39;TOTAL&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+      <span class="p">.</span><span class="nx">exec</span><span class="p">(</span><span class="nx">callback</span><span class="p">)</span></pre></div>             </td>           </tr>                               <tr id="section-42">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-42">&#182;</a>               </div>               <h3>Register Handler</h3>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-43">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-43">&#182;</a>               </div>               <p>When registered a processing handler function, the queue becomes a worker
+automatically: <strong>Fairy</strong> will immediately start polling tasks and process
+them on present.</p>
+
+<p>When becomes a worker, <strong>Fairy</strong> will regist an uuid (v4) key in the
+<code>WORKERS</code> hash for the queue, and remove the key on exit. Except for hard
+termination like <code>SIGKILL</code>, monitoring the <code>WORKERS</code> hash will give you
+an overview of online workers. <strong>Usage:</strong></p>
+
+<pre><code>queue.regist (param1, param2, callback) -&gt;
+  console.log param1, param2
+  callback()
+</code></pre>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">regist: </span><span class="p">(</span><span class="nx">@handler</span><span class="p">)</span> <span class="o">=&gt;</span>
+    <span class="nx">registered_workers</span><span class="p">.</span><span class="nx">push</span> <span class="s">&quot;</span><span class="si">#{</span><span class="nx">@fairy</span><span class="p">.</span><span class="nx">id</span><span class="si">}</span><span class="s">|</span><span class="si">#{</span><span class="nx">@name</span><span class="si">}</span><span class="s">&quot;</span>
+    <span class="nv">worker_id = </span><span class="nx">uuid</span><span class="p">.</span><span class="nx">v4</span><span class="p">()</span>
+    <span class="nx">@redis</span><span class="p">.</span><span class="nx">hset</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;WORKERS&#39;</span><span class="p">),</span> <span class="nx">worker_id</span><span class="p">,</span> <span class="s">&quot;</span><span class="si">#{</span><span class="nx">os</span><span class="p">.</span><span class="nx">hostname</span><span class="p">()</span><span class="si">}</span><span class="s">|</span><span class="si">#{</span><span class="nx">server_ip</span><span class="p">()</span><span class="si">}</span><span class="s">|</span><span class="si">#{</span><span class="nx">process</span><span class="p">.</span><span class="nx">pid</span><span class="si">}</span><span class="s">|</span><span class="si">#{</span><span class="nb">Date</span><span class="p">.</span><span class="nx">now</span><span class="p">()</span><span class="si">}</span><span class="s">&quot;</span>
+
+    <span class="nx">process</span><span class="p">.</span><span class="kc">on</span> <span class="s">&#39;uncaughtException&#39;</span><span class="p">,</span> <span class="p">(</span><span class="nx">err</span><span class="p">)</span> <span class="o">=&gt;</span>
+      <span class="k">if</span> <span class="nx">@_handler_callback</span>
+        <span class="nx">console</span><span class="p">.</span><span class="nx">log</span> <span class="s">&quot;Worker [</span><span class="si">#{</span><span class="nx">worker_id</span><span class="p">.</span><span class="nx">split</span><span class="p">(</span><span class="s">&#39;-&#39;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s">] registered for Task [</span><span class="si">#{</span><span class="nx">@name</span><span class="si">}</span><span class="s">] will block its current processing group&quot;</span> 
+        <span class="nx">@_handler_callback</span> <span class="p">{</span><span class="nv">do: </span><span class="s">&#39;block&#39;</span><span class="p">,</span> <span class="nv">message: </span><span class="nx">err</span><span class="p">.</span><span class="nx">stack</span><span class="p">}</span>
+      <span class="k">else</span>
+        <span class="nx">@_try_exit</span><span class="p">()</span>
+
+    <span class="nx">process</span><span class="p">.</span><span class="kc">on</span> <span class="s">&#39;exit&#39;</span><span class="p">,</span> <span class="o">=&gt;</span> <span class="nx">@redis</span><span class="p">.</span><span class="nx">hdel</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;WORKERS&#39;</span><span class="p">),</span> <span class="nx">worker_id</span>
+    <span class="nx">@_poll</span><span class="p">()</span></pre></div>             </td>           </tr>                               <tr id="section-44">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-44">&#182;</a>               </div>               <h3>Poll New Task</h3>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-45">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-45">&#182;</a>               </div>               <p><strong>Private</strong> method. If any task presents in the <code>SOURCE</code> list, <code>lpop</code> from
+<code>SOURCE</code> (<code>rpush</code>) into <code>QUEUED</code>. The <code>lpop</code> and <code>rpush</code> are protected by
+a transaction.</p>
+
+<p>Since the task being popped and pushed should be known in prior of the
+begin of the transaction (aka, the <code>multi</code> command), we need to get the
+first task of the source list, and, watch the source list to prevent the
+same task being taken by two different workers.</p>
+
+<p>If there's no pending tasks of the same group, then process the task
+immediately.</p>
+
+<p>If there's no tasks in the <code>SOURCE</code> list, poll again after an interval of
+<code>polling_interval</code> milliseconds.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">_poll: </span><span class="o">=&gt;</span>
+    <span class="k">return</span> <span class="nx">@_try_exit</span><span class="p">()</span> <span class="k">if</span> <span class="nx">exiting</span>
+    <span class="nx">@redis</span><span class="p">.</span><span class="nx">watch</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;SOURCE&#39;</span><span class="p">)</span>
+    <span class="nx">@redis</span><span class="p">.</span><span class="nx">lindex</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;SOURCE&#39;</span><span class="p">),</span> <span class="mi">0</span><span class="p">,</span> <span class="p">(</span><span class="nx">err</span><span class="p">,</span> <span class="nx">res</span><span class="p">)</span> <span class="o">=&gt;</span>
+      <span class="k">if</span> <span class="nx">res</span>
+        <span class="nv">task = </span><span class="nx">JSON</span><span class="p">.</span><span class="nx">parse</span> <span class="nx">res</span>
+        <span class="nx">@redis</span><span class="p">.</span><span class="nx">multi</span><span class="p">()</span>
+        <span class="p">.</span><span class="nx">lpop</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;SOURCE&#39;</span><span class="p">))</span>
+        <span class="p">.</span><span class="nx">rpush</span><span class="p">(</span><span class="s">&quot;</span><span class="si">#{</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;QUEUED&#39;</span><span class="p">)</span><span class="si">}</span><span class="s">:</span><span class="si">#{</span><span class="nx">task</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s">&quot;</span><span class="p">,</span> <span class="nx">res</span><span class="p">)</span>
+        <span class="p">.</span><span class="nx">exec</span> <span class="p">(</span><span class="nx">multi_err</span><span class="p">,</span> <span class="nx">multi_res</span><span class="p">)</span> <span class="o">=&gt;</span>
+          <span class="k">return</span> <span class="nx">@_poll</span><span class="p">()</span> <span class="nx">unless</span> <span class="nx">multi_res</span> <span class="o">and</span> <span class="nx">multi_res</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">is</span> <span class="mi">1</span>
+          <span class="nx">@_process</span> <span class="nx">task</span>
+      <span class="k">else</span>
+        <span class="nx">@redis</span><span class="p">.</span><span class="nx">unwatch</span><span class="p">()</span>
+        <span class="nx">setTimeout</span> <span class="nx">@_poll</span><span class="p">,</span> <span class="nx">@polling_interval</span></pre></div>             </td>           </tr>                               <tr id="section-46">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-46">&#182;</a>               </div>               <h3>Exit When All Queues are Cleaned Up</h3>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-47">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-47">&#182;</a>               </div>               <p><strong>Private</strong> method. Wait if there're queues still working, or exit the
+process immediately.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">_try_exit: </span><span class="o">=&gt;</span>
+    <span class="nx">registered_workers</span><span class="p">.</span><span class="nx">splice</span> <span class="nx">registered_workers</span><span class="p">.</span><span class="nx">indexOf</span> <span class="s">&quot;</span><span class="si">#{</span><span class="nx">@fairy</span><span class="p">.</span><span class="nx">id</span><span class="si">}</span><span class="s">|</span><span class="si">#{</span><span class="nx">@name</span><span class="si">}</span><span class="s">&quot;</span><span class="p">,</span> <span class="mi">1</span>
+    <span class="nx">process</span><span class="p">.</span><span class="nx">exit</span><span class="p">()</span> <span class="nx">unless</span> <span class="nx">registered_workers</span><span class="p">.</span><span class="nx">length</span>
+    <span class="nx">log_registered_workers</span><span class="p">()</span></pre></div>             </td>           </tr>                               <tr id="section-48">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-48">&#182;</a>               </div>               <h3>Process Each Group's First Task</h3>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-49">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-49">&#182;</a>               </div>               <p><strong>Private</strong> method. The real job is done by the passed in <code>handler</code> of
+<code>regist</code>ered method, when the job is:</p>
+
+<ul>
+<li><strong>successed</strong>, pop the finished job from the group queue, and:
+<ul><li>continue process task of the same group if there's pending job(s) in
+the same <code>QUEUED</code> list, or</li>
+<li>poll task from the <code>SOURCE</code> queue.</li></ul></li>
+<li><strong>failed</strong>, then inspect the passed in argument, retry or block
+according to the <code>do</code> property of the error object.</li>
+</ul>
+
+<p>Calling the callback function is the responsibility of you. Otherwise
+<code>Fairy</code> will stop dispatching tasks.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">_process: </span><span class="p">(</span><span class="nx">task</span><span class="p">)</span> <span class="o">=&gt;</span>
+
+    <span class="nx">@redis</span><span class="p">.</span><span class="nx">hset</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;PROCESSING&#39;</span><span class="p">),</span> <span class="nx">task</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">([</span><span class="nx">task</span><span class="p">...,</span> <span class="nv">start_time = </span><span class="nb">Date</span><span class="p">.</span><span class="nx">now</span><span class="p">()])</span></pre></div>             </td>           </tr>                               <tr id="section-50">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-50">&#182;</a>               </div>               <p>Before Processing the Task:</p>
+
+<ol>
+<li>Keep start time of processing.</li>
+<li>Set <code>PROCESSING</code> hash in Redis.</li>
+<li>Allow <code>retry_limit</code> times of retries.</li>
+</ol>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nv">processing = </span><span class="nx">task</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="nv">retry_count = </span><span class="nx">@retry_limit</span>
+    <span class="nv">errors = </span><span class="p">[]</span>
+
+    <span class="vi">@_handler_callback = </span><span class="nv">handler_callback = </span><span class="p">(</span><span class="nx">err</span><span class="p">,</span> <span class="nx">res</span><span class="p">)</span> <span class="o">=&gt;</span>
+
+      <span class="vi">@_handler_callback = </span><span class="kc">null</span></pre></div>             </td>           </tr>                               <tr id="section-51">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-51">&#182;</a>               </div>               <p>Error handling routine:</p>
+
+<ol>
+<li>Keep the error message.</li>
+<li>According to specific error handling request, when:
+<ul><li><code>block</code>: block the group immediately.</li>
+<li><code>block-after-retry</code>: retry n times, block the group if still
+fails (blocking).</li>
+<li>or: retry n times, skip the task if still fails (non-blocking).
+Set <code>retry_limit</code> to <code>0</code> to skip failed tasks immediately.</li></ul></li>
+</ol>             </td>             <td class="code">               <div class="highlight"><pre>      <span class="k">if</span> <span class="nx">err</span>
+        <span class="nx">errors</span><span class="p">.</span><span class="nx">push</span> <span class="nx">err</span><span class="p">.</span><span class="nx">message</span> <span class="o">or</span> <span class="kc">null</span>
+        <span class="k">switch</span> <span class="nx">err</span><span class="p">.</span><span class="nx">do</span>
+          <span class="k">when</span> <span class="s">&#39;block&#39;</span>
+            <span class="nx">@redis</span><span class="p">.</span><span class="nx">multi</span><span class="p">()</span>
+              <span class="p">.</span><span class="nx">rpush</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;FAILED&#39;</span><span class="p">),</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">([</span><span class="nx">task</span><span class="p">...,</span> <span class="nb">Date</span><span class="p">.</span><span class="nx">now</span><span class="p">(),</span> <span class="nx">errors</span><span class="p">]))</span>
+              <span class="p">.</span><span class="nx">hdel</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;PROCESSING&#39;</span><span class="p">),</span> <span class="nx">processing</span><span class="p">)</span>
+              <span class="p">.</span><span class="nx">sadd</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;BLOCKED&#39;</span><span class="p">),</span> <span class="nx">task</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+              <span class="p">.</span><span class="nx">exec</span><span class="p">()</span>
+            <span class="k">return</span> <span class="nx">@_poll</span><span class="p">()</span>
+          <span class="k">when</span> <span class="s">&#39;block-after-retry&#39;</span>
+            <span class="k">return</span> <span class="nx">setTimeout</span> <span class="nx">call_handler</span><span class="p">,</span> <span class="nx">@retry_delay</span> <span class="k">if</span> <span class="nx">retry_count</span><span class="o">--</span>
+            <span class="nx">@redis</span><span class="p">.</span><span class="nx">multi</span><span class="p">()</span>
+              <span class="p">.</span><span class="nx">rpush</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;FAILED&#39;</span><span class="p">),</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">([</span><span class="nx">task</span><span class="p">...,</span> <span class="nb">Date</span><span class="p">.</span><span class="nx">now</span><span class="p">(),</span> <span class="nx">errors</span><span class="p">]))</span>
+              <span class="p">.</span><span class="nx">hdel</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;PROCESSING&#39;</span><span class="p">),</span> <span class="nx">processing</span><span class="p">)</span>
+              <span class="p">.</span><span class="nx">sadd</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;BLOCKED&#39;</span><span class="p">),</span> <span class="nx">task</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+              <span class="p">.</span><span class="nx">exec</span><span class="p">()</span>
+            <span class="k">return</span> <span class="nx">@_poll</span><span class="p">()</span>
+          <span class="k">else</span>
+            <span class="k">return</span> <span class="nx">setTimeout</span> <span class="nx">call_handler</span><span class="p">,</span> <span class="nx">@retry_delay</span> <span class="k">if</span> <span class="nx">retry_count</span><span class="o">--</span>
+            <span class="nx">@redis</span><span class="p">.</span><span class="nx">multi</span><span class="p">()</span>
+              <span class="p">.</span><span class="nx">rpush</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;FAILED&#39;</span><span class="p">),</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">([</span><span class="nx">task</span><span class="p">...,</span> <span class="nb">Date</span><span class="p">.</span><span class="nx">now</span><span class="p">(),</span> <span class="nx">errors</span><span class="p">]))</span>
+              <span class="p">.</span><span class="nx">hdel</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;PROCESSING&#39;</span><span class="p">),</span> <span class="nx">processing</span><span class="p">)</span>
+              <span class="p">.</span><span class="nx">exec</span><span class="p">()</span></pre></div>             </td>           </tr>                               <tr id="section-52">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-52">&#182;</a>               </div>               <p>Success handling routine:</p>
+
+<ol>
+<li>Remove last task from processing hash.</li>
+<li>Update statistics hash:
+<ul><li>total number of <code>finished</code> tasks;</li>
+<li>total <code>pending</code> time;</li></ul></li>
+<li>Track recent finished tasks in <code>RECENT</code> list.</li>
+<li>Track tasks take the longest processing time in <code>SLOWEST</code> sorted
+set.</li>
+</ol>             </td>             <td class="code">               <div class="highlight"><pre>      <span class="k">else</span>
+        <span class="nv">finish_time  = </span><span class="nb">Date</span><span class="p">.</span><span class="nx">now</span><span class="p">()</span>
+        <span class="nv">process_time = </span><span class="nx">finish_time</span> <span class="o">-</span> <span class="nx">start_time</span>
+        <span class="nx">@redis</span><span class="p">.</span><span class="nx">multi</span><span class="p">()</span>
+          <span class="p">.</span><span class="nx">hdel</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;PROCESSING&#39;</span><span class="p">),</span> <span class="nx">processing</span><span class="p">)</span>
+          <span class="p">.</span><span class="nx">hincrby</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;STATISTICS&#39;</span><span class="p">),</span> <span class="s">&#39;FINISHED&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+          <span class="p">.</span><span class="nx">hincrby</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;STATISTICS&#39;</span><span class="p">),</span> <span class="s">&#39;total_pending_time&#39;</span><span class="p">,</span> <span class="nx">start_time</span> <span class="o">-</span> <span class="nx">task</span><span class="p">[</span><span class="nx">task</span><span class="p">.</span><span class="nx">length</span> <span class="o">-</span> <span class="mi">1</span><span class="p">])</span>
+          <span class="p">.</span><span class="nx">hincrby</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;STATISTICS&#39;</span><span class="p">),</span> <span class="s">&#39;total_process_time&#39;</span><span class="p">,</span> <span class="nx">process_time</span><span class="p">)</span>
+          <span class="p">.</span><span class="nx">lpush</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;RECENT&#39;</span><span class="p">),</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">([</span><span class="nx">task</span><span class="p">...,</span> <span class="nx">finish_time</span><span class="p">]))</span>
+          <span class="p">.</span><span class="nx">ltrim</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;RECENT&#39;</span><span class="p">),</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">@recent_size</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+          <span class="p">.</span><span class="nx">zadd</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;SLOWEST&#39;</span><span class="p">),</span> <span class="nx">process_time</span><span class="p">,</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">([</span><span class="nx">task</span><span class="p">...,</span> <span class="nx">start_time</span><span class="p">]))</span>
+          <span class="p">.</span><span class="nx">zremrangebyrank</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;SLOWEST&#39;</span><span class="p">),</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span> <span class="nx">@slowest_size</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+          <span class="p">.</span><span class="nx">exec</span><span class="p">()</span>
+
+      <span class="nx">@_continue_group</span> <span class="nx">task</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="nx">do</span> <span class="nv">call_handler = </span><span class="o">=&gt;</span>
+      <span class="nx">@handler</span> <span class="nx">task</span><span class="p">[</span><span class="mi">1</span><span class="p">...</span><span class="o">-</span><span class="mi">1</span><span class="p">]...,</span> <span class="p">(</span><span class="vi">@_handler_callback = </span><span class="nx">handler_callback</span><span class="p">)</span></pre></div>             </td>           </tr>                               <tr id="section-53">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-53">&#182;</a>               </div>               <h3>Continue Process a Group</h3>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-54">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-54">&#182;</a>               </div>               <p><strong>Private</strong> method. Upon successful execution of a task, or skipping a
+failed task:</p>
+
+<ol>
+<li><code>lpop</code> the current task from <code>QUEUED</code> list.</li>
+<li>Check if there exists task in the same <code>QUEUED</code> list.</li>
+<li>Process if <code>YES</code>, or poll <code>SOURCE</code> if <code>NO</code>.</li>
+</ol>
+
+<p>Above commands are protected by a transaction to prevent multiple workers
+processing a same task.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">_continue_group: </span><span class="p">(</span><span class="nx">group</span><span class="p">)</span> <span class="o">=&gt;</span>
+    <span class="nx">@redis</span><span class="p">.</span><span class="nx">watch</span> <span class="s">&quot;</span><span class="si">#{</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;QUEUED&#39;</span><span class="p">)</span><span class="si">}</span><span class="s">:</span><span class="si">#{</span><span class="nx">group</span><span class="si">}</span><span class="s">&quot;</span>
+    <span class="nx">@redis</span><span class="p">.</span><span class="nx">lindex</span> <span class="s">&quot;</span><span class="si">#{</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;QUEUED&#39;</span><span class="p">)</span><span class="si">}</span><span class="s">:</span><span class="si">#{</span><span class="nx">group</span><span class="si">}</span><span class="s">&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="p">(</span><span class="nx">err</span><span class="p">,</span> <span class="nx">res</span><span class="p">)</span> <span class="o">=&gt;</span>
+      <span class="k">if</span> <span class="nx">res</span>
+        <span class="nv">task = </span><span class="nx">JSON</span><span class="p">.</span><span class="nx">parse</span> <span class="nx">res</span>
+        <span class="nx">@redis</span><span class="p">.</span><span class="nx">unwatch</span><span class="p">()</span>
+        <span class="nx">@redis</span><span class="p">.</span><span class="nx">lpop</span> <span class="s">&quot;</span><span class="si">#{</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;QUEUED&#39;</span><span class="p">)</span><span class="si">}</span><span class="s">:</span><span class="si">#{</span><span class="nx">group</span><span class="si">}</span><span class="s">&quot;</span>
+        <span class="k">return</span> <span class="nx">@_requeue_group</span> <span class="nx">group</span> <span class="k">if</span> <span class="nx">exiting</span>
+        <span class="nx">@_process</span> <span class="nx">task</span>
+      <span class="k">else</span>
+        <span class="nx">@redis</span><span class="p">.</span><span class="nx">multi</span><span class="p">()</span>
+        <span class="p">.</span><span class="nx">lpop</span><span class="p">(</span><span class="s">&quot;</span><span class="si">#{</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;QUEUED&#39;</span><span class="p">)</span><span class="si">}</span><span class="s">:</span><span class="si">#{</span><span class="nx">group</span><span class="si">}</span><span class="s">&quot;</span><span class="p">)</span>
+        <span class="p">.</span><span class="nx">exec</span> <span class="p">(</span><span class="nx">multi_err</span><span class="p">,</span> <span class="nx">multi_res</span><span class="p">)</span> <span class="o">=&gt;</span>
+          <span class="k">return</span> <span class="nx">@_continue_group</span> <span class="nx">group</span> <span class="nx">unless</span> <span class="nx">multi_res</span>   
+          <span class="k">return</span> <span class="nx">@_try_exit</span><span class="p">()</span> <span class="k">if</span> <span class="nx">exiting</span>
+          <span class="nx">@_poll</span><span class="p">()</span>
+  </pre></div>             </td>           </tr>                               <tr id="section-55">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-55">&#182;</a>               </div>               <h3>Requeue Tasks on Exit</h3>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-56">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-56">&#182;</a>               </div>               <p><strong>Private</strong> method. Before exiting, requeue all tasks in the processing
+<code>QUEUED</code> list back into <code>SOURCE</code> list to <strong>prevent blocking</strong> the group.</p>
+
+<p>To ensure the correct order of tasks, <code>lpush</code> tasks in the <code>QUEUED</code> list
+in their reverse order. The <code>lrange</code> and <code>lpush</code> is protected by a
+transaction for atomicity since other workers may still shifting tasks in
+the <code>SOURCE</code> list into <code>QUEUED</code> list.</p>
+
+<p>When tasks are requeued successfully, <code>_try_exit</code> the process.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">_requeue_group: </span><span class="p">(</span><span class="nx">group</span><span class="p">)</span> <span class="o">=&gt;</span>
+    <span class="nx">@redis</span><span class="p">.</span><span class="nx">watch</span> <span class="s">&quot;</span><span class="si">#{</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;QUEUED&#39;</span><span class="p">)</span><span class="si">}</span><span class="s">:</span><span class="si">#{</span><span class="nx">group</span><span class="si">}</span><span class="s">&quot;</span>
+    <span class="nx">@redis</span><span class="p">.</span><span class="nx">lrange</span> <span class="s">&quot;</span><span class="si">#{</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;QUEUED&#39;</span><span class="p">)</span><span class="si">}</span><span class="s">:</span><span class="si">#{</span><span class="nx">group</span><span class="si">}</span><span class="s">&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">(</span><span class="nx">err</span><span class="p">,</span> <span class="nx">res</span><span class="p">)</span> <span class="o">=&gt;</span>
+      <span class="nx">@redis</span><span class="p">.</span><span class="nx">multi</span><span class="p">()</span>
+      <span class="p">.</span><span class="nx">lpush</span><span class="p">(</span><span class="s">&quot;</span><span class="si">#{</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;SOURCE&#39;</span><span class="p">)</span><span class="si">}</span><span class="s">&quot;</span><span class="p">,</span> <span class="nx">res</span><span class="p">.</span><span class="nx">reverse</span><span class="p">()...)</span>
+      <span class="p">.</span><span class="nx">del</span><span class="p">(</span><span class="s">&quot;</span><span class="si">#{</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;QUEUED&#39;</span><span class="p">)</span><span class="si">}</span><span class="s">:</span><span class="si">#{</span><span class="nx">group</span><span class="si">}</span><span class="s">&quot;</span><span class="p">)</span>
+      <span class="p">.</span><span class="nx">exec</span> <span class="p">(</span><span class="nx">multi_err</span><span class="p">,</span> <span class="nx">multi_res</span><span class="p">)</span> <span class="o">=&gt;</span>
+        <span class="k">return</span> <span class="nx">@_requeue_group</span> <span class="nx">group</span> <span class="nx">unless</span> <span class="nx">multi_res</span>
+        <span class="k">return</span> <span class="nx">@_try_exit</span><span class="p">()</span></pre></div>             </td>           </tr>                               <tr id="section-57">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-57">&#182;</a>               </div>               <h3>Re-Schedule Failed and Blocked Tasks</h3>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-58">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-58">&#182;</a>               </div>               <p>Requeue the failed and blocked tasks into <code>SOURCE</code> list. Useful for failure
+recovery. <code>reschedule</code> will:</p>
+
+<ol>
+<li>Requeue tasks in the <code>FAILED</code> list into <code>SOURCE</code> list, and,</li>
+<li>Pop all blocked tasks (<code>QUEUED</code> lists listed in the <code>BLOCKED</code> set,
+without first task of each list, because that's the failed task
+who blocked the queue which is already requeued in step 1) into <code>SOURCE</code>
+list.</li>
+</ol>
+
+<p>Above commands should be protected by a transaction. <code>reschedule</code> is an
+asynchronous method. Arguments of the callback function follow node.js error
+handling convention: <code>err</code> and <code>res</code>. On success, the <code>res</code> object will be
+the same as the <code>res</code> object of <code>statistics</code> method.</p>
+
+<p><strong>Usage:</strong></p>
+
+<pre><code>queue.reschedule (err, statistics) -&gt; # YOUR CODE
+</code></pre>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">reschedule: </span><span class="p">(</span><span class="nx">callback</span><span class="p">)</span> <span class="o">=&gt;</span>
+
+    <span class="nv">client = </span><span class="nx">create_client</span> <span class="nx">@fairy</span><span class="p">.</span><span class="nx">options</span>
+
+    <span class="nx">do</span> <span class="nv">reschedule = </span><span class="o">=&gt;</span></pre></div>             </td>           </tr>                               <tr id="section-59">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-59">&#182;</a>               </div>               <p>Make sure <code>FAILED</code> list and <code>BLOCKED</code> set are not touched during the
+transaction.</p>             </td>             <td class="code">               <div class="highlight"><pre>      <span class="nx">client</span><span class="p">.</span><span class="nx">watch</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;FAILED&#39;</span><span class="p">)</span>
+      <span class="nx">client</span><span class="p">.</span><span class="nx">watch</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;SOURCE&#39;</span><span class="p">)</span>
+      <span class="nx">client</span><span class="p">.</span><span class="nx">watch</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;BLOCKED&#39;</span><span class="p">)</span>
+      <span class="nx">client</span><span class="p">.</span><span class="nx">watch</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;PROCESSING&#39;</span><span class="p">)</span>
+      <span class="nx">client</span><span class="p">.</span><span class="nx">hlen</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;PROCESSING&#39;</span><span class="p">),</span> <span class="p">(</span><span class="nx">err</span><span class="p">,</span> <span class="nx">res</span><span class="p">)</span> <span class="o">=&gt;</span>
+        <span class="k">if</span> <span class="nx">res</span>
+          <span class="nx">client</span><span class="p">.</span><span class="nx">unwatch</span><span class="p">()</span>
+          <span class="k">return</span> <span class="nx">reschedule</span><span class="p">()</span></pre></div>             </td>           </tr>                               <tr id="section-60">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-60">&#182;</a>               </div>               <p>Push all failed tasks (without last two parameters: error message and
+failure time) into a temporary task array storing tasks to be rescheduled.
+Then, get all blocked groups.</p>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nx">@failed_tasks</span> <span class="p">(</span><span class="nx">err</span><span class="p">,</span> <span class="nx">tasks</span><span class="p">)</span> <span class="o">=&gt;</span>
+          <span class="nv">requeued_tasks = </span><span class="p">[]</span>
+          <span class="nx">requeued_tasks</span><span class="p">.</span><span class="nx">push</span> <span class="nx">tasks</span><span class="p">.</span><span class="nx">map</span><span class="p">(</span><span class="nf">(task) -&gt;</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">stringify</span> <span class="p">[</span><span class="nx">task</span><span class="p">.</span><span class="nx">id</span><span class="p">,</span> <span class="nx">task</span><span class="p">.</span><span class="nx">params</span><span class="p">...,</span> <span class="nx">task</span><span class="p">.</span><span class="nx">queued</span><span class="p">.</span><span class="nx">valueOf</span><span class="p">()])...</span>
+
+          <span class="nx">@blocked_groups</span> <span class="p">(</span><span class="nx">err</span><span class="p">,</span> <span class="nx">groups</span><span class="p">)</span> <span class="o">=&gt;</span></pre></div>             </td>           </tr>                               <tr id="section-61">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-61">&#182;</a>               </div>               <p>Make sure all blocked <code>QUEUED</code> list are not touched when you
+reschedule tasks in them. Then, start the transaction as:</p>
+
+<ol>
+<li>Push tasks in the temporary task array into <code>SOURCE</code> list.</li>
+<li>Delete <code>FAILED</code> list.</li>
+<li>Delete all blocked <code>QUEUED</code> list.</li>
+<li>Delete <code>BLOCKED</code> set.</li>
+</ol>
+
+<p>Commit the transaction, re-initiate the transaction when concurrency
+occurred, otherwise the reschedule is finished.</p>             </td>             <td class="code">               <div class="highlight"><pre>            <span class="nx">client</span><span class="p">.</span><span class="nx">watch</span> <span class="nx">groups</span><span class="p">.</span><span class="nx">map</span><span class="p">((</span><span class="nx">group</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="s">&quot;</span><span class="si">#{</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;QUEUED&#39;</span><span class="p">)</span><span class="si">}</span><span class="s">:</span><span class="si">#{</span><span class="nx">group</span><span class="si">}</span><span class="s">&quot;</span><span class="p">)...</span> <span class="k">if</span> <span class="nx">groups</span><span class="p">.</span><span class="nx">length</span>
+            <span class="nv">start_transaction = </span><span class="o">=&gt;</span>
+              <span class="nv">multi = </span><span class="nx">client</span><span class="p">.</span><span class="nx">multi</span><span class="p">()</span>
+              <span class="nx">multi</span><span class="p">.</span><span class="nx">lpush</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;SOURCE&#39;</span><span class="p">),</span> <span class="nx">requeued_tasks</span><span class="p">.</span><span class="nx">reverse</span><span class="p">()...</span> <span class="k">if</span> <span class="nx">requeued_tasks</span><span class="p">.</span><span class="nx">length</span>
+              <span class="nx">multi</span><span class="p">.</span><span class="nx">del</span> <span class="nx">@key</span> <span class="s">&#39;FAILED&#39;</span>
+              <span class="nx">multi</span><span class="p">.</span><span class="nx">del</span> <span class="nx">groups</span><span class="p">.</span><span class="nx">map</span><span class="p">((</span><span class="nx">group</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="s">&quot;</span><span class="si">#{</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;QUEUED&#39;</span><span class="p">)</span><span class="si">}</span><span class="s">:</span><span class="si">#{</span><span class="nx">group</span><span class="si">}</span><span class="s">&quot;</span><span class="p">)...</span> <span class="k">if</span> <span class="nx">groups</span><span class="p">.</span><span class="nx">length</span>
+              <span class="nx">multi</span><span class="p">.</span><span class="nx">del</span> <span class="nx">@key</span> <span class="s">&#39;BLOCKED&#39;</span>
+              <span class="nx">multi</span><span class="p">.</span><span class="nx">exec</span> <span class="p">(</span><span class="nx">multi_err</span><span class="p">,</span> <span class="nx">multi_res</span><span class="p">)</span> <span class="o">=&gt;</span>
+                <span class="k">if</span> <span class="nx">multi_err</span>
+                  <span class="nx">client</span><span class="p">.</span><span class="nx">quit</span><span class="p">()</span>
+                  <span class="k">return</span> <span class="nx">callback</span> <span class="nx">multi_err</span> 
+                <span class="k">if</span> <span class="nx">multi_res</span>
+                  <span class="nx">client</span><span class="p">.</span><span class="nx">quit</span><span class="p">()</span>
+                  <span class="nx">@statistics</span> <span class="nx">callback</span>
+                <span class="k">else</span>
+                  <span class="nx">reschedule</span> <span class="nx">callback</span></pre></div>             </td>           </tr>                               <tr id="section-62">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-62">&#182;</a>               </div>               <p>If there're blocked task groups, then:</p>
+
+<ol>
+<li>Find all blocked tasks, and:</li>
+<li>Push them into the temporary tasks array, finally:</li>
+<li>Start the transaction when this is done for all blocked groups.</li>
+</ol>
+
+<p>Otherwise, start the transaction immediately.</p>             </td>             <td class="code">               <div class="highlight"><pre>            <span class="k">if</span> <span class="nv">total_groups = </span><span class="nx">groups</span><span class="p">.</span><span class="nx">length</span>
+              <span class="k">for</span> <span class="nx">group</span> <span class="k">in</span> <span class="nx">groups</span>
+                <span class="nx">client</span><span class="p">.</span><span class="nx">lrange</span> <span class="s">&quot;</span><span class="si">#{</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;QUEUED&#39;</span><span class="p">)</span><span class="si">}</span><span class="s">:</span><span class="si">#{</span><span class="nx">group</span><span class="si">}</span><span class="s">&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">(</span><span class="nx">err</span><span class="p">,</span> <span class="nx">res</span><span class="p">)</span> <span class="o">=&gt;</span>
+                  <span class="nx">requeued_tasks</span><span class="p">.</span><span class="nx">push</span> <span class="nx">res</span><span class="p">...</span>
+                  <span class="nx">start_transaction</span><span class="p">()</span> <span class="nx">unless</span> <span class="o">--</span><span class="nx">total_groups</span>
+            <span class="k">else</span> <span class="nx">start_transaction</span><span class="p">()</span></pre></div>             </td>           </tr>                               <tr id="section-63">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-63">&#182;</a>               </div>               <h3>Get Recently Finished Tasks Asynchronously</h3>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-64">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-64">&#182;</a>               </div>               <p>Recently finished tasks are tasks stored in the <code>RECENT</code> list (in the
+reverse order of finished time), which will be limited to a maximum size
+default to 10.</p>
+
+<p><code>recently_finished_tasks</code> is an asynchronous method. Arguments of the
+callback function follow node.js error handling convention: <code>err</code> and <code>res</code>.</p>
+
+<p>Below is an example <code>res</code> array:</p>
+
+<pre><code>[{ id:       '8c0c3eab-8114-41d6-8808-2ae8615d38b4',
+   params:   [ 'param1', 'param2' ],
+   queued:   Sat, 12 May 2012 07:41:33 GMT // Date Object
+   finished: Sat, 12 May 2012 07:41:59 GMT // Date Object
+ }, ...]
+</code></pre>
+
+<p><strong>Usage:</strong></p>
+
+<pre><code>queue.recently_finished_tasks (err, tasks) -&gt; YOUR CODE
+</code></pre>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">recently_finished_tasks: </span><span class="p">(</span><span class="nx">callback</span><span class="p">)</span> <span class="o">=&gt;</span>
+    <span class="nx">@redis</span><span class="p">.</span><span class="nx">lrange</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;RECENT&#39;</span><span class="p">),</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nf">(err, res) -&gt;</span>
+      <span class="k">return</span> <span class="nx">callback</span> <span class="nx">err</span> <span class="k">if</span> <span class="nx">err</span>
+      <span class="nx">callback</span> <span class="kc">null</span><span class="p">,</span> <span class="nx">res</span><span class="p">.</span><span class="nx">map</span> <span class="nf">(entry) -&gt;</span>
+        <span class="nv">entry = </span><span class="nx">JSON</span><span class="p">.</span><span class="nx">parse</span> <span class="nx">entry</span>
+        <span class="nv">id: </span><span class="nx">entry</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="nv">params: </span><span class="nx">entry</span><span class="p">[</span><span class="mi">1</span><span class="p">..</span><span class="o">-</span><span class="mi">3</span><span class="p">]</span>
+        <span class="nv">finished: </span><span class="k">new</span> <span class="nb">Date</span> <span class="nx">entry</span><span class="p">.</span><span class="nx">pop</span><span class="p">()</span>
+        <span class="nv">queued: </span><span class="k">new</span> <span class="nb">Date</span> <span class="nx">entry</span><span class="p">.</span><span class="nx">pop</span><span class="p">()</span></pre></div>             </td>           </tr>                               <tr id="section-65">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-65">&#182;</a>               </div>               <h3>Get Failed Tasks Asynchronously</h3>             </td>             <td class="code">               <div class="highlight"><pre>  </pre></div>             </td>           </tr>                               <tr id="section-66">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-66">&#182;</a>               </div>               <p>Failed tasks are stored in the <code>FAILED</code> list.</p>
+
+<p><code>failed_tasks</code> is an asynchronous method. Arguments of the callback function
+follow node.js convention: <code>err</code> and <code>res</code>.</p>
+
+<p>Below is an example <code>res</code> array:</p>
+
+<pre><code>[{ id:     '8c0c3eab-8114-41d6-8808-2ae8615d38b4',
+   params: [ 'param1', 'param2' ],
+   queued: Sat, 12 May 2012 07:41:33 GMT // Date Object
+   failed: Sat, 12 May 2012 07:41:59 GMT // Date Object
+   reason: [ 'failure reason 1', 'failure reason 2', ...]
+ }, ...]
+</code></pre>
+
+<p><strong>Usage:</strong></p>
+
+<pre><code>queue.failed_tasks (err, tasks) -&gt; YOUR CODE
+</code></pre>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">failed_tasks: </span><span class="p">(</span><span class="nx">callback</span><span class="p">)</span> <span class="o">=&gt;</span>
+    <span class="nx">@redis</span><span class="p">.</span><span class="nx">lrange</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;FAILED&#39;</span><span class="p">),</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="nf">(err, res) -&gt;</span>
+      <span class="k">return</span> <span class="nx">callback</span> <span class="nx">err</span> <span class="k">if</span> <span class="nx">err</span>
+      <span class="nx">callback</span> <span class="kc">null</span><span class="p">,</span> <span class="nx">res</span><span class="p">.</span><span class="nx">map</span> <span class="nf">(entry) -&gt;</span>
+        <span class="nv">entry = </span><span class="nx">JSON</span><span class="p">.</span><span class="nx">parse</span> <span class="nx">entry</span>
+        <span class="nv">id: </span><span class="nx">entry</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="nv">params: </span><span class="nx">entry</span><span class="p">[</span><span class="mi">1</span><span class="p">..</span><span class="o">-</span><span class="mi">4</span><span class="p">]</span>
+        <span class="nv">reason: </span><span class="nx">entry</span><span class="p">.</span><span class="nx">pop</span><span class="p">()</span>
+        <span class="nv">failed: </span><span class="k">new</span> <span class="nb">Date</span> <span class="nx">entry</span><span class="p">.</span><span class="nx">pop</span><span class="p">()</span>
+        <span class="nv">queued: </span><span class="k">new</span> <span class="nb">Date</span> <span class="nx">entry</span><span class="p">.</span><span class="nx">pop</span><span class="p">()</span></pre></div>             </td>           </tr>                               <tr id="section-67">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-67">&#182;</a>               </div>               <h3>Get Blocked Groups Asynchronously</h3>             </td>             <td class="code">               <div class="highlight"><pre>  </pre></div>             </td>           </tr>                               <tr id="section-68">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-68">&#182;</a>               </div>               <p>Blocked groups' identifiers are stored in the <code>BLOCKED</code> set.</p>
+
+<p><code>blocked_groups</code> is an asynchronous method. Arguments of the callback
+function follow node.js async callback pattern: <code>err</code> and <code>res</code>.</p>
+
+<p>Below is an example <code>res</code> array:</p>
+
+<pre><code>[ 'group1', 'group2', ...]
+</code></pre>
+
+<p><strong>Usage:</strong></p>
+
+<pre><code>queue.blocked_groups (err, groups) -&gt; YOUR CODE
+</code></pre>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">blocked_groups: </span><span class="nf">(callback) -&gt;</span>
+    <span class="nx">@redis</span><span class="p">.</span><span class="nx">smembers</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;BLOCKED&#39;</span><span class="p">),</span> <span class="nf">(err, res) -&gt;</span>
+      <span class="k">return</span> <span class="nx">callback</span> <span class="nx">err</span> <span class="k">if</span> <span class="nx">err</span>
+      <span class="nx">callback</span> <span class="kc">null</span><span class="p">,</span> <span class="nx">res</span><span class="p">.</span><span class="nx">map</span> <span class="nf">(entry) -&gt;</span>
+        <span class="nv">entry = </span><span class="nx">JSON</span><span class="p">.</span><span class="nx">parse</span> <span class="nx">entry</span></pre></div>             </td>           </tr>                               <tr id="section-69">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-69">&#182;</a>               </div>               <h3>Get Slowest Tasks Asynchronously</h3>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-70">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-70">&#182;</a>               </div>               <p>Slowest tasks are tasks stored in the <code>SLOWEST</code> ordered set, which will be
+limited to a maximum size default to 10.</p>
+
+<p><code>slowest_tasks</code> is an asynchronous method. Arguments of the callback
+function follow node.js error handling convention: <code>err</code> and <code>res</code>.</p>
+
+<p>Below is an example <code>res</code> array:</p>
+
+<pre><code>[{ id:      '8c0c3eab-8114-41d6-8808-2ae8615d38b4',
+   params:  [ 'param1', 'param2' ],
+   queued:  Sat, 12 May 2012 07:41:33 GMT // Date Object
+   started: Sat, 12 May 2012 07:41:39 GMT // Date Object
+   time:    1876 // time taken in milliseconds
+ }, ...]
+</code></pre>
+
+<p><strong>Usage:</strong></p>
+
+<pre><code>queue.slowest_tasks (err, task) -&gt; YOUR CODE
+</code></pre>
+
+<p><code>slowest_tasks</code> is an asynchronous method. The only arg of the callback
+function is an array of slowest tasks in the reverse order by processing
+time. The actual processing time will be appended at the end of the task's
+original arguments.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">slowest_tasks: </span><span class="nf">(callback) -&gt;</span>
+    <span class="nx">@redis</span><span class="p">.</span><span class="nx">zrevrange</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;SLOWEST&#39;</span><span class="p">),</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="s">&quot;WITHSCORES&quot;</span><span class="p">,</span> <span class="nf">(err, res) -&gt;</span>
+      <span class="k">return</span> <span class="nx">callback</span> <span class="nx">err</span> <span class="k">if</span> <span class="nx">err</span>
+      <span class="nv">res = </span><span class="nx">res</span><span class="p">.</span><span class="nx">map</span> <span class="nf">(entry) -&gt;</span> <span class="nx">JSON</span><span class="p">.</span><span class="nx">parse</span> <span class="nx">entry</span>
+      <span class="nx">callback</span> <span class="kc">null</span><span class="p">,</span> <span class="p">([</span><span class="nx">res</span><span class="p">[</span><span class="nx">i</span><span class="p">]...,</span><span class="nx">res</span><span class="p">[</span><span class="nx">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]]</span> <span class="k">for</span> <span class="nx">i</span> <span class="k">in</span> <span class="p">[</span><span class="mi">0</span><span class="p">...</span><span class="nx">res</span><span class="p">.</span><span class="nx">length</span><span class="p">]</span> <span class="k">by</span> <span class="mi">2</span><span class="p">).</span><span class="nx">map</span> <span class="nf">(entry) -&gt;</span>
+        <span class="nv">id: </span><span class="nx">entry</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="nv">params: </span><span class="nx">entry</span><span class="p">[</span><span class="mi">1</span><span class="p">..</span><span class="o">-</span><span class="mi">4</span><span class="p">]</span>
+        <span class="nv">time: </span><span class="nx">entry</span><span class="p">.</span><span class="nx">pop</span><span class="p">()</span>
+        <span class="nv">started: </span><span class="k">new</span> <span class="nb">Date</span> <span class="nx">entry</span><span class="p">.</span><span class="nx">pop</span><span class="p">()</span>
+        <span class="nv">queued: </span><span class="k">new</span> <span class="nb">Date</span> <span class="nx">entry</span><span class="p">.</span><span class="nx">pop</span><span class="p">()</span></pre></div>             </td>           </tr>                               <tr id="section-71">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-71">&#182;</a>               </div>               <h3>Get Processing Tasks Asynchronously</h3>             </td>             <td class="code">               <div class="highlight"><pre>  </pre></div>             </td>           </tr>                               <tr id="section-72">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-72">&#182;</a>               </div>               <p>Currently processing tasks are tasks in the <code>PROCESSING</code> list.</p>
+
+<p><code>processing_tasks</code> is an asynchronous method. Arguments of the callback
+function follow node.js error handling convention: <code>err</code> and <code>res</code>.</p>
+
+<p>Below is an example <code>res</code> array:</p>
+
+<pre><code>[{ id:      '8c0c3eab-8114-41d6-8808-2ae8615d38b4',
+   params:  [ 'param1', 'param2' ],
+   queued:  Sat, 12 May 2012 07:41:33 GMT // Date Object
+   started: Sat, 12 May 2012 07:41:39 GMT // Date Object
+ }, ...]
+</code></pre>
+
+<p><strong>Usage:</strong></p>
+
+<pre><code>queue.processing_tasks (err, tasks) -&gt; YOUR CODE
+</code></pre>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">processing_tasks: </span><span class="nf">(callback) -&gt;</span>
+    <span class="nx">@redis</span><span class="p">.</span><span class="nx">hvals</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;PROCESSING&#39;</span><span class="p">),</span> <span class="nf">(err, res) -&gt;</span>
+      <span class="k">return</span> <span class="nx">callback</span> <span class="nx">err</span> <span class="k">if</span> <span class="nx">err</span>
+      <span class="nx">callback</span> <span class="kc">null</span><span class="p">,</span> <span class="nx">res</span><span class="p">.</span><span class="nx">map</span> <span class="nf">(entry) -&gt;</span>
+        <span class="nv">entry = </span><span class="nx">JSON</span><span class="p">.</span><span class="nx">parse</span><span class="p">(</span><span class="nx">entry</span><span class="p">)</span>
+        <span class="nv">id: </span><span class="nx">entry</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="nv">params: </span><span class="nx">entry</span><span class="p">[</span><span class="mi">1</span><span class="p">..</span><span class="o">-</span><span class="mi">3</span><span class="p">]</span>
+        <span class="nv">start: </span><span class="k">new</span> <span class="nb">Date</span> <span class="nx">entry</span><span class="p">.</span><span class="nx">pop</span><span class="p">()</span>
+        <span class="nv">queued: </span><span class="k">new</span> <span class="nb">Date</span> <span class="nx">entry</span><span class="p">.</span><span class="nx">pop</span><span class="p">()</span></pre></div>             </td>           </tr>                               <tr id="section-73">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-73">&#182;</a>               </div>               <h3>Get Source Tasks Asynchronously</h3>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-74">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-74">&#182;</a>               </div>               <p>Get tasks in the <code>SOURCE</code> list. <strong>NOTE:</strong> Tasks in the <code>SOURCE</code> list does
+<strong>NOT</strong> equal to <strong>pending</strong> tasks! There may be tasks in the <code>QUEUED</code> lists
+need be processed before processing tasks in the <code>SOURCE</code> list.</p>
+
+<p>Accepted parameters are:</p>
+
+<ol>
+<li><code>skip</code> <em>(optional)</em>, the number of skipped tasks. Defaults to 0.</li>
+<li><code>take</code> <em>(optional)</em>, the number of tasks need be taken. Defaults to 10.</li>
+<li><code>callback</code>, the callback function. Arguments of which follows node.js error
+handling convention: <code>err</code> and <code>res</code>.</li>
+</ol>
+
+<p>Below is an example <code>res</code> array:</p>
+
+<pre><code>[{ id:     '8c0c3eab-8114-41d6-8808-2ae8615d38b4',
+   params: [ 'param1', 'param2' ],
+   queued: Sat, 12 May 2012 07:41:33 GMT // Date Object
+ }, ...]
+</code></pre>
+
+<p>Possible combos of arguments are:</p>
+
+<ol>
+<li><code>callback</code>. (leave <code>skip</code> defaults to 0, <code>take</code> defaults to 10).</li>
+<li><code>skip</code> and <code>callback</code>. (leave <code>take</code> defaults to 10).</li>
+<li><code>skip</code>, <code>take</code>, and <code>callback</code>.</li>
+</ol>
+
+<p><strong>Usage:</strong></p>
+
+<pre><code>queue.source_tasks 20, 5, (err, tasks) -&gt; YOUR CODE
+</code></pre>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">source_tasks: </span><span class="nf">(args..., callback) -&gt;</span>
+    <span class="nv">skip = </span><span class="nx">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">or</span> <span class="mi">0</span>
+    <span class="nv">take = </span><span class="nx">args</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">or</span> <span class="mi">10</span>
+    <span class="nx">@redis</span><span class="p">.</span><span class="nx">lrange</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;SOURCE&#39;</span><span class="p">),</span> <span class="nx">skip</span><span class="p">,</span> <span class="nx">skip</span> <span class="o">+</span> <span class="nx">take</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="nf">(err, res) -&gt;</span>
+      <span class="nx">callback</span> <span class="nx">err</span> <span class="k">if</span> <span class="nx">err</span>
+      <span class="nx">callback</span> <span class="kc">null</span><span class="p">,</span> <span class="nx">res</span><span class="p">.</span><span class="nx">map</span> <span class="nf">(entry) -&gt;</span>
+        <span class="nv">entry = </span><span class="nx">JSON</span><span class="p">.</span><span class="nx">parse</span> <span class="nx">entry</span>
+        <span class="nv">id: </span><span class="nx">entry</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="nv">params: </span><span class="nx">entry</span><span class="p">[</span><span class="mi">1</span><span class="p">..</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span>
+        <span class="nv">queued: </span><span class="k">new</span> <span class="nb">Date</span> <span class="nx">entry</span><span class="p">.</span><span class="nx">pop</span><span class="p">()</span></pre></div>             </td>           </tr>                               <tr id="section-75">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-75">&#182;</a>               </div>               <h3>Get Workers Asynchronously</h3>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                               <tr id="section-76">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-76">&#182;</a>               </div>               <p>Asynchronous method to get all <strong>live</strong> workers of the queue. <strong>Live</strong>
+workers are registered in the <code>WORKERS</code> hash. Values of <code>WORKERS</code> hash are
+in <code>hostname|ip|pid|since</code> format.</p>
+
+<p>Arguments of the callback function follow node.js error handling convention:
+<code>err</code> and <code>res</code>. <code>res</code> is an array of live workers. Each worker object have:</p>
+
+<ul>
+<li><code>host</code>, the host name of the worker machine.</li>
+<li><code>ip</code>, the first external IPv4 address of the worker machine.</li>
+<li><code>pid</code>, the process id of the working process.</li>
+<li><code>since</code>, the born date of the worker.</li>
+</ul>
+
+<p>Below is an example of returned workers:</p>
+
+<pre><code>[{
+   host: 'baoshan',
+   ip: '192.168.2.7',
+   pid: 1628
+   since: Sat, 12 May 2012 07:28:21 GMT // Date Object
+ }, ...]
+</code></pre>
+
+<p><strong>Usage:</strong></p>
+
+<pre><code>queue.workers (err, workers) -&gt; YOUR CODE
+</code></pre>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">workers: </span><span class="p">(</span><span class="nx">callback</span><span class="p">)</span> <span class="o">=&gt;</span>
+    <span class="nx">@redis</span><span class="p">.</span><span class="nx">hvals</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;WORKERS&#39;</span><span class="p">),</span> <span class="nf">(err, res) -&gt;</span>
+      <span class="k">return</span> <span class="nx">callback</span> <span class="nx">err</span> <span class="k">if</span> <span class="nx">err</span>
+      <span class="nx">callback</span> <span class="kc">null</span><span class="p">,</span> <span class="nx">res</span><span class="p">.</span><span class="nx">map</span><span class="p">(</span><span class="nf">(entry) -&gt;</span>
+        <span class="nv">entry = </span><span class="nx">entry</span><span class="p">.</span><span class="nx">split</span> <span class="s">&#39;|&#39;</span>
+        <span class="nv">host: </span><span class="nx">entry</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="nv">ip: </span><span class="nx">entry</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="nv">pid: </span><span class="nb">parseInt</span> <span class="nx">entry</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+        <span class="nv">since: </span><span class="k">new</span> <span class="nb">Date</span> <span class="nb">parseInt</span> <span class="nx">entry</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+      <span class="p">).</span><span class="nx">sort</span> <span class="nf">(a, b) -&gt;</span>
+        <span class="k">return</span>  <span class="mi">1</span> <span class="k">if</span> <span class="nx">a</span><span class="p">.</span><span class="nx">ip</span>  <span class="o">&gt;</span> <span class="nx">b</span><span class="p">.</span><span class="nx">ip</span>
+        <span class="k">return</span> <span class="o">-</span><span class="mi">1</span> <span class="k">if</span> <span class="nx">a</span><span class="p">.</span><span class="nx">ip</span>  <span class="o">&lt;</span> <span class="nx">b</span><span class="p">.</span><span class="nx">ip</span>
+        <span class="k">return</span>  <span class="mi">1</span> <span class="k">if</span> <span class="nx">a</span><span class="p">.</span><span class="nx">pid</span> <span class="o">&gt;</span> <span class="nx">b</span><span class="p">.</span><span class="nx">pid</span>
+        <span class="k">return</span> <span class="o">-</span><span class="mi">1</span> <span class="k">if</span> <span class="nx">a</span><span class="p">.</span><span class="nx">pid</span> <span class="o">&lt;</span> <span class="nx">b</span><span class="p">.</span><span class="nx">pid</span></pre></div>             </td>           </tr>                               <tr id="section-77">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-77">&#182;</a>               </div>               <h3>Clear A Queue</h3>             </td>             <td class="code">               <div class="highlight"><pre>  </pre></div>             </td>           </tr>                               <tr id="section-78">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-78">&#182;</a>               </div>               <p>Remove <strong>all</strong> tasks of the queue, and reset statistics. Set <code>TOTAL</code> to
+<code>PROCESSING</code> tasks to prevent negative pending tasks being calculated.</p>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">clear: </span><span class="p">(</span><span class="nx">callback</span><span class="p">)</span> <span class="o">=&gt;</span>
+    <span class="nx">@redis</span><span class="p">.</span><span class="nx">watch</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;SOURCE&#39;</span><span class="p">)</span>
+    <span class="nx">@redis</span><span class="p">.</span><span class="nx">watch</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;PROCESSING&#39;</span><span class="p">)</span>
+    <span class="nx">@redis</span><span class="p">.</span><span class="nx">hlen</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;PROCESSING&#39;</span><span class="p">),</span> <span class="p">(</span><span class="nx">err</span><span class="p">,</span> <span class="nx">processing</span><span class="p">)</span> <span class="o">=&gt;</span>
+      <span class="k">return</span> <span class="nx">callback</span><span class="o">?</span> <span class="nx">err</span> <span class="k">if</span> <span class="nx">err</span>
+      <span class="nx">@redis</span><span class="p">.</span><span class="nx">keys</span> <span class="s">&quot;</span><span class="si">#{</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;QUEUED&#39;</span><span class="p">)</span><span class="si">}</span><span class="s">:*&quot;</span><span class="p">,</span> <span class="p">(</span><span class="nx">err</span><span class="p">,</span> <span class="nx">res</span><span class="p">)</span> <span class="o">=&gt;</span>
+        <span class="k">return</span> <span class="nx">callback</span><span class="o">?</span> <span class="nx">err</span> <span class="k">if</span> <span class="nx">err</span>
+        <span class="nx">@redis</span><span class="p">.</span><span class="nx">multi</span><span class="p">()</span>
+          <span class="p">.</span><span class="nx">del</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;GROUPS&#39;</span><span class="p">),</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;RECENT&#39;</span><span class="p">),</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;FAILED&#39;</span><span class="p">),</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;SOURCE&#39;</span><span class="p">),</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;STATISTICS&#39;</span><span class="p">),</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;SLOWEST&#39;</span><span class="p">),</span> <span class="nx">@key</span><span class="p">(</span><span class="s">&#39;BLOCKED&#39;</span><span class="p">),</span> <span class="nx">res</span><span class="p">...)</span>
+          <span class="p">.</span><span class="nx">hmset</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;STATISTICS&#39;</span><span class="p">),</span> <span class="s">&#39;TOTAL&#39;</span><span class="p">,</span> <span class="nx">processing</span><span class="p">,</span> <span class="s">&#39;FINISHED&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="s">&#39;TOTAL_PENDING_TIME&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="s">&#39;TOTAL_PROCESS_TIME&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+          <span class="p">.</span><span class="nx">exec</span> <span class="p">(</span><span class="nx">err</span><span class="p">,</span> <span class="nx">res</span><span class="p">)</span> <span class="o">=&gt;</span>
+            <span class="k">return</span> <span class="nx">callback</span><span class="o">?</span> <span class="nx">err</span> <span class="k">if</span> <span class="nx">err</span>
+            <span class="k">return</span> <span class="nx">@clear</span> <span class="nx">callback</span> <span class="nx">unless</span> <span class="nx">res</span>
+            <span class="nx">@statistics</span> <span class="nx">callback</span> <span class="k">if</span> <span class="nx">callback</span></pre></div>             </td>           </tr>                               <tr id="section-79">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-79">&#182;</a>               </div>               <h3>Get Statistics of a Queue Asynchronously</h3>             </td>             <td class="code">               <div class="highlight"><pre>  </pre></div>             </td>           </tr>                               <tr id="section-80">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-80">&#182;</a>               </div>               <p>Statistics of a queue include:</p>
+
+<ul>
+<li><code>name</code>, name of the queue.</li>
+<li><code>workers</code>, total live workers.</li>
+<li><code>processing_tasks</code>, total processing tasks.</li>
+<li><code>total</code>
+<ul><li><code>groups</code>, total groups of tasks.</li>
+<li><code>tasks</code>, total tasks placed.</li></ul></li>
+<li><code>finished_tasks</code>, total tasks finished.</li>
+<li><code>average_pending_time</code>, average time spent on waiting for processing the
+finished tasks in milliseconds.</li>
+<li><code>average_process_time</code>, average time spent on processing the finished
+tasks in milliseconds.</li>
+<li><code>failed_tasks</code>, total tasks failed.</li>
+<li><code>blocked</code>
+<ul><li><code>groups</code>, total blocked groups.</li>
+<li><code>tasks</code>, total blocked tasks.</li></ul></li>
+<li><code>pending_tasks</code>, total pending tasks.</li>
+</ul>
+
+<p><code>statistics</code> is an asynchronous method. Arguments of the callback function
+follow node.js asynchronous callback convention: <code>err</code> and <code>res</code>.</p>
+
+<p>Below is an example of the <code>res</code> object:</p>
+
+<pre><code>  { name: 'task',
+    workers: 1,
+    processing_tasks: 0,
+    total: { groups: 10, tasks: 20000 },
+    finished_tasks: 8373,
+    average_pending_time: 313481,
+    average_process_time: 14,
+    failed_tasks: 15,
+    blocked: { groups: 9, tasks: 11612 },
+    pending_tasks: 0 }
+</code></pre>
+
+<p>If there're no finished tasks, <code>average_pending_time</code> and
+<code>average_process_time</code> will both be string <code>-</code>.</p>
+
+<p><strong>Usage:</strong></p>
+
+<pre><code>  queue.statistics (err, statistics) -&gt; # YOUR CODE
+</code></pre>             </td>             <td class="code">               <div class="highlight"><pre>  <span class="nv">statistics: </span><span class="nf">(callback) -&gt;</span></pre></div>             </td>           </tr>                               <tr id="section-81">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-81">&#182;</a>               </div>               <p>Start a transaction, in the transaction:</p>
+
+<ol>
+<li>Count total groups -- <code>SCARD</code> of <code>GROUPS</code> set.</li>
+<li>Get all fields and values in the <code>STATISTICS</code> hash, including:
+<ul><li><code>total</code></li>
+<li><code>finished</code></li>
+<li><code>total_pending_time</code></li>
+<li><code>total_process_time</code></li></ul></li>
+<li>Count processing tasks -- <code>LLEN</code> of <code>PROCESSING</code> list.</li>
+<li>Count failed task -- <code>LLEN</code> of <code>FAILED</code> list.</li>
+<li>Get identifiers of blocked group -- <code>SMEMBERS</code> of <code>BLOCKED</code> set.</li>
+<li>Count <strong>live</strong> workers of this queue -- <code>HLEN</code> of <code>WORKERS</code>.</li>
+</ol>             </td>             <td class="code">               <div class="highlight"><pre>    <span class="nx">@redis</span><span class="p">.</span><span class="nx">multi</span><span class="p">()</span>
+      <span class="p">.</span><span class="nx">scard</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;GROUPS&#39;</span><span class="p">))</span>
+      <span class="p">.</span><span class="nx">hgetall</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;STATISTICS&#39;</span><span class="p">))</span>
+      <span class="p">.</span><span class="nx">hlen</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;PROCESSING&#39;</span><span class="p">))</span>
+      <span class="p">.</span><span class="nx">llen</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;FAILED&#39;</span><span class="p">))</span>
+      <span class="p">.</span><span class="nx">smembers</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;BLOCKED&#39;</span><span class="p">))</span>
+      <span class="p">.</span><span class="nx">hlen</span><span class="p">(</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;WORKERS&#39;</span><span class="p">))</span>
+      <span class="p">.</span><span class="nx">exec</span> <span class="p">(</span><span class="nx">multi_err</span><span class="p">,</span> <span class="nx">multi_res</span><span class="p">)</span> <span class="o">=&gt;</span>
+        <span class="k">return</span> <span class="nx">callback</span> <span class="nx">multi_err</span> <span class="k">if</span> <span class="nx">multi_err</span></pre></div>             </td>           </tr>                               <tr id="section-82">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-82">&#182;</a>               </div>               <p>Process the result of the transaction.</p>
+
+<ol>
+<li>Assign transaction results to result object, and:</li>
+<li>Convert:
+<ul><li><code>total_pending_time</code> into <code>average_pending_time</code>, and:</li>
+<li><code>total_process_time</code> into <code>average_process_time</code></li></ul></li>
+<li>Calibrate initial condition (in case of no task is finished).</li>
+</ol>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">statistics = </span><span class="nx">multi_res</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">or</span> <span class="p">{}</span>
+        <span class="nv">result =</span>
+          <span class="nv">name: </span><span class="nx">@name</span>
+          <span class="nv">total:</span>
+            <span class="nv">groups: </span><span class="nx">multi_res</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="nv">tasks: </span><span class="nb">parseInt</span><span class="p">(</span><span class="nx">statistics</span><span class="p">.</span><span class="nx">TOTAL</span><span class="p">)</span> <span class="o">or</span> <span class="mi">0</span>
+          <span class="nv">finished_tasks: </span><span class="nb">parseInt</span><span class="p">(</span><span class="nx">statistics</span><span class="p">.</span><span class="nx">FINISHED</span><span class="p">)</span> <span class="o">or</span> <span class="mi">0</span>
+          <span class="nv">average_pending_time: </span><span class="nb">Math</span><span class="p">.</span><span class="nx">round</span><span class="p">(</span><span class="nx">statistics</span><span class="p">.</span><span class="nx">TOTAL_PENDING_TIME</span> <span class="o">*</span> <span class="mi">100</span> <span class="o">/</span> <span class="nx">statistics</span><span class="p">.</span><span class="nx">FINISHED</span><span class="p">)</span> <span class="o">/</span> <span class="mi">100</span>
+          <span class="nv">average_process_time: </span><span class="nb">Math</span><span class="p">.</span><span class="nx">round</span><span class="p">(</span><span class="nx">statistics</span><span class="p">.</span><span class="nx">TOTAL_PROCESS_TIME</span> <span class="o">*</span> <span class="mi">100</span> <span class="o">/</span> <span class="nx">statistics</span><span class="p">.</span><span class="nx">FINISHED</span><span class="p">)</span> <span class="o">/</span> <span class="mi">100</span>
+          <span class="nv">blocked:</span>
+            <span class="nv">groups: </span><span class="nx">multi_res</span><span class="p">[</span><span class="mi">4</span><span class="p">].</span><span class="nx">length</span>
+          <span class="nv">processing_tasks: </span><span class="nx">multi_res</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+          <span class="nv">failed_tasks: </span><span class="nx">multi_res</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+          <span class="nv">workers: </span><span class="nx">multi_res</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nx">result</span><span class="p">.</span><span class="nx">finished_tasks</span> <span class="o">is</span> <span class="mi">0</span>
+          <span class="nv">result.average_pending_time = </span><span class="s">&#39;-&#39;</span>
+          <span class="nv">result.average_process_time = </span><span class="s">&#39;-&#39;</span></pre></div>             </td>           </tr>                               <tr id="section-83">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-83">&#182;</a>               </div>               <p>Calculate blocked and pending tasks:</p>
+
+<ol>
+<li>Initiate another transaction to count all <code>BLOCKED</code> tasks. Blocked
+tasks are tasks in the <code>QUEUED</code> lists whose group identifiers are in
+the <code>BLOCKED</code> set. <strong>Note:</strong> The leftmost task of each <code>QUEUED</code> list
+will not be counted, since that's the causing (failed) task.</li>
+<li>Calculate pending tasks.</li>
+</ol>
+
+<p>The equation used to calculate pending tasks is:</p>
+
+<pre><code> pending = total - finished - processing - failed - blocked
+</code></pre>             </td>             <td class="code">               <div class="highlight"><pre>        <span class="nv">multi2 = </span><span class="nx">@redis</span><span class="p">.</span><span class="nx">multi</span><span class="p">()</span>
+        <span class="nx">multi2</span><span class="p">.</span><span class="nx">llen</span> <span class="s">&quot;</span><span class="si">#{</span><span class="nx">@key</span><span class="p">(</span><span class="s">&#39;QUEUED&#39;</span><span class="p">)</span><span class="si">}</span><span class="s">:</span><span class="si">#{</span><span class="nx">group</span><span class="si">}</span><span class="s">&quot;</span> <span class="k">for</span> <span class="nx">group</span> <span class="k">in</span> <span class="nx">multi_res</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span>
+        <span class="nx">multi2</span><span class="p">.</span><span class="nx">exec</span> <span class="nf">(multi2_err, multi2_res) -&gt;</span>
+          <span class="k">return</span> <span class="nx">callback</span> <span class="nx">multi2_err</span> <span class="k">if</span> <span class="nx">multi2_err</span>
+          <span class="nv">result.blocked.tasks = </span><span class="nx">multi2_res</span><span class="p">.</span><span class="nx">reduce</span><span class="p">((</span><span class="nf">(a, b) -&gt;</span> <span class="nx">a</span> <span class="o">+</span> <span class="nx">b</span><span class="p">),</span> <span class="o">-</span> <span class="nx">result</span><span class="p">.</span><span class="nx">blocked</span><span class="p">.</span><span class="nx">groups</span><span class="p">)</span>
+          <span class="nv">result.pending_tasks = </span><span class="nx">result</span><span class="p">.</span><span class="nx">total</span><span class="p">.</span><span class="nx">tasks</span> <span class="o">-</span> <span class="nx">result</span><span class="p">.</span><span class="nx">finished_tasks</span> <span class="o">-</span> <span class="nx">result</span><span class="p">.</span><span class="nx">processing_tasks</span> <span class="o">-</span> <span class="nx">result</span><span class="p">.</span><span class="nx">failed_tasks</span> <span class="o">-</span> <span class="nx">result</span><span class="p">.</span><span class="nx">blocked</span><span class="p">.</span><span class="nx">tasks</span>
+          <span class="nx">callback</span> <span class="kc">null</span><span class="p">,</span> <span class="nx">result</span></pre></div>             </td>           </tr>                               <tr id="section-84">             <td class="docs">               <div class="pilwrap">                 <a class="pilcrow" href="#section-84">&#182;</a>               </div>               <h3>Known Bugs:</h3>             </td>             <td class="code">               <div class="highlight"><pre></pre></div>             </td>           </tr>                </tbody>     </table>   </div> </body> </html> 

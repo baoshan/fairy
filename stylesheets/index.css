@@ -1,0 +1,777 @@
+/*--------------------- Layout and Typography ----------------------------*/
+@font-face{
+	font-family:'Octicons Regular'; 
+	src :url("fonts/octicons-regular-webfont.eot");
+	src:url("fonts/octicons-regular-webfont.eot") format("embedded-opentype"),url("fonts/octicons-regular-webfont.woff") format("woff"),url("fonts/octicons-regular-webfont.ttf") format("truetype"),url("https://a248.e.akamai.net/assets.github.com/fonts/octicons/octicons-regular-webfont.svg?v=1#newFontRegular") format("svg");
+	font-weight:normal;
+	font-style:normal;
+}
+body {
+  font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, FreeSerif, serif;
+  font-size: 15px;
+  line-height: 22px;
+  color: #252519;
+  margin: 0; padding: 0;
+}
+a {
+  color: #261a3b;
+}
+  a:visited {
+    color: #261a3b;
+  }
+p {
+  margin: 0 0 15px 0;
+}
+h1, h2, h3, h4, h5, h6 {
+  margin: 0px 0 15px 0;
+}
+  h1 {
+    margin-top: 40px;
+  }
+#container {
+  position: relative;
+}
+#background {
+  position: fixed;
+  top: 0; left: 525px; right: 0; bottom: 0;
+  background: #f5f5ff;
+  border-left: 1px solid #e5e5ee;
+  z-index: -1;
+}
+#jump_to, #jump_page {
+  background: white;
+  -webkit-box-shadow: 0 0 25px #777; -moz-box-shadow: 0 0 25px #777;
+  -webkit-border-bottom-left-radius: 5px; -moz-border-radius-bottomleft: 5px;
+  font: 10px Arial;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-align: right;
+}
+#jump_to, #jump_wrapper {
+  position: fixed;
+  right: 0; top: 0;
+  padding: 5px 10px;
+}
+  #jump_wrapper {
+    padding: 0;
+    display: none;
+  }
+    #jump_to:hover #jump_wrapper {
+      display: block;
+    }
+    #jump_page {
+      padding: 5px 0 3px;
+      margin: 0 0 25px 25px;
+    }
+      #jump_page .source {
+        display: block;
+        padding: 5px 10px;
+        text-decoration: none;
+        border-top: 1px solid #eee;
+      }
+        #jump_page .source:hover {
+          background: #f5f5ff;
+        }
+        #jump_page .source:first-child {
+        }
+table td {
+  border: 0;
+  outline: 0;
+}
+  td.docs, th.docs {
+    max-width: 450px;
+    min-width: 450px;
+    min-height: 5px;
+    padding: 10px 25px 1px 50px;
+    overflow-x: hidden;
+    vertical-align: top;
+    text-align: left;
+  }
+    .docs pre {
+      margin: 15px 0 15px;
+      padding-left: 15px;
+    }
+    .docs p tt, .docs p code {
+      background: #f8f8ff;
+      border: 1px solid #dedede;
+      font-size: 12px;
+      padding: 0 0.2em;
+    }
+    .pilwrap {
+      position: relative;
+    }
+      .pilcrow {
+        font: 12px Arial;
+        text-decoration: none;
+        color: #454545;
+        position: absolute;
+        top: 3px; left: -20px;
+        padding: 1px 2px;
+        opacity: 0;
+        -webkit-transition: opacity 0.2s linear;
+      }
+        td.docs:hover .pilcrow {
+          opacity: 1;
+        }
+  td.code, th.code {
+    padding: 14px 15px 16px 25px;
+    width: 100%;
+    vertical-align: top;
+    background: #f5f5ff;
+    border-left: 1px solid #e5e5ee;
+  }
+    pre, tt, code {
+      font-size: 12px; line-height: 18px;
+      font-family: Menlo, Monaco, Consolas, "Lucida Console", monospace;
+      margin: 0; padding: 0;
+    }
+
+
+/*---------------------- Syntax Highlighting -----------------------------*/
+td.linenos { background-color: #f0f0f0; padding-right: 10px; }
+span.lineno { background-color: #f0f0f0; padding: 0 5px 0 5px; }
+body .hll { background-color: #ffffcc }
+body .c { color: #408080; font-style: italic }  /* Comment */
+body .err { border: 1px solid #FF0000 }         /* Error */
+body .k { color: #954121 }                      /* Keyword */
+body .o { color: #666666 }                      /* Operator */
+body .cm { color: #408080; font-style: italic } /* Comment.Multiline */
+body .cp { color: #BC7A00 }                     /* Comment.Preproc */
+body .c1 { color: #408080; font-style: italic } /* Comment.Single */
+body .cs { color: #408080; font-style: italic } /* Comment.Special */
+body .gd { color: #A00000 }                     /* Generic.Deleted */
+body .ge { font-style: italic }                 /* Generic.Emph */
+body .gr { color: #FF0000 }                     /* Generic.Error */
+body .gh { color: #000080; font-weight: bold }  /* Generic.Heading */
+body .gi { color: #00A000 }                     /* Generic.Inserted */
+body .go { color: #808080 }                     /* Generic.Output */
+body .gp { color: #000080; font-weight: bold }  /* Generic.Prompt */
+body .gs { font-weight: bold }                  /* Generic.Strong */
+body .gu { color: #800080; font-weight: bold }  /* Generic.Subheading */
+body .gt { color: #0040D0 }                     /* Generic.Traceback */
+body .kc { color: #954121 }                     /* Keyword.Constant */
+body .kd { color: #954121; font-weight: bold }  /* Keyword.Declaration */
+body .kn { color: #954121; font-weight: bold }  /* Keyword.Namespace */
+body .kp { color: #954121 }                     /* Keyword.Pseudo */
+body .kr { color: #954121; font-weight: bold }  /* Keyword.Reserved */
+body .kt { color: #B00040 }                     /* Keyword.Type */
+body .m { color: #666666 }                      /* Literal.Number */
+body .s { color: #219161 }                      /* Literal.String */
+body .na { color: #7D9029 }                     /* Name.Attribute */
+body .nb { color: #954121 }                     /* Name.Builtin */
+body .nc { color: #0000FF; font-weight: bold }  /* Name.Class */
+body .no { color: #880000 }                     /* Name.Constant */
+body .nd { color: #AA22FF }                     /* Name.Decorator */
+body .ni { color: #999999; font-weight: bold }  /* Name.Entity */
+body .ne { color: #D2413A; font-weight: bold }  /* Name.Exception */
+body .nf { color: #0000FF }                     /* Name.Function */
+body .nl { color: #A0A000 }                     /* Name.Label */
+body .nn { color: #0000FF; font-weight: bold }  /* Name.Namespace */
+body .nt { color: #954121; font-weight: bold }  /* Name.Tag */
+body .nv { color: #19469D }                     /* Name.Variable */
+body .ow { color: #AA22FF; font-weight: bold }  /* Operator.Word */
+body .w { color: #bbbbbb }                      /* Text.Whitespace */
+body .mf { color: #666666 }                     /* Literal.Number.Float */
+body .mh { color: #666666 }                     /* Literal.Number.Hex */
+body .mi { color: #666666 }                     /* Literal.Number.Integer */
+body .mo { color: #666666 }                     /* Literal.Number.Oct */
+body .sb { color: #219161 }                     /* Literal.String.Backtick */
+body .sc { color: #219161 }                     /* Literal.String.Char */
+body .sd { color: #219161; font-style: italic } /* Literal.String.Doc */
+body .s2 { color: #219161 }                     /* Literal.String.Double */
+body .se { color: #BB6622; font-weight: bold }  /* Literal.String.Escape */
+body .sh { color: #219161 }                     /* Literal.String.Heredoc */
+body .si { color: #BB6688; font-weight: bold }  /* Literal.String.Interpol */
+body .sx { color: #954121 }                     /* Literal.String.Other */
+body .sr { color: #BB6688 }                     /* Literal.String.Regex */
+body .s1 { color: #219161 }                     /* Literal.String.Single */
+body .ss { color: #19469D }                     /* Literal.String.Symbol */
+body .bp { color: #954121 }                     /* Name.Builtin.Pseudo */
+body .vc { color: #19469D }                     /* Name.Variable.Class */
+body .vg { color: #19469D }                     /* Name.Variable.Global */
+body .vi { color: #19469D }                     /* Name.Variable.Instance */
+body .il { color: #666666 }                     /* Literal.Number.Integer.Long */
+
+/* Docci Modules */
+#filelists { position: relative; }
+#filelists table {
+  /*position: absolute;
+  width: 680px;*/
+}
+
+#filelists table {
+	border-radius: 3px;
+	border: 1px solid #CACACA;
+	border-collapse:collapse;
+	margin:0;
+	font-size: 13px;
+	/*line-height: 30px;*/
+}
+
+#filelists table thead td{
+	/*line-height: 30px;*/
+	padding-right:5px;
+	text-shadow: 0 1px 0 white;
+	border-bottom: 1px solid #D8D8D8;
+	background: #FAFAFA;
+	background: -moz-linear-gradient(#FAFAFA,#EAEAEA);
+	background: -webkit-linear-gradient(#FAFAFA,#EAEAEA);
+}
+
+/*#filelists table thead td:first-child{
+	padding-right: 0;
+}
+
+#filelists table thead td:first-child+td{
+	width: 95px;
+}
+
+#filelists table thead td:first-child+td+td{
+	width: 40px;
+}
+
+#filelists table thead td:first-child+td+td+td{
+	width: 65px;
+}
+
+#filelists table thead td:first-child+td+td+td+td{
+	width: 100px;
+}
+
+
+#filelists table thead td:first-child+td+td+td+td+td{
+	width: 120px;
+}*/
+#filelists table tbody td{
+	border-bottom: 1px solid #CACACA;
+	background-color:#F8F8F8;
+	margin: 0;
+	white-space:nowrap;
+}
+
+/*#filelists > table tbody td:last-child{
+	white-space:pre;
+}*/
+
+#filelists table td.icon{
+/*width: 18px;
+height: 16px;
+background:url(https://a248.e.akamai.net/assets.github.com/images/icons/dir.png) no-repeat 0 50% #F8F8F8;*/
+}
+
+
+/*liuzhengming*/
+/*--------------------------------------github_data_lang--------start-----------------------------------------*/
+span[data-lang="Other"] {
+    background-color: #CCCCCC;
+}
+span[data-lang="ActionScript"] {
+    background-color: #E3491A;
+}
+span[data-lang="Ada"] {
+    background-color: #02F88C;
+}
+span[data-lang="Arc"] {
+    background-color: #CA2AFE;
+}
+span[data-lang="Arduino"] {
+    background-color: #BD79D1;
+}
+span[data-lang="ASP"] {
+    background-color: #6A40FD;
+}
+span[data-lang="Assembly"] {
+    background-color: #A67219;
+}
+span[data-lang="AutoHotkey"] {
+    background-color: #6594B9;
+}
+span[data-lang="Boo"] {
+    background-color: #D4BEC1;
+}
+span[data-lang="C"] {
+    background-color: #555555;
+}
+span[data-lang="C#"] {
+    background-color: #5A25A2;
+}
+span[data-lang="C++"] {
+    background-color: #F34B7D;
+}
+span[data-lang="Clojure"] {
+    background-color: #DB5855;
+}
+span[data-lang="CoffeeScript"] {
+    background-color: #244776;
+}
+span[data-lang="ColdFusion"] {
+    background-color: #ED2CD6;
+}
+span[data-lang="Common Lisp"] {
+    background-color: #3FB68B;
+}
+span[data-lang="D"] {
+    background-color: #FCD46D;
+}
+span[data-lang="Delphi"] {
+    background-color: #B0CE4E;
+}
+span[data-lang="Dylan"] {
+    background-color: #3EBC27;
+}
+span[data-lang="Eiffel"] {
+    background-color: #946D57;
+}
+span[data-lang="Elixir"] {
+    background-color: #6E4A7E;
+}
+span[data-lang="Emacs Lisp"] {
+    background-color: #C065DB;
+}
+span[data-lang="Erlang"] {
+    background-color: #949E0E;
+}
+span[data-lang="F#"] {
+    background-color: #B845FC;
+}
+span[data-lang="Factor"] {
+    background-color: #636746;
+}
+span[data-lang="Fancy"] {
+    background-color: #7B9DB4;
+}
+span[data-lang="Fantom"] {
+    background-color: #DBDED5;
+}
+span[data-lang="FORTRAN"] {
+    background-color: #4D41B1;
+}
+span[data-lang="Go"] {
+    background-color: #8D04EB;
+}
+span[data-lang="Gosu"] {
+    background-color: #82937F;
+}
+span[data-lang="Groovy"] {
+    background-color: #E69F56;
+}
+span[data-lang="Haskell"] {
+    background-color: #29B544;
+}
+span[data-lang="HaXe"] {
+    background-color: #346D51;
+}
+span[data-lang="Io"] {
+    background-color: #A9188D;
+}
+span[data-lang="Ioke"] {
+    background-color: #078193;
+}
+span[data-lang="Java"] {
+    background-color: #B07219;
+}
+span[data-lang="JavaScript"] {
+    background-color: #F15501;
+}
+span[data-lang="Lua"] {
+    background-color: #FA1FA1;
+}
+span[data-lang="Matlab"] {
+    background-color: #BB92AC;
+}
+span[data-lang="Max/MSP"] {
+    background-color: #CE279C;
+}
+span[data-lang="Mirah"] {
+    background-color: #C7A938;
+}
+span[data-lang="Nemerle"] {
+    background-color: #0D3C6E;
+}
+span[data-lang="Nimrod"] {
+    background-color: #37775B;
+}
+span[data-lang="Nu"] {
+    background-color: #C9DF40;
+}
+span[data-lang="Objective-C"] {
+    background-color: #438EFF;
+}
+span[data-lang="Objective-J"] {
+    background-color: #FF0C5A;
+}
+span[data-lang="OCaml"] {
+    background-color: #3BE133;
+}
+span[data-lang="ooc"] {
+    background-color: #B0B77E;
+}
+span[data-lang="Parrot"] {
+    background-color: #F3CA0A;
+}
+span[data-lang="Perl"] {
+    background-color: #0298C3;
+}
+span[data-lang="PHP"] {
+    background-color: #6E03C1;
+}
+span[data-lang="Prolog"] {
+    background-color: #74283C;
+}
+span[data-lang="Puppet"] {
+    background-color: #CC5555;
+}
+span[data-lang="Pure Data"] {
+    background-color: #91DE79;
+}
+span[data-lang="Python"] {
+    background-color: #3581BA;
+}
+span[data-lang="R"] {
+    background-color: #198CE7;
+}
+span[data-lang="Racket"] {
+    background-color: #AE17FF;
+}
+span[data-lang="Rebol"] {
+    background-color: #358A5B;
+}
+span[data-lang="Ruby"] {
+    background-color: #701516;
+}
+span[data-lang="Rust"] {
+    background-color: #DEA584;
+}
+span[data-lang="Scala"] {
+    background-color: #7DD3B0;
+}
+span[data-lang="Scheme"] {
+    background-color: #1E4AEC;
+}
+span[data-lang="Self"] {
+    background-color: #0579AA;
+}
+span[data-lang="Shell"] {
+    background-color: #5861CE;
+}
+span[data-lang="Smalltalk"] {
+    background-color: #596706;
+}
+span[data-lang="Standard ML"] {
+    background-color: #DC566D;
+}
+span[data-lang="SuperCollider"] {
+    background-color: #46390B;
+}
+span[data-lang="Tcl"] {
+    background-color: #E4CC98;
+}
+span[data-lang="Turing"] {
+    background-color: #45F715;
+}
+span[data-lang="Vala"] {
+    background-color: #EE7D06;
+}
+span[data-lang="Verilog"] {
+    background-color: #848BF3;
+}
+span[data-lang="VHDL"] {
+    background-color: #543978;
+}
+span[data-lang="VimL"] {
+    background-color: #199C4B;
+}
+span[data-lang="Visual Basic"] {
+    background-color: #945DB7;
+}
+span[data-lang="XQuery"] {
+    background-color: #2700E2;
+}
+
+/*--------------------------------------github_data_lang----end---------------------------------------------*/
+
+
+
+html{ height:100%;}
+body{ width:1366px;  height:100%; color:#252519;}
+#container{ height:100%;}
+#background{ left:0px;}
+.left{ background:#fff; width:525px;  min-height:100%; float:left; border:1px solid #E5E5EE;}
+.left>h1{
+  padding:50px 25px 1px 50px;
+  margin-top:0px;
+}
+.left>p{
+  padding:10px 25px 1px 50px;
+	/*font-family:Helvetica,arial,freesans,clean,sans-serif;*/
+	font-weight:300;
+	color:#666;
+	/*font-size:13px;*/
+	font-style:italic;
+}
+
+/*readme*/
+.readme{
+  width:450px;
+	min-height:5px;
+	/*float:left;*/
+	padding:10px 25px 1px 50px;
+	text-align:left;
+}
+.readme pre{
+  margin:15px 0 15px;
+    background-color: #F8F8F8;
+    border: 1px solid #E8E8E8;
+    border-left-width:6px;
+    /*border-radius: 3px 3px 3px 3px;*/
+    font-size: 13px;
+    line-height: 19px;
+    margin: 15px 0;
+    overflow: auto;
+    padding: 6px 10px;
+}
+.readme pre code{
+	white-space:pre;
+	margin:0;
+	padding:0;
+}
+/*content*/
+.content{
+  width:775px;
+	min-height:5px;
+	float:left;
+	padding-left:25px;
+	padding-top:25px;
+	overflow:hidden;
+	margin-top:140px;
+}
+/*代码统计*/
+.code_stats { border-collapse:collapse; font:13px/1.4 Helvetica,arial,freesans,clean,sans-serif; margin-bottom:20px;}
+.code_stats span{ display:inline-block;}
+.code_stats tr td:nth-child(1){text-align:right;color:#666; padding-right:6px;}
+.code_stats tr td:nth-child(2){text-align:right;color:#333;}
+.code_stats tr td:nth-child(3){ padding-left:5px; padding-right:4px;}
+.code_stats tr td:nth-child(3) span{width:8px;height:10px;}
+.code_stats tr td:nth-child(4){ width:200px;}
+.code_stats tr td:nth-child(4) div{ position:relative; width:100%; display:inline-block;}
+.code_stats tr td:nth-child(4) span:nth-child(1){ height:10px; min-width:3px; border-radius: 0px 2px 2px 0px;}
+.code_stats tr td:nth-child(4) span:nth-child(2){ position:absolute; top:0px; text-indent:4px; text-align:left; color:#666; width:60px; white-space:nowrap;}
+
+
+.content>ol{
+  clear:both;
+	margin:0px auto auto -20px;
+}
+
+.content>ol li{
+	font-size:13px; 
+	color:#666;
+	font-family:Helvetica,arial,freesans,clean,sans-serif;
+	font-weight:300;
+}
+
+/*table上方导航连接*/
+#filebrowser{
+  padding-top:20px;
+}
+#breadcrumb{
+  color:#999;
+	margin:5px 0px 5px 0px;
+}
+#breadcrumb span{
+	color: #000;
+	font-size: 18px;
+	margin: 5px 0;
+	font:18px/1.4 Helvetica,arial,freesans,clean,sans-serif;
+	font-weight:bold;
+}
+#breadcrumb a,#breadcrumb>span:nth-child(1){
+	font:18px/1.4 Helvetica,arial,freesans,clean,sans-serif;
+	font-weight:bold;
+	color: #4183C4;
+	text-decoration: none;
+	cursor:pointer;
+}
+/*table*/
+#filelists{
+  width:10000px;
+}
+.filelist{
+	float:left;
+	background: none repeat scroll 0 0 #EEEEEE;
+	border-radius: 3px 3px 3px 3px;
+	padding: 3px;
+	width:769px;
+	margin-right:50px;
+}
+
+.filelist table{
+	border-collapse:collapse;
+	border-spacing:0;
+	border: 1px solid #CACACA;
+	border-radius: 3px 3px 3px 3px;
+	margin: 0;
+	/*width: 100%;*/
+	width:100%;
+	font-family:Arial, Helvetica, sans-serif;
+}
+.filelist table thead tr{
+	background:-webkit-linear-gradient(#FAFAFA,#EAEAEA);
+	background: -moz-linear-gradient(#FAFAFA, #EAEAEA);
+  background: -ms-linear-gradient(#FAFAFA, #EAEAEA);
+  background: -o-linear-gradient(#FAFAFA, #EAEAEA);
+  background: linear-gradient(#FAFAFA, #EAEAEA);
+	border-bottom: 1px solid #D8D8D8;
+	color: #555555;
+	font-family:Arial, Helvetica, sans-serif;
+	font-weight: bold;
+	padding: 6px 3px;
+	text-align: left;
+	text-shadow: 0 1px 0 #FFFFFF;
+}
+.filelist table thead tr th:nth-child(1){
+  width:27px;
+  padding:7px 0px;
+}
+.filelist table thead tr th:nth-child(2){
+  padding:7px 3px;
+}
+.filelist table thead tr th:nth-child(3){
+	width:50px;
+	text-align:right;
+  padding:7px 0px 7px 0px;
+}
+.filelist table thead tr th:nth-child(4){
+	width:65px;
+	text-align:right;
+  padding:7px 24px 7px 0;
+}
+.filelist table thead tr th:nth-child(5){
+	width:90px;
+  padding:7px 15px 7px 0px;
+}
+.filelist table thead tr th:nth-child(6){
+  padding:7px 3px;
+}
+.history{
+  float:right;
+	padding-right:5px;
+	text-decoration:none;
+}
+.history a{
+  text-decoration:none;
+	color:#4183C4;
+}
+.history a:hover{
+  text-decoration:underline;
+	color:#4183C4;
+}
+.history a:visited{
+  text-decoration:none;
+	color:#4183C4;
+}
+.filelist table thead tr td{
+	background: none repeat scroll 0 0 #F8F8F8;
+	border-bottom: 1px solid #EEEEEE;
+	color: #484848;
+	padding: 7px 3px;
+	vertical-align: middle;
+}
+.filelist .directory .icon:after{
+  font-size:16px;
+  font-family:'Octicons Regular';
+  color:#80A6CD;
+  content:"";
+  float:right;
+}
+.filelist .file .icon:after{
+  font-size:16px;
+  font-family:'Octicons Regular';
+  color:#777777;
+  content:"";
+  float:right;
+}
+.filelist .document .icon:after{
+  font-size:16px;
+  font-family:'Octicons Regular';
+  color:#80A6CD;
+  content:"";
+  float:right;
+}
+.filelist .submodule .icon:after{
+  font-size:16px;
+  font-family:'Octicons Regular';
+  color:#3CBF5E;
+  content:"";
+  float:right;
+}
+/*连接到外部网址的连接后边加的图标*/
+.filelist .file>td>a{ padding-right:15px; background:url("data:image/gif;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAAMAAwDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD0Qwy6zvnureK5vbqytGtzDbL+63GViCZA4VeDliOnABbAPFeJrO50q6tLW7+z/aFhfe6QrCJB50gRtqcDKBff1qwvi2YWtpDLpOk3HkwpGjz25dgoXjktXomj6PpbaHpzvplk8j2sbO7W6ksSoyScVtflZjuj/9k=") no-repeat scroll right center transparent;}
+.filelist table tbody a{
+  color: #4183C4;
+	cursor:pointer;
+	text-decoration:none;
+}
+.filelist table tbody a:hover{
+	text-decoration:underline;
+}
+.filelist table tbody tr td:nth-child(1){
+	width:27px;
+  padding:7px 4px 7px 0px;
+}
+.filelist table tbody tr td:nth-child(2){
+	padding:7px 3px;
+}
+.filelist table tbody tr td:nth-child(3){
+	width:50px;
+	text-align:right;
+	padding:7px 0px 7px 0px;
+}
+.filelist table tbody tr td:nth-child(4){
+	width:65px;
+	padding:7px 24px 7px 0;
+	text-align:right;
+}
+.filelist table tbody tr td:nth-child(5){
+	width:90px;
+	padding:7px 15px 7px 0px;
+}
+.filelist table tbody tr td:nth-child(6){
+	padding:7px 3px;
+  min-width:250px;
+}
+.filelist table tbody tr td:nth-child(6) div {
+     position: relative;
+     white-space: nowrap;
+}
+
+.filelist table tbody tr td:nth-child(6) div span:first-child {
+     display: inline-block;
+     float: left;
+     max-width: 370px;
+     overflow-x: hidden;
+     text-overflow: ellipsis;
+}
+
+.file_browser_author {
+     background: none repeat scroll 0pt 0pt #666666;
+     border-radius: 3px 3px 3px 3px;
+     border: 1px solid #CCCCCC;
+     color: #FFFFFF;
+     display: none;
+     font-size: 12px;
+     height: 21px;
+     line-height: 21px;
+     padding-left: 5px;
+     padding-right: 5px;
+     position: absolute;
+     right: 5px;
+     top: 0px;
+}
+.file_browser_author a:link{ color:#fff; text-decoration:none;}
+.file_browser_author a:hover{ color:#fff; text-decoration:underline;}
+.file_browser_author a:active{ color:#fff; text-decoration:none;}
+.file_browser_author a:visited{ color:#fff; text-decoration:none;}
+.filelist table tbody tr td:nth-child(6):hover .file_browser_author {
+     display: inline-block;
+}
