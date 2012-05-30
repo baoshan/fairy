@@ -100,9 +100,19 @@ thead tr{ background:#F5F5F5; color:#666}
 .overview .active td:nth-child(7){ background:#fdc1c1 !important;}
 .overview .active td:nth-child(8){ background:#fdc1c1 !important;}
 
+
+
 /*Glance and Worders*/
+#queque_detail{ display:none;}
+
 table[class*="glance"]{
   width:300px;
+}
+table tr td:nth-child(1){
+  width:200px;
+}
+table tr td:nth-child(2){
+  width:100px;
 }
 table[class*="workers"]{
   width:600px;
