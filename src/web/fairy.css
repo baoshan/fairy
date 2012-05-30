@@ -74,7 +74,7 @@ h1+.table_title{ margin-top:120px;}
 .overview tr th:nth-child(11){ width:40px;}
 .overview tr th:nth-child(7){ background:#ffeded; color:red;}
 .overview tr th:nth-child(8){ background:#ffeded; color:red;}
-.overview tr:last-child td{ 
+.overview tfoot tr td{ 
   border-top:3px solid #999; 
   background:#F5F5F5; 
   color:#333;
