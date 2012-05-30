@@ -35,7 +35,7 @@ h1, h2, h3, h4, h5, h6 {
   position: fixed;
   top: 0; left: 525px; right: 0; bottom: 0;
   background: #f5f5ff;
-  border-left: 1px solid #e5e5ee;
+  /*border-left: 1px solid #e5e5ee;*/
   z-index: -1;
 }
 #jump_to, #jump_page {
@@ -492,11 +492,11 @@ span[data-lang="XQuery"] {
 
 
 
-html{ height:100%;}
-body{ width:1366px;  height:100%; color:#252519;}
-#container{ height:100%;}
-#background{ left:0px;}
-.left{ background:#fff; width:525px;  min-height:100%; float:left; border:1px solid #E5E5EE;}
+body{ 
+  width:1366px;
+  background : -moz-linear-gradient(left center , #FFFFFF 524px, #CCCCCC 525px, #F5F5FF 1px) repeat scroll 0 0 transparent;
+}
+.left{/* background:#fff;  float:left; border:1px solid #E5E5EE;*/width:525px;}
 .left>h1{
   padding:50px 25px 1px 50px;
   margin-top:0px;
@@ -541,9 +541,9 @@ body{ width:1366px;  height:100%; color:#252519;}
 	min-height:5px;
 	float:left;
 	padding-left:25px;
-	padding-top:25px;
+	/*padding-top:25px;*/
 	overflow:hidden;
-	margin-top:140px;
+	/*margin-top:140px;*/
 }
 /*代码统计*/
 .code_stats { border-collapse:collapse; font:13px/1.4 Helvetica,arial,freesans,clean,sans-serif; margin-bottom:20px;}
@@ -774,4 +774,27 @@ body{ width:1366px;  height:100%; color:#252519;}
 .file_browser_author a:visited{ color:#fff; text-decoration:none;}
 .filelist table tbody tr td:nth-child(6):hover .file_browser_author {
      display: inline-block;
+}
+/*左侧背景修改*/
+/*#container>table>tbody>tr>td:nth-child(2){
+    background: none repeat scroll 0 0 #F5F5FF;
+    border-left: 1px solid #E5E5EE;
+}*/
+td{
+  vertical-align:top;
+}
+code{
+    background:#F8F8FF;
+    border: 1px solid #DEDEDE;
+    font-size: 12px;
+    padding: 0 0.2em !important;
+}
+pre code{
+    background:none;
+    border: 0px solid #DEDEDE;
+    padding: 0 !important;
+}
+.left img{
+  border:none;
+  float:right;
 }
