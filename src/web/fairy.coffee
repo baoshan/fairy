@@ -30,7 +30,6 @@ interval = $("select option:selected").val()
 # 页面加载事件
 $ ->
   $('select').find("option:nth-child(1)").attr("selected","true")
-  $('#queque_detail').hide()
   render_master()
   events_bind()
 
