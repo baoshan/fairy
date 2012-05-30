@@ -6,7 +6,7 @@ statistics_template = [
   '<tbody>',
   '<% _.each(data, function(item){ %>',
   '<tr>',
-  '<td><%= item.name %></td><td><%= item.workers%></td><td><%= item.average_pending_time%></td><td><span><%= item.total.tasks%></span><span>/</span><span><%= item.total.groups%><span></td><td><%= item.finished_tasks%></td><td><%= item.processing_tasks%></td><td><%= item.pending_tasks%></td><td><%= item.failed_tasks%></td><td><span><%= item.blocked.tasks%></span><span>/</span><span><%= item.blocked.groups%><span></td><td><button class="btn_reschedule">Schedule</button></td><td><button class="btn_clear">Clear</button></td>',
+  '<td><%= item.name %></td><td><%= item.workers%></td><td><%= item.average_pending_time + item.average_process_time%></td><td><span><%= item.total.tasks%></span><span>/</span><span><%= item.total.groups%><span></td><td><%= item.finished_tasks%></td><td><%= item.processing_tasks%></td><td><%= item.pending_tasks%></td><td><%= item.failed_tasks%></td><td><span><%= item.blocked.tasks%></span><span>/</span><span><%= item.blocked.groups%><span></td><td><button class="btn_reschedule">Schedule</button></td><td><button class="btn_clear">Clear</button></td>',
   '</tr>',
   '<%})%>',
   '</tbody>',
