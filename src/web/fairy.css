@@ -87,7 +87,7 @@ h1+.table_title{ margin-top:120px;}
 .overview tr td{ vertical-align:middle !important;}
 .overview tbody tr td:nth-child(7){ color:red; font-weight:400; background:#ffeded;}
 .overview tbody tr td:nth-child(8){ color:red; font-weight:400; background:#ffeded;}
-.overview tr:last-child td:nth-child(7),.overview tr:last-child td:nth-child(8){ border-top:3px solid #ce1212;}
+.overview tfoot tr td:nth-child(7),.overview tfoot tr td:nth-child(8){ border-top:3px solid #ce1212; color:red;}
 thead tr{ background:#F5F5F5; color:#666}
 .overview tr:hover td{ background:#F5F5F5 !important; color:#000;}
 .overview tr td:hover{ background:#E4E4E4 !important;}
