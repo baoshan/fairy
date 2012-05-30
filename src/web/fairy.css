@@ -104,6 +104,12 @@ thead tr{ background:#F5F5F5; color:#666}
 table[class*="glance"]{
   width:300px;
 }
+table tr td:nth-child(1){
+  width:200px;
+}
+table tr td:nth-child(2){
+  width:100px;
+}
 table[class*="workers"]{
   width:600px;
 }
