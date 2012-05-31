@@ -217,3 +217,5 @@ td:hover .failed_popover{
   overflow:hidden important;
   /*font-size:0px;*/
 }
+a:link,a:hover,a:focus,a:active,a:visited{ outline : none !important;}
+*:link,*:hover,*:focus,*:active,*:visited{ outline : none !important;}

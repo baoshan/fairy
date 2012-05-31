@@ -100,12 +100,12 @@ $("select").change () ->
 
 # 点击图标切换 统计 下显示表格的方式
 $('.icon-th').click () ->
-  $('#workers + .tabbable').addClass('xz')
+  $('#s_workers + .tabbable').addClass('xz')
   $(this).addClass('active')
   $('.icon-th-large').removeClass('active')
 
 $('.icon-th-large').click () ->
-  $('#workers + .tabbable').removeClass('xz')
+  $('#s_workers + .tabbable').removeClass('xz')
   $(this).addClass('active')
   $('.icon-th').removeClass('active')
 
