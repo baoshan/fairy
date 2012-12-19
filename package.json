@@ -12,7 +12,7 @@
   "dependencies": {
     "redis": "*",
     "node-uuid": "*",
-    "express": "3.0"
+    "express": "*"
   },
   "devDependencies": {
     "mocha": "*",
