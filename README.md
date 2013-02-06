@@ -1,3 +1,4 @@
+[![build status](https://secure.travis-ci.org/baoshan/fairy.png)](http://travis-ci.org/baoshan/fairy)
 ## Redis Queue Battles Message Groups!
 
 **Fairy** is a lightweight queue engine for node.js based on Redis. **Fairy**
