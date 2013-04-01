@@ -99,7 +99,7 @@
      <tr>
       <td><%= item.id.substring(0,8) %></td>
       <%_.each(item.params, function(value){ %>
-      <td> <%= value %> </td>     
+      <td> <%= JSON.stringify(value, null, "  ") %> </td>     
       <% })%>
       <td> <%= moment.duration((new Date).valueOf()-(new Date(item.queued)).valueOf()).humanize()%></td>
       <td> <%= moment.duration((new Date).valueOf()-(new Date(item.finished)).valueOf()).humanize()%></td>
@@ -126,7 +126,7 @@
    <tr>
     <td><%= item.id.substring(0,8) %></td>
     <%_.each(item.params, function(value){ %>
-    <td> <%= value %> </td>     
+      <td> <%= JSON.stringify(value, null, "  ") %> </td>     
     <% })%>
     <td> <%= moment.duration((new Date).valueOf()-(new Date(item.queued)).valueOf()).humanize()%></td>
     <td> <%= moment.duration((new Date).valueOf()-(new Date(item.failed)).valueOf()).humanize()%></td>
@@ -171,7 +171,7 @@
      <tr>
       <td><%= item.id.substring(0,8) %></td>
       <%_.each( item.params, function(value){ %>
-      <td> <%= value %> </td>     
+      <td> <%= JSON.stringify(value, null, "  ") %> </td>     
       <% })%>
       <td> <%= moment.duration((new Date).valueOf()-(new Date(item.queued)).valueOf()).humanize()%></td>
       <td> <%= moment.duration((new Date).valueOf()-(new Date(item.started)).valueOf()).humanize()%></td>
@@ -197,7 +197,7 @@
      <tr>
       <td><%= item.id.substring(0,8) %></td>
       <%_.each( item.params, function(value){ %>
-      <td> <%= value %> </td>     
+      <td> <%= JSON.stringify(value, null, "  ") %> </td>     
       <% })%>
       <td> <%= moment.duration((new Date).valueOf()-(new Date(item.queued)).valueOf()).humanize()%></td>
       <td> <%= moment.duration((new Date).valueOf()-(new Date(item.started)).valueOf()).humanize()%></td>
