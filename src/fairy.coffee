@@ -87,12 +87,11 @@ registered_workers = []
 
 # Log active workers while waiting for all workers to clean-up.
 log_registered_workers = ->
-  console.log "\nFairy is waiting for #{registered_workers.length} workers to clean-up before exit:"
-  for registered_worker in registered_workers
-    worker_info = registered_worker.split '|'
-    console.log "  * Client Id: [#{worker_info[0]}], Task: [#{worker_info[1]}]"
+  console.log "\nFairy is waiting for #{workers.length} workers to clean-up before exit:"
+  for worker in workers
+    console.log "  * Client Id: [#{worker.fairy.id}], Task: [#{worker.name}]"
 
-cleanup_required = off
+workers = []
 
 # Fairy will enter cleanup mode before exit when:
 #
@@ -100,43 +99,51 @@ cleanup_required = off
 #   + `uncaughtException` captured.
 #
 # If there's no registered workers, exit directly.
-enter_cleanup_mode = ->
-  if registered_workers.length
-    log_registered_workers()
-    cleanup_required = on
-    exiting = on
-  else
-    return process.exit()
+first_time = on
+clean_up = ->
+  log_registered_workers() unless first_time
+  first_time = off
+  return process.exit() unless workers.length
+  # console.log 'abc'
+  exiting = on
+  for worker in workers
+    worker.unregist() if worker.is_idling
 
 # When below signals are captured, gracefully exit the program by notifying all
 # workers entering cleanup mode and exit after all are cleaned up.
 #
-# + `SIGINT` (e.g. `Control-C`)
+# + `SIGINT` (`Control-C`)
 # + `SIGHUP`
 # + `SIGQUIT`
 # + `SIGUSR1`
 # + `SIGUSR2`
 # + `SIGTERM`
 # + `SIGABRT`
-process.on 'SIGINT', enter_cleanup_mode
-process.on 'SIGHUP', enter_cleanup_mode
-process.on 'SIGQUIT', enter_cleanup_mode
-process.on 'SIGUSR1', enter_cleanup_mode
-process.on 'SIGUSR2', enter_cleanup_mode
-process.on 'SIGTERM', enter_cleanup_mode
-process.on 'SIGABRT', enter_cleanup_mode
+capturable_signals = [
+  'SIGINT'
+  'SIGHUP'
+  'SIGQUIT'
+  'SIGUSR1'
+  'SIGUSR2'
+  'SIGTERM'
+  'SIGABRT'
+]
+
+process.on signal, clean_up for signal in capturable_signals
 
 # When `uncaughtException` is captured, **Fairy** can not tell if this is caught
 # by the handling function, as well as which queue cause the exception.
 # **Fairy** will fail all processing tasks and block the according group.
+#
+# TODO: Use `Domain` to manage exception handling.
 process.on 'uncaughtException', (err) ->
   console.log 'Exception:', err.stack
   console.log 'Fairy workers will block their processing groups before exit.' if registered_workers.length
-  enter_cleanup_mode()
+  clean_up()
 
 # Say goodbye on exit.
 process.on 'exit', ->
-  console.log "Fairy cleaned up, exiting..." if cleanup_required
+  # console.log "Fairy cleaned up, exiting..." if cleanup_required
 
 
 # ## Helper Methods
@@ -187,6 +194,7 @@ class Fairy
   # values are according objects of class `Queue`.
   constructor: (@options) ->
     @redis = create_client options
+    @pubsub = create_client options
     @id = fairy_id++
     @queue_pool = {}
 
@@ -278,7 +286,7 @@ class Queue
   # The constructor of class `Queue` stores the Redis connection and the name
   # of the queue as instance properties.
   constructor: (@fairy, @name) ->
-    @redis = fairy.redis
+    {@redis, @pubsub} = fairy
 
 
   # ### Function to Resolve Key Name
@@ -310,7 +318,6 @@ class Queue
   #   + Retry interval in milliseconds
   #   + Storage capacity for newly finished tasks 
   #   + Storage capacity for slowest tasks
-  polling_interval : 5
   retry_limit      : 2
   retry_delay      : 0.1 * 1000
   recent_size      : 10
@@ -335,14 +342,15 @@ class Queue
   #     queue.enqueue 'group_id', 'param2', (err, res) -> # YOUR CODE
   # 
   # A transaction ensures the atomicity.
-  enqueue: (args..., callback) =>
+  enqueue: (group, args..., callback) =>
     if typeof callback isnt 'function'
       args.push callback
       callback = undefined
     @redis.multi()
-      .rpush(@key('SOURCE'), JSON.stringify([uuid.v4(), args..., Date.now()]))
-      .sadd(@key('GROUPS'), args[0])
+      .rpush(@key('SOURCE'), JSON.stringify([uuid.v4(), group, args..., Date.now()]))
+      .sadd(@key('GROUPS'), group)
       .hincrby(@key('STATISTICS'), 'TOTAL', 1)
+      .publish(@key('ENQUEUED'), null)
       .exec(callback)
 
   # ### Register Handler
@@ -360,206 +368,8 @@ class Queue
   #       console.log param1, param2
   #       callback()
   regist: (@handler) =>
-    registered_workers.push "#{@fairy.id}|#{@name}"
-    worker_id = uuid.v4()
-    @redis.hset @key('WORKERS'), worker_id, "#{os.hostname()}|#{server_ip()}|#{process.pid}|#{Date.now()}"
+    workers.push new Worker @, @handler
 
-    process.on 'uncaughtException', (err) =>
-      if @_handler_callback
-        console.log "Worker [#{worker_id.split('-')[0]}] registered for Task [#{@name}] will block its current processing group" 
-        @_handler_callback {do: 'block', message: err.stack}
-      else
-        @_try_exit()
-
-    process.on 'exit', => @redis.hdel @key('WORKERS'), worker_id
-    @_poll()
-
-
-  # ### Poll New Task
-
-  # **Private** method. If any task presents in the `SOURCE` list, `lpop` from
-  # `SOURCE` (`rpush`) into `QUEUED`. The `lpop` and `rpush` are protected by
-  # a transaction.
-  #
-  # Since the task being popped and pushed should be known in prior of the
-  # begin of the transaction (aka, the `multi` command), we need to get the
-  # first task of the source list, and, watch the source list to prevent the
-  # same task being taken by two different workers.
-  #
-  # If there's no pending tasks of the same group, then process the task
-  # immediately.
-  #
-  # If there's no tasks in the `SOURCE` list, poll again after an interval of
-  # `polling_interval` milliseconds.
-  _poll: =>
-    return @_try_exit() if exiting
-    @redis.watch @key('SOURCE')
-    @redis.lindex @key('SOURCE'), 0, (err, res) =>
-      if res
-        task = JSON.parse res
-        @redis.multi()
-        .lpop(@key('SOURCE'))
-        .rpush("#{@key('QUEUED')}:#{task[1]}", res)
-        .exec (multi_err, multi_res) =>
-          return @_poll() unless multi_res and multi_res[1] is 1
-          @_process task
-      else
-        @redis.unwatch()
-        setTimeout @_poll, @polling_interval
-
-
-  # ### Exit When All Queues are Cleaned Up
-
-  # **Private** method. Wait if there're queues still working, or exit the
-  # process immediately.
-  _try_exit: =>
-    registered_workers.splice registered_workers.indexOf "#{@fairy.id}|#{@name}", 1
-    process.exit() unless registered_workers.length
-    log_registered_workers()
-
-
-  # ### Process Each Group's First Task
-
-  # **Private** method. The real job is done by the passed in `handler` of
-  # `regist`ered method, when the job is:
-  #
-  #   + **successed**, pop the finished job from the group queue, and:
-  #     - continue process task of the same group if there's pending job(s) in
-  #     the same `QUEUED` list, or
-  #     - poll task from the `SOURCE` queue.
-  #   + **failed**, then inspect the passed in argument, retry or block
-  #   according to the `do` property of the error object.
-  #
-  # Calling the callback function is the responsibility of you. Otherwise
-  # `Fairy` will stop dispatching tasks.
-  _process: (task) =>
-
-    @redis.hset @key('PROCESSING'), task[0], JSON.stringify([task..., start_time = Date.now()])
-
-    # Before Processing the Task:
-    #
-    #   1. Keep start time of processing.
-    #   2. Set `PROCESSING` hash in Redis.
-    #   3. Allow `retry_limit` times of retries.
-    processing = task[0]
-    retry_count = @retry_limit
-    errors = []
-
-    @_handler_callback = handler_callback = (err, res) =>
-
-      @_handler_callback = null
-
-      # Error handling routine:
-      #
-      #   1. Keep the error message.
-      #   2. According to specific error handling request, when:
-      #     + `block`: block the group immediately.
-      #     + `block-after-retry`: retry n times, block the group if still
-      #     fails (blocking).
-      #     + or: retry n times, skip the task if still fails (non-blocking).
-      #     Set `retry_limit` to `0` to skip failed tasks immediately.
-      if err
-        errors.push err.message or null
-        switch err.do
-          when 'block'
-            @redis.multi()
-              .rpush(@key('FAILED'), JSON.stringify([task..., Date.now(), errors]))
-              .hdel(@key('PROCESSING'), processing)
-              .sadd(@key('BLOCKED'), task[1])
-              .exec()
-            return @_poll()
-          when 'block-after-retry'
-            return setTimeout call_handler, @retry_delay if retry_count--
-            @redis.multi()
-              .rpush(@key('FAILED'), JSON.stringify([task..., Date.now(), errors]))
-              .hdel(@key('PROCESSING'), processing)
-              .sadd(@key('BLOCKED'), task[1])
-              .exec()
-            return @_poll()
-          else
-            return setTimeout call_handler, @retry_delay if retry_count--
-            @redis.multi()
-              .rpush(@key('FAILED'), JSON.stringify([task..., Date.now(), errors]))
-              .hdel(@key('PROCESSING'), processing)
-              .exec()
-
-      # Success handling routine:
-      #
-      #   1. Remove last task from processing hash.
-      #   2. Update statistics hash:
-      #     + total number of `finished` tasks;
-      #     + total `pending` time;
-      #   3. Track recent finished tasks in `RECENT` list.
-      #   4. Track tasks take the longest processing time in `SLOWEST` sorted
-      #   set.
-      else
-        finish_time  = Date.now()
-        process_time = finish_time - start_time
-        @redis.multi()
-          .hdel(@key('PROCESSING'), processing)
-          .hincrby(@key('STATISTICS'), 'FINISHED', 1)
-          .hincrby(@key('STATISTICS'), 'TOTAL_PENDING_TIME', start_time - task[task.length - 1])
-          .hincrby(@key('STATISTICS'), 'TOTAL_PROCESS_TIME', process_time)
-          .lpush(@key('RECENT'), JSON.stringify([task..., finish_time]))
-          .ltrim(@key('RECENT'), 0, @recent_size - 1)
-          .zadd(@key('SLOWEST'), process_time, JSON.stringify([task..., start_time]))
-          .zremrangebyrank(@key('SLOWEST'), 0, - @slowest_size - 1)
-          .exec()
-
-      @_continue_group task[1]
-
-    do call_handler = =>
-      @handler task[1...-1]..., (@_handler_callback = handler_callback)
-
-  # ### Continue Process a Group
-
-  # **Private** method. Upon successful execution of a task, or skipping a
-  # failed task:
-  #
-  #   1. `lpop` the current task from `QUEUED` list.
-  #   2. Check if there exists task in the same `QUEUED` list.
-  #   3. Process if `YES`, or poll `SOURCE` if `NO`.
-  #
-  # Above commands are protected by a transaction to prevent multiple workers
-  # processing a same task.
-  _continue_group: (group) =>
-    @redis.watch "#{@key('QUEUED')}:#{group}"
-    @redis.lindex "#{@key('QUEUED')}:#{group}", 1, (err, res) =>
-      if res
-        task = JSON.parse res
-        @redis.unwatch()
-        @redis.lpop "#{@key('QUEUED')}:#{group}"
-        return @_requeue_group group if exiting
-        @_process task
-      else
-        @redis.multi()
-        .lpop("#{@key('QUEUED')}:#{group}")
-        .exec (multi_err, multi_res) =>
-          return @_continue_group group unless multi_res   
-          return @_try_exit() if exiting
-          @_poll()
-  
-
-  # ### Requeue Tasks on Exit
-
-  # **Private** method. Before exiting, requeue all tasks in the processing
-  # `QUEUED` list back into `SOURCE` list to **prevent blocking** the group.
-  #
-  # To ensure the correct order of tasks, `lpush` tasks in the `QUEUED` list
-  # in their reverse order. The `lrange` and `lpush` is protected by a
-  # transaction for atomicity since other workers may still shifting tasks in
-  # the `SOURCE` list into `QUEUED` list.
-  #
-  # When tasks are requeued successfully, `_try_exit` the process.
-  _requeue_group: (group) =>
-    @redis.watch "#{@key('QUEUED')}:#{group}"
-    @redis.lrange "#{@key('QUEUED')}:#{group}", 0, -1, (err, res) =>
-      @redis.multi()
-      .lpush("#{@key('SOURCE')}", res.reverse()...)
-      .del("#{@key('QUEUED')}:#{group}")
-      .exec (multi_err, multi_res) =>
-        return @_requeue_group group unless multi_res
-        return @_try_exit()
 
   # ### Re-Schedule Failed and Blocked Tasks
 
@@ -624,9 +434,10 @@ class Queue
               multi.exec (multi_err, multi_res) =>
                 if multi_err
                   client.quit()
-                  return callback multi_err 
+                  return callback multi_err
                 if multi_res
                   client.quit()
+                  @redis.publish(@key('ENQUEUED'), "")
                   @statistics callback
                 else
                   reschedule callback
@@ -645,6 +456,28 @@ class Queue
                   start_transaction() unless --total_groups
             else start_transaction()
 
+
+  # ### Clear A Queue
+  
+  # Remove **all** tasks of the queue, and reset statistics. Set `TOTAL` to
+  # `PROCESSING` tasks to prevent negative pending tasks being calculated.
+  clear: (callback) =>
+    @redis.watch @key('SOURCE')
+    @redis.watch @key('PROCESSING')
+    @redis.hlen @key('PROCESSING'), (err, processing) =>
+      return callback? err if err
+      @redis.keys "#{@key('QUEUED')}:*", (err, res) =>
+        return callback? err if err
+        @redis.multi()
+          .del(@key('GROUPS'), @key('RECENT'), @key('FAILED'), @key('SOURCE'), @key('STATISTICS'), @key('SLOWEST'), @key('BLOCKED'), res...)
+          .hmset(@key('STATISTICS'), 'TOTAL', processing, 'FINISHED', 0, 'TOTAL_PENDING_TIME', 0, 'TOTAL_PROCESS_TIME', 0)
+          .exec (err, res) =>
+            return callback? err if err
+            return @clear callback unless res
+            @statistics callback if callback
+
+
+  # ##  Read-Only Operations
 
   # ### Get Recently Finished Tasks Asynchronously
 
@@ -879,26 +712,6 @@ class Queue
         return -1 if a.pid < b.pid
 
 
-  # ### Clear A Queue
-  
-  # Remove **all** tasks of the queue, and reset statistics. Set `TOTAL` to
-  # `PROCESSING` tasks to prevent negative pending tasks being calculated.
-  clear: (callback) =>
-    @redis.watch @key('SOURCE')
-    @redis.watch @key('PROCESSING')
-    @redis.hlen @key('PROCESSING'), (err, processing) =>
-      return callback? err if err
-      @redis.keys "#{@key('QUEUED')}:*", (err, res) =>
-        return callback? err if err
-        @redis.multi()
-          .del(@key('GROUPS'), @key('RECENT'), @key('FAILED'), @key('SOURCE'), @key('STATISTICS'), @key('SLOWEST'), @key('BLOCKED'), res...)
-          .hmset(@key('STATISTICS'), 'TOTAL', processing, 'FINISHED', 0, 'TOTAL_PENDING_TIME', 0, 'TOTAL_PROCESS_TIME', 0)
-          .exec (err, res) =>
-            return callback? err if err
-            return @clear callback unless res
-            @statistics callback if callback
-
-
   # ### Get Statistics of a Queue Asynchronously
   
   # Statistics of a queue include:
@@ -1010,5 +823,227 @@ class Queue
           result.pending_tasks = result.total.tasks - result.finished_tasks - result.processing_tasks - result.failed_tasks - result.blocked.tasks
           callback null, result
 
+
+# ### Worker Definition
+
+class Worker
+
+  constructor: (@queue, @handler) ->
+    {@name, @fairy, @redis, @pubsub} = queue
+    @worker_id = worker_id = uuid.v4()
+    @redis.hset @key('WORKERS'), worker_id, "#{os.hostname()}|#{server_ip()}|#{process.pid}|#{Date.now()}"
+
+    process.on 'uncaughtException', (err) =>
+      if @_handler_callback
+        console.log "Worker [#{worker_id.split('-')[0]}] registered for Task [#{@name}] will block its current processing group"
+        @_handler_callback {do: 'block', message: err.stack}
+      else
+        @unregist()
+
+    @pubsub.subscribe @key('ENQUEUED')
+    @pubsub.on 'message', (channel, message) =>
+      return unless channel is @key('ENQUEUED')
+      @_new_task = on
+      @awake() if @is_idling
+      # console.log 'awake'
+    @awake()
+    
+  key: (key) -> "#{prefix}:#{key}:#{@name}"
+
+  # ### Exit When All Queues are Cleaned Up
+
+  # **Private** method. Wait if there're queues still working, or exit the
+  # process immediately.
+  unregist: =>
+    @redis.hdel @key('WORKERS'), @worker_id, ->
+      workers.splice workers.indexOf(@), 1
+      process.exit() unless workers.length
+      log_registered_workers()
+
+
+  # ### Poll New Task
+
+  # **Private** method. If any task presents in the `SOURCE` list, `lpop` from
+  # `SOURCE` (`rpush`) into `QUEUED`. The `lpop` and `rpush` are protected by
+  # a transaction.
+  #
+  # Since the task being popped and pushed should be known in prior of the
+  # begin of the transaction (aka, the `multi` command), we need to get the
+  # first task of the source list, and, watch the source list to prevent the
+  # same task being taken by two different workers.
+  #
+  # If there's no pending tasks of the same group, then process the task
+  # immediately.
+  #
+  # If there's no tasks in the `SOURCE` list, poll again after an interval of
+  # `polling_interval` milliseconds.
+  awake: =>
+    # console.log 'awake'
+    @is_idling = @_new_task = off
+    return @unregist() if exiting
+    # console.log @key('SOURCE')
+    @redis.watch @key('SOURCE')
+    @redis.lindex @key('SOURCE'), 0, (err, res) =>
+      if res
+        task = JSON.parse res
+        # console.log task
+        @redis.multi()
+        .lpop(@key('SOURCE'))
+        .rpush("#{@key('QUEUED')}:#{task[1]}", res)
+        .exec (multi_err, multi_res) =>
+          return @awake() unless multi_res and multi_res[1] is 1
+          @_process task
+      else
+        # console.log 'else'
+        @redis.unwatch()
+        return @awake() if @_new_task
+        @redis.llen @key('SOURCE'), (err, a, b) =>
+          return @awake() if b
+          @is_idling = on
+
+  # ### Process Each Group's First Task
+
+  # **Private** method. The real job is done by the passed in `handler` of
+  # `regist`ered method, when the job is:
+  #
+  #   + **successed**, pop the finished job from the group queue, and:
+  #     - continue process task of the same group if there's pending job(s) in
+  #     the same `QUEUED` list, or
+  #     - poll task from the `SOURCE` queue.
+  #   + **failed**, then inspect the passed in argument, retry or block
+  #   according to the `do` property of the error object.
+  #
+  # Calling the callback function is the responsibility of you. Otherwise
+  # `Fairy` will stop dispatching tasks.
+  _process: (task) =>
+    # console.log 'process'
+    @redis.hset @key('PROCESSING'), task[0], JSON.stringify([task..., start_time = Date.now()])
+
+    # Before Processing the Task:
+    #
+    #   1. Keep start time of processing.
+    #   2. Set `PROCESSING` hash in Redis.
+    #   3. Allow `retry_limit` times of retries.
+    processing = task[0]
+    retry_count = @retry_limit
+    errors = []
+
+    @_handler_callback = handler_callback = (err, res) =>
+
+      @_handler_callback = null
+
+      # Error handling routine:
+      #
+      #   1. Keep the error message.
+      #   2. According to specific error handling request, when:
+      #     + `block`: block the group immediately.
+      #     + `block-after-retry`: retry n times, block the group if still
+      #     fails (blocking).
+      #     + or: retry n times, skip the task if still fails (non-blocking).
+      #     Set `retry_limit` to `0` to skip failed tasks immediately.
+      if err
+        errors.push err.message or null
+        switch err.do
+          when 'block'
+            @redis.multi()
+              .rpush(@key('FAILED'), JSON.stringify([task..., Date.now(), errors]))
+              .hdel(@key('PROCESSING'), processing)
+              .sadd(@key('BLOCKED'), task[1])
+              .exec()
+            return @awake()
+          when 'block-after-retry'
+            return setTimeout call_handler, @retry_delay if retry_count--
+            @redis.multi()
+              .rpush(@key('FAILED'), JSON.stringify([task..., Date.now(), errors]))
+              .hdel(@key('PROCESSING'), processing)
+              .sadd(@key('BLOCKED'), task[1])
+              .exec()
+            return @awake()
+          else
+            return setTimeout call_handler, @retry_delay if retry_count--
+            @redis.multi()
+              .rpush(@key('FAILED'), JSON.stringify([task..., Date.now(), errors]))
+              .hdel(@key('PROCESSING'), processing)
+              .exec()
+
+      # Success handling routine:
+      #
+      #   1. Remove last task from processing hash.
+      #   2. Update statistics hash:
+      #     + total number of `finished` tasks;
+      #     + total `pending` time;
+      #   3. Track recent finished tasks in `RECENT` list.
+      #   4. Track tasks take the longest processing time in `SLOWEST` sorted
+      #   set.
+      else
+        finish_time  = Date.now()
+        process_time = finish_time - start_time
+        @redis.multi()
+          .hdel(@key('PROCESSING'), processing)
+          .hincrby(@key('STATISTICS'), 'FINISHED', 1)
+          .hincrby(@key('STATISTICS'), 'TOTAL_PENDING_TIME', start_time - task[task.length - 1])
+          .hincrby(@key('STATISTICS'), 'TOTAL_PROCESS_TIME', process_time)
+          .lpush(@key('RECENT'), JSON.stringify([task..., finish_time]))
+          .ltrim(@key('RECENT'), 0, @recent_size - 1)
+          .zadd(@key('SLOWEST'), process_time, JSON.stringify([task..., start_time]))
+          .zremrangebyrank(@key('SLOWEST'), 0, - @slowest_size - 1)
+          .exec()
+
+      @_continue_group task[1]
+
+    do call_handler = =>
+      @handler task[1...-1]..., (@_handler_callback = handler_callback)
+
+  # ### Continue Process a Group
+
+  # **Private** method. Upon successful execution of a task, or skipping a
+  # failed task:
+  #
+  #   1. `lpop` the current task from `QUEUED` list.
+  #   2. Check if there exists task in the same `QUEUED` list.
+  #   3. Process if `YES`, or poll `SOURCE` if `NO`.
+  #
+  # Above commands are protected by a transaction to prevent multiple workers
+  # processing a same task.
+  _continue_group: (group) =>
+    @redis.watch "#{@key('QUEUED')}:#{group}"
+    @redis.lindex "#{@key('QUEUED')}:#{group}", 1, (err, res) =>
+      if res
+        task = JSON.parse res
+        @redis.unwatch()
+        @redis.lpop "#{@key('QUEUED')}:#{group}"
+        return @requeue group if exiting
+        @_process task
+      else
+        @redis.multi()
+        .lpop("#{@key('QUEUED')}:#{group}")
+        .exec (multi_err, multi_res) =>
+          return @_continue_group group unless multi_res
+          return @unregist() if exiting
+          @is_idling = on
+          @awake()
+  
+
+  # ### Requeue Tasks on Exit
+
+  # **Private** method. Before exiting, requeue all tasks in the processing
+  # `QUEUED` list back into `SOURCE` list to **prevent blocking** the group.
+  #
+  # To ensure the correct order of tasks, `lpush` tasks in the `QUEUED` list
+  # in their reverse order. The `lrange` and `lpush` is protected by a
+  # transaction for atomicity since other workers may still shifting tasks in
+  # the `SOURCE` list into `QUEUED` list.
+  #
+  # When tasks are requeued successfully, the worker `unregist` itself.
+  requeue: (group) =>
+    # @redis.publish "requeue", null
+    @redis.watch "#{@key('QUEUED')}:#{group}"
+    @redis.lrange "#{@key('QUEUED')}:#{group}", 0, -1, (err, res) =>
+      @redis.multi()
+      .lpush("#{@key('SOURCE')}", res.reverse()...)
+      .del("#{@key('QUEUED')}:#{group}")
+      .exec (multi_err, multi_res) =>
+        return @requeue group unless multi_res
+        @unregist()
 
 # ### Known Bugs:
