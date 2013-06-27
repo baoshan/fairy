@@ -725,7 +725,7 @@ class Queue
   #   + `finished_tasks`, total tasks finished.
   #   + `average_pending_time`, average time spent on waiting for processing the
   #   finished tasks in milliseconds.
-  #   + `average_process_time`, average time spent on processing the finished
+  #   + `averageprocess_time`, average time spent on processing the finished
   #   tasks in milliseconds.
   #   + `failed_tasks`, total tasks failed.
   #   + `blocked`
@@ -744,13 +744,13 @@ class Queue
   #         total: { groups: 10, tasks: 20000 },
   #         finished_tasks: 8373,
   #         average_pending_time: 313481,
-  #         average_process_time: 14,
+  #         averageprocess_time: 14,
   #         failed_tasks: 15,
   #         blocked: { groups: 9, tasks: 11612 },
   #         pending_tasks: 0 }
   #
   # If there're no finished tasks, `average_pending_time` and
-  # `average_process_time` will both be string `-`.
+  # `averageprocess_time` will both be string `-`.
   #
   # **Usage:**
   #
@@ -764,7 +764,7 @@ class Queue
     #     + `total`
     #     + `finished`
     #     + `total_pending_time`
-    #     + `total_process_time`
+    #     + `totalprocess_time`
     #   3. Count processing tasks -- `LLEN` of `PROCESSING` list.
     #   4. Count failed task -- `LLEN` of `FAILED` list.
     #   5. Get identifiers of blocked group -- `SMEMBERS` of `BLOCKED` set.
@@ -784,7 +784,7 @@ class Queue
         # 1. Assign transaction results to result object, and:
         # 2. Convert:
         #   - `total_pending_time` into `average_pending_time`, and:
-        #   - `total_process_time` into `average_process_time`
+        #   - `totalprocess_time` into `averageprocess_time`
         # 3. Calibrate initial condition (in case of no task is finished).
         statistics = multi_res[1] or {}
         result =
@@ -794,7 +794,7 @@ class Queue
             tasks: parseInt(statistics.TOTAL) or 0
           finished_tasks: parseInt(statistics.FINISHED) or 0
           average_pending_time: Math.round(statistics.TOTAL_PENDING_TIME * 100 / statistics.FINISHED) / 100
-          average_process_time: Math.round(statistics.TOTAL_PROCESS_TIME * 100 / statistics.FINISHED) / 100
+          averageprocess_time: Math.round(statistics.TOTAL_PROCESS_TIME * 100 / statistics.FINISHED) / 100
           blocked:
             groups: multi_res[4].length
           processing_tasks: multi_res[2]
@@ -802,7 +802,7 @@ class Queue
           workers: multi_res[5]
         if result.finished_tasks is 0
           result.average_pending_time = '-'
-          result.average_process_time = '-'
+          result.averageprocess_time = '-'
 
         # Calculate blocked and pending tasks:
         # 
@@ -850,16 +850,6 @@ class Worker
     
   key: (key) -> "#{prefix}:#{key}:#{@name}"
 
-  # ### Exit When All Queues are Cleaned Up
-
-  # **Private** method. Wait if there're queues still working, or exit the
-  # process immediately.
-  unregist: =>
-    @redis.hdel @key('WORKERS'), @worker_id, ->
-      workers.splice workers.indexOf(@), 1
-      process.exit() unless workers.length
-      log_registered_workers()
-
 
   # ### Poll New Task
 
@@ -892,7 +882,7 @@ class Worker
         .rpush("#{@key('QUEUED')}:#{task[1]}", res)
         .exec (multi_err, multi_res) =>
           return @awake() unless multi_res and multi_res[1] is 1
-          @_process task
+          @process task
       else
         # console.log 'else'
         @redis.unwatch()
@@ -915,7 +905,7 @@ class Worker
   #
   # Calling the callback function is the responsibility of you. Otherwise
   # `Fairy` will stop dispatching tasks.
-  _process: (task) =>
+  process: (task) =>
     # console.log 'process'
     @redis.hset @key('PROCESSING'), task[0], JSON.stringify([task..., start_time = Date.now()])
 
@@ -989,7 +979,7 @@ class Worker
           .zremrangebyrank(@key('SLOWEST'), 0, - @slowest_size - 1)
           .exec()
 
-      @_continue_group task[1]
+      @continue_group task[1]
 
     do call_handler = =>
       @handler task[1...-1]..., (@_handler_callback = handler_callback)
@@ -1005,7 +995,7 @@ class Worker
   #
   # Above commands are protected by a transaction to prevent multiple workers
   # processing a same task.
-  _continue_group: (group) =>
+  continue_group: (group) =>
     @redis.watch "#{@key('QUEUED')}:#{group}"
     @redis.lindex "#{@key('QUEUED')}:#{group}", 1, (err, res) =>
       if res
@@ -1013,16 +1003,16 @@ class Worker
         @redis.unwatch()
         @redis.lpop "#{@key('QUEUED')}:#{group}"
         return @requeue group if exiting
-        @_process task
+        @process task
       else
         @redis.multi()
         .lpop("#{@key('QUEUED')}:#{group}")
         .exec (multi_err, multi_res) =>
-          return @_continue_group group unless multi_res
+          return @continue_group group unless multi_res
           return @unregist() if exiting
           @is_idling = on
           @awake()
-  
+
 
   # ### Requeue Tasks on Exit
 
@@ -1036,7 +1026,6 @@ class Worker
   #
   # When tasks are requeued successfully, the worker `unregist` itself.
   requeue: (group) =>
-    # @redis.publish "requeue", null
     @redis.watch "#{@key('QUEUED')}:#{group}"
     @redis.lrange "#{@key('QUEUED')}:#{group}", 0, -1, (err, res) =>
       @redis.multi()
@@ -1045,5 +1034,17 @@ class Worker
       .exec (multi_err, multi_res) =>
         return @requeue group unless multi_res
         @unregist()
+
+
+  # ### Exit When All Queues are Cleaned Up
+
+  # **Private** method. Wait if there're queues still working, or exit the
+  # process immediately.
+  unregist: =>
+    @redis.hdel @key('WORKERS'), @worker_id, ->
+      workers.splice workers.indexOf(@), 1
+      process.exit() unless workers.length
+      log_registered_workers()
+
 
 # ### Known Bugs:
