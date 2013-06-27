@@ -367,8 +367,8 @@ class Queue
   #     queue.regist (param1, param2, callback) ->
   #       console.log param1, param2
   #       callback()
-  regist: (@handler) =>
-    workers.push new Worker @, @handler
+  regist: (handler) =>
+    workers.push new Worker @, handler
 
 
   # ### Re-Schedule Failed and Blocked Tasks
@@ -886,10 +886,11 @@ class Worker
       else
         # console.log 'else'
         @redis.unwatch()
-        return @awake() if @_new_task
-        @redis.llen @key('SOURCE'), (err, a, b) =>
-          return @awake() if b
-          @is_idling = on
+        @is_idling = on
+        # return @awake() if @_new_task
+        # @redis.llen @key('SOURCE'), (err, a, b) =>
+        # return @awake() if b
+        # @is_idling = on
 
   # ### Process Each Group's First Task
 
