@@ -39,6 +39,16 @@ exports = module.exports =
       sequence = group_sequence[group]++
       queue.enqueue group, sequence, generate
 
+  enqueue_tasks_wo_check: (queue, total_groups, total_tasks, done) ->
+    generated = 0
+    group_sequence = [0 .. total_groups - 1].map -> 0
+    do generate = ->
+      if generated++ is total_tasks
+        return done()
+      group = parseInt Math.random() * total_groups
+      sequence = group_sequence[group]++
+      queue.enqueue group, sequence, generate
+
   kill_one: (queue, done) ->
     queue.workers (err, workers) ->
       return done() unless workers.length
