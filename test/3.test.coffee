@@ -13,7 +13,7 @@ child_processes = []
 
 exiting = off
 killed = 0
-describe "Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_workers} Fail-n-Block Workers, Kill and Respawn Periodically", ->
+describe "Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_workers} Fail-n-Block Workers, Kill and Respawn Periodically, Start Workers First", ->
 
   it "Should Clear the Queue First", (done) ->
     clear_queue queue, done
