@@ -43,9 +43,10 @@
 # [express]:       https://github.com/visionmedia/express
 # [http api]:      fairy_web.html
 # [web front-end]: fairy_web.html
-uuid  = require 'node-uuid'
-redis = require 'redis'
-os    = require 'os'
+uuid   = require 'node-uuid'
+redis  = require 'redis'
+os     = require 'os'
+domain = require 'domain'
 
 # A constant prefix will be applied to all Redis keys for safety and
 # ease-of-management reasons.
@@ -104,7 +105,6 @@ clean_up = ->
   log_registered_workers() unless first_time
   first_time = off
   return process.exit() unless workers.length
-  # console.log 'abc'
   exiting = on
   for worker in workers
     worker.unregist() if worker.is_idling
@@ -628,7 +628,6 @@ class Queue
         queued: new Date entry.pop()
 
 
-
   # ### Get Source Tasks Asynchronously
 
   # Get tasks in the `SOURCE` list. **NOTE:** Tasks in the `SOURCE` list does
@@ -844,9 +843,9 @@ class Worker
     @pubsub.on 'message', (channel, message) =>
       return unless channel is @key('ENQUEUED')
       @_new_task = on
-      @awake() if @is_idling
-      # console.log 'awake'
-    @awake()
+      @start() if @is_idling
+      # console.log 'start'
+    @start()
     
   key: (key) -> "#{prefix}:#{key}:#{@name}"
 
@@ -867,8 +866,8 @@ class Worker
   #
   # If there's no tasks in the `SOURCE` list, poll again after an interval of
   # `polling_interval` milliseconds.
-  awake: =>
-    # console.log 'awake'
+  start: =>
+    # console.log 'start'
     @is_idling = @_new_task = off
     return @unregist() if exiting
     # console.log @key('SOURCE')
@@ -881,15 +880,15 @@ class Worker
         .lpop(@key('SOURCE'))
         .rpush("#{@key('QUEUED')}:#{task[1]}", res)
         .exec (multi_err, multi_res) =>
-          return @awake() unless multi_res and multi_res[1] is 1
+          return @start() unless multi_res and multi_res[1] is 1
           @process task
       else
         # console.log 'else'
         @redis.unwatch()
         @is_idling = on
-        # return @awake() if @_new_task
+        # return @start() if @_new_task
         # @redis.llen @key('SOURCE'), (err, a, b) =>
-        # return @awake() if b
+        # return @start() if b
         # @is_idling = on
 
   # ### Process Each Group's First Task
@@ -937,25 +936,25 @@ class Worker
         switch err.do
           when 'block'
             @redis.multi()
-              .rpush(@key('FAILED'), JSON.stringify([task..., Date.now(), errors]))
-              .hdel(@key('PROCESSING'), processing)
-              .sadd(@key('BLOCKED'), task[1])
-              .exec()
-            return @awake()
+            .rpush(@key('FAILED'), JSON.stringify([task..., Date.now(), errors]))
+            .hdel(@key('PROCESSING'), processing)
+            .sadd(@key('BLOCKED'), task[1])
+            .exec()
+            return @start()
           when 'block-after-retry'
             return setTimeout call_handler, @retry_delay if retry_count--
             @redis.multi()
-              .rpush(@key('FAILED'), JSON.stringify([task..., Date.now(), errors]))
-              .hdel(@key('PROCESSING'), processing)
-              .sadd(@key('BLOCKED'), task[1])
-              .exec()
-            return @awake()
+            .rpush(@key('FAILED'), JSON.stringify([task..., Date.now(), errors]))
+            .hdel(@key('PROCESSING'), processing)
+            .sadd(@key('BLOCKED'), task[1])
+            .exec()
+            return @start()
           else
             return setTimeout call_handler, @retry_delay if retry_count--
             @redis.multi()
-              .rpush(@key('FAILED'), JSON.stringify([task..., Date.now(), errors]))
-              .hdel(@key('PROCESSING'), processing)
-              .exec()
+            .rpush(@key('FAILED'), JSON.stringify([task..., Date.now(), errors]))
+            .hdel(@key('PROCESSING'), processing)
+            .exec()
 
       # Success handling routine:
       #
@@ -970,20 +969,31 @@ class Worker
         finish_time  = Date.now()
         process_time = finish_time - start_time
         @redis.multi()
-          .hdel(@key('PROCESSING'), processing)
-          .hincrby(@key('STATISTICS'), 'FINISHED', 1)
-          .hincrby(@key('STATISTICS'), 'TOTAL_PENDING_TIME', start_time - task[task.length - 1])
-          .hincrby(@key('STATISTICS'), 'TOTAL_PROCESS_TIME', process_time)
-          .lpush(@key('RECENT'), JSON.stringify([task..., finish_time]))
-          .ltrim(@key('RECENT'), 0, @recent_size - 1)
-          .zadd(@key('SLOWEST'), process_time, JSON.stringify([task..., start_time]))
-          .zremrangebyrank(@key('SLOWEST'), 0, - @slowest_size - 1)
-          .exec()
+        .hdel(@key('PROCESSING'), processing)
+        .hincrby(@key('STATISTICS'), 'FINISHED', 1)
+        .hincrby(@key('STATISTICS'), 'TOTAL_PENDING_TIME', start_time - task[task.length - 1])
+        .hincrby(@key('STATISTICS'), 'TOTAL_PROCESS_TIME', process_time)
+        .lpush(@key('RECENT'), JSON.stringify([task..., finish_time]))
+        .ltrim(@key('RECENT'), 0, @recent_size - 1)
+        .zadd(@key('SLOWEST'), process_time, JSON.stringify([task..., start_time]))
+        .zremrangebyrank(@key('SLOWEST'), 0, - @slowest_size - 1)
+        .exec()
 
       @continue_group task[1]
+    
+    d = domain.create()
 
-    do call_handler = =>
+    d.on 'error', (error) =>
+      @redis.multi()
+      .rpush(@key('FAILED'), JSON.stringify([task..., Date.now(), errors]))
+      .hdel(@key('PROCESSING'), processing)
+      .exec (err, res) =>
+        exiting = on
+        @unregist()
+
+    d.run call_handler = =>
       @handler task[1...-1]..., (@_handler_callback = handler_callback)
+
 
   # ### Continue Process a Group
 
@@ -999,8 +1009,7 @@ class Worker
   continue_group: (group) =>
     @redis.watch "#{@key('QUEUED')}:#{group}"
     @redis.lindex "#{@key('QUEUED')}:#{group}", 1, (err, res) =>
-      if res
-        task = JSON.parse res
+      if task = JSON.parse res
         @redis.unwatch()
         @redis.lpop "#{@key('QUEUED')}:#{group}"
         return @requeue group if exiting
@@ -1011,8 +1020,7 @@ class Worker
         .exec (multi_err, multi_res) =>
           return @continue_group group unless multi_res
           return @unregist() if exiting
-          @is_idling = on
-          @awake()
+          @start()
 
 
   # ### Requeue Tasks on Exit
@@ -1042,10 +1050,6 @@ class Worker
   # **Private** method. Wait if there're queues still working, or exit the
   # process immediately.
   unregist: =>
-    @redis.hdel @key('WORKERS'), @worker_id, ->
+    @redis.hdel @key('WORKERS'), @worker_id, (err, res) =>
       workers.splice workers.indexOf(@), 1
       process.exit() unless workers.length
-      log_registered_workers()
-
-
-# ### Known Bugs:
