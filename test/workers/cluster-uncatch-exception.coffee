@@ -1,12 +1,17 @@
 cluster = require "cluster"
-closing = off
+fairy = require "#{__dirname}/../.."
+
 if cluster.isMaster
-  for i in [0...8]
-    cluster.fork()
-    # cluster.on 'exit', (worker) ->
+
+  exiting = off
+  cluster.fork() for i in [0...8]
+
   cluster.on 'exit', (worker) ->
-    console.log 'worker ' + worker.process.pid + ' died. restart...'
-    cluster.fork() unless closing
+    console.log 'worker ' + worker.process.pid + ' died. restart...', worker.suicide
+    cluster.fork() unless worker.suicide
+
+  return
+
   soft_kill_signals = [
     'SIGINT'
     'SIGHUP'
@@ -16,23 +21,20 @@ if cluster.isMaster
     'SIGTERM'
     'SIGABRT'
   ]
-  for signal in soft_kill_signals
-    do (signal) ->
-      process.on signal, ->
-        console.log signal, ' in MASTER'
-        closing = on
-        # worker.send 'SIGINT' for id, worker of cluster.workers
-        worker.process.kill(signal) for id, worker of cluster.workers
-        # process.exit()
+
+  for soft_kill_signal in soft_kill_signals
+    do (soft_kill_signal) ->
+      process.on soft_kill_signal, ->
+        exiting = on
+        worker.process.kill(soft_kill_signal) for id, worker of cluster.workers
+
 else
-  console.log 'slave process'
-  # process.on 'SIGTERM', -> console.log 'SIGTERM'
+
   {exec} = require 'child_process'
   task      = process.argv[2]
-  fairy     = require("#{__dirname}/../..").connect()
+  fairy     = fairy.connect()
   queue     = fairy.queue task
-  #setTimeout (->), 100000
-  #return
+
   queue.regist (group, sequence, callback) ->
     setTimeout ->
       if Math.random() < 0.1

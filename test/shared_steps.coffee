@@ -56,8 +56,8 @@ exports = module.exports =
   kill_one: (queue, done) ->
     queue.workers (err, workers) ->
       return done() unless workers.length
-      try
-        process.kill workers.random().pid, soft_kill_signals.random()
+      # try
+      process.kill workers.random().pid, soft_kill_signals.random()
       done()
 
   wait_until_done: (queue, total_tasks, done) ->

@@ -43,8 +43,8 @@
 # [express]:       https://github.com/visionmedia/express
 # [http api]:      fairy_web.html
 # [web front-end]: fairy_web.html
-uuid   = require 'node-uuid'
 redis  = require 'redis'
+uuid   = require 'node-uuid'
 os     = require 'os'
 domain = require 'domain'
 
@@ -72,6 +72,7 @@ prefix = 'FAIRY'
 # [node_redis documents]: https://github.com/mranney/node_redis
 exports.connect = (options = {}) ->
   new Fairy options
+
 
 # ### Exception / Interruption Handling
 
@@ -105,7 +106,7 @@ clean_up = ->
   console.log 'clean up'
   log_registered_workers() unless first_time
   first_time = off
-  return process.exit() unless workers.length
+  return setTimeout((->process.exit()), 100) unless workers.length
   exiting = on
   for worker in workers
     worker.unregist() if worker.is_idling
@@ -130,22 +131,31 @@ capturable_signals = [
   'SIGABRT'
 ]
 
-process.on 'SIGTERM', -> console.log 'SIGTERM'
-process.on signal, clean_up for signal in capturable_signals
+# process.on 'SIGTERM', -> console.log 'SIGTERM'
 
 # When `uncaughtException` is captured, **Fairy** can not tell if this is caught
 # by the handling function, as well as which queue cause the exception.
 # **Fairy** will fail all processing tasks and block the according group.
-#
-# TODO: Use `Domain` to manage exception handling.
 process.on 'uncaughtException', (err) ->
   console.log 'Exception:', err.stack
   console.log 'Fairy workers will block their processing groups before exit.' if registered_workers.length
   clean_up()
 
-  # process.on 'exit', (code, signal) -> console.log code, signal
 
-  # process.on 'message', (message) -> clean_up() if message is 'EXIT'
+  # exports.setupMaster = ->
+cluster = require 'cluster'
+if cluster.isMaster
+  for soft_kill_signal in capturable_signals
+    do (soft_kill_signal) ->
+      process.on soft_kill_signal, ->
+        console.log "FAIRY CORE...", soft_kill_signal
+        for id, worker of cluster.workers
+          worker.process.kill(soft_kill_signal)
+          worker.suicide = on
+        setImmediate clean_up
+else if cluster.isWorker
+  process.on signal, clean_up for signal in capturable_signals
+
 
 # ## Helper Methods
 
@@ -357,7 +367,7 @@ class Queue
   # ### Register Handler
 
   # When registered a processing handler function, the queue becomes a worker
-  # automatically: **Fairy** will immediately start polling tasks and process
+  # automatically: **Fairy** will immediately start monitoring tasks and process
   # them on present.
   #
   # When becomes a worker, **Fairy** will regist an uuid (v4) key in the
@@ -864,16 +874,13 @@ class Worker
   # If there's no pending tasks of the same group, then process the task
   # immediately.
   #
-  # If there's no tasks in the `SOURCE` list, poll again after an interval of
-  # `polling_interval` milliseconds.
+  # If there's no tasks in the `SOURCE` list, take worker into `idle` state.
   start: =>
     @is_idling = @_new_task = off
     return @unregist() if exiting
     @redis.watch @key('SOURCE')
     @redis.lindex @key('SOURCE'), 0, (err, res) =>
-      if res
-        task = JSON.parse res
-        # console.log task
+      if task = JSON.parse res
         @redis.multi()
         .lpop(@key('SOURCE'))
         .rpush("#{@key('QUEUED')}:#{task[1]}", res)
@@ -881,7 +888,6 @@ class Worker
           return @start() unless multi_res and multi_res[1] is 1
           @process task
       else
-        # console.log 'else'
         @redis.unwatch()
         @is_idling = on
         # return @start() if @_new_task
@@ -897,7 +903,7 @@ class Worker
   #   + **successed**, pop the finished job from the group queue, and:
   #     - continue process task of the same group if there's pending job(s) in
   #     the same `QUEUED` list, or
-  #     - poll task from the `SOURCE` queue.
+  #     - pull task from the `SOURCE` queue.
   #   + **failed**, then inspect the passed in argument, retry or block
   #   according to the `do` property of the error object.
   #
@@ -1001,7 +1007,7 @@ class Worker
   #
   #   1. `lpop` the current task from `QUEUED` list.
   #   2. Check if there exists task in the same `QUEUED` list.
-  #   3. Process if `YES`, or poll `SOURCE` if `NO`.
+  #   3. Process if `YES`, or pull `SOURCE` if `NO`.
   #
   # Above commands are protected by a transaction to prevent multiple workers
   # processing a same task.
@@ -1018,7 +1024,6 @@ class Worker
         .lpop("#{@key('QUEUED')}:#{group}")
         .exec (multi_err, multi_res) =>
           return @continue_group group unless multi_res
-          # return @unregist() if exiting
           @start()
 
 
