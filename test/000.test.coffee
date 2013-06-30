@@ -1,13 +1,13 @@
 {exec} = require 'child_process'
 should = require 'should'
 fairy  = require("..").connect()
-{clear_queue, enqueue_tasks, kill_one, wait_until_done, clean_up, check_result} = require './shared_steps'
+{clear_queue, enqueue_tasks, kill_one, wait_until_done, clean_up_without_kill, check_result} = require './shared_steps'
 
 task_name = 'TEST5'
 queue     = fairy.queue task_name
 
-total_groups = 10
-total_tasks  = 2000
+total_groups = 5
+total_tasks  = 200
 total_workers = require('os').cpus().length
 child_processes = []
 
@@ -25,7 +25,7 @@ describe "in cluster, Process #{total_tasks} Tasks of #{total_groups} Groups by 
 
     while total_workers-- > 0
       do create_worker = ->
-        exec("coffee #{__dirname}/workers/cluster-uncatch-exception.coffee #{task_name}").on 'exit', ->
+        child_processes.push exec("coffee #{__dirname}/workers/cluster-uncatch-exception.coffee #{task_name}").on 'exit', ->
           return if exiting
           killed++
           create_worker()
@@ -43,7 +43,10 @@ describe "in cluster, Process #{total_tasks} Tasks of #{total_groups} Groups by 
       done()
 
   it "Should Cleanup Elegantly on Interruption", (done) ->
-    clean_up queue, done
+    child_process.kill() for child_process in child_processes
+    setTimeout ->
+      clean_up_without_kill queue, done
+    , 100
 
   it "Should Dump Incremental Numbers", (done) ->
     check_result total_groups, done

@@ -6,8 +6,8 @@ fairy     = require("..").connect()
 task_name = 'TEST1'
 queue     = fairy.queue task_name
 
-total_groups  = 10
-total_tasks   = 2000
+total_groups  = 5
+total_tasks   = 200
 total_workers = require('os').cpus().length
 
 describe ["Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_workers} Fail-n-Block Workers"], ->

@@ -6,8 +6,8 @@ fairy  = require("..").connect()
 task_name = 'TEST4'
 queue     = fairy.queue task_name
 
-total_groups = 10
-total_tasks  = 2000
+total_groups = 5
+total_tasks  = 200
 total_workers = require('os').cpus().length
 child_processes = []
 
@@ -34,9 +34,9 @@ describe "Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_work
       queue.reschedule (err, statistics) ->
         setTimeout reschedule, 100
 
-    do kill_one_periodically = ->
-      kill_one queue, ->
-        setTimeout kill_one_periodically, 100
+        # do kill_one_periodically = ->
+        # kill_one queue, ->
+        # setTimeout kill_one_periodically, 100
 
     wait_until_done queue, total_tasks, ->
       exiting = on

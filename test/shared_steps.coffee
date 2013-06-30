@@ -76,6 +76,15 @@ exports = module.exports =
           statistics.pending_tasks.should.equal 0
           done()
 
+  clean_up_without_kill: (queue, done) ->
+    success_counter = 0
+    do get_statistics = ->
+      queue.statistics (err, statistics) ->
+        return setTimeout get_statistics, 100 unless statistics.workers is 0
+        return setTimeout get_statistics, 100 unless success_counter++ is 3
+        statistics.pending_tasks.should.equal 0
+        done()
+
   check_result: (total_groups, done) ->
     for group in [0 .. total_groups - 1]
       for content, line in fs.readFileSync("#{__dirname}/workers/#{group}.dmp").toString().split('\n')[0...-1]

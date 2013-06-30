@@ -102,6 +102,7 @@ workers = []
 # If there's no registered workers, exit directly.
 first_time = on
 clean_up = ->
+  console.log 'clean up'
   log_registered_workers() unless first_time
   first_time = off
   return process.exit() unless workers.length
@@ -129,6 +130,7 @@ capturable_signals = [
   'SIGABRT'
 ]
 
+process.on 'SIGTERM', -> console.log 'SIGTERM'
 process.on signal, clean_up for signal in capturable_signals
 
 # When `uncaughtException` is captured, **Fairy** can not tell if this is caught
@@ -141,10 +143,9 @@ process.on 'uncaughtException', (err) ->
   console.log 'Fairy workers will block their processing groups before exit.' if registered_workers.length
   clean_up()
 
-# Say goodbye on exit.
-process.on 'exit', ->
-  # console.log "Fairy cleaned up, exiting..." if cleanup_required
+  # process.on 'exit', (code, signal) -> console.log code, signal
 
+  # process.on 'message', (message) -> clean_up() if message is 'EXIT'
 
 # ## Helper Methods
 
@@ -157,7 +158,7 @@ server_ip = ->
   for card, addresses of os.networkInterfaces()
     for address in addresses
       return address.address if not address.internal and address.family is 'IPv4'
-  return 'UNKNOWN_IP'
+  'UNKNOWN_IP'
 
 
 # ## Create Redis Client
@@ -829,12 +830,12 @@ class Worker
 
   constructor: (@queue, @handler) ->
     {@name, @fairy, @redis, @pubsub} = queue
-    @worker_id = worker_id = uuid.v4()
-    @redis.hset @key('WORKERS'), worker_id, "#{os.hostname()}|#{server_ip()}|#{process.pid}|#{Date.now()}"
+    @id = uuid.v4()
+    @redis.hset @key('WORKERS'), @id, "#{os.hostname()}|#{server_ip()}|#{process.pid}|#{Date.now()}"
 
     process.on 'uncaughtException', (err) =>
       if @_handler_callback
-        console.log "Worker [#{worker_id.split('-')[0]}] registered for Task [#{@name}] will block its current processing group"
+        console.log "Worker [#{@id.split('-')[0]}] registered for Task [#{@name}] will block its current processing group"
         @_handler_callback {do: 'block', message: err.stack}
       else
         @unregist()
@@ -844,7 +845,6 @@ class Worker
       return unless channel is @key('ENQUEUED')
       @_new_task = on
       @start() if @is_idling
-      # console.log 'start'
     @start()
     
   key: (key) -> "#{prefix}:#{key}:#{@name}"
@@ -867,10 +867,8 @@ class Worker
   # If there's no tasks in the `SOURCE` list, poll again after an interval of
   # `polling_interval` milliseconds.
   start: =>
-    # console.log 'start'
     @is_idling = @_new_task = off
     return @unregist() if exiting
-    # console.log @key('SOURCE')
     @redis.watch @key('SOURCE')
     @redis.lindex @key('SOURCE'), 0, (err, res) =>
       if res
@@ -987,6 +985,7 @@ class Worker
       @redis.multi()
       .rpush(@key('FAILED'), JSON.stringify([task..., Date.now(), errors]))
       .hdel(@key('PROCESSING'), processing)
+      .sadd(@key('BLOCKED'), task[1])
       .exec (err, res) =>
         exiting = on
         @unregist()
@@ -1019,7 +1018,7 @@ class Worker
         .lpop("#{@key('QUEUED')}:#{group}")
         .exec (multi_err, multi_res) =>
           return @continue_group group unless multi_res
-          return @unregist() if exiting
+          # return @unregist() if exiting
           @start()
 
 
@@ -1050,6 +1049,6 @@ class Worker
   # **Private** method. Wait if there're queues still working, or exit the
   # process immediately.
   unregist: =>
-    @redis.hdel @key('WORKERS'), @worker_id, (err, res) =>
+    @redis.hdel @key('WORKERS'), @id, (err, res) =>
       workers.splice workers.indexOf(@), 1
       process.exit() unless workers.length
