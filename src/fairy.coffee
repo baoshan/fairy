@@ -142,18 +142,25 @@ process.on 'uncaughtException', (err) ->
   clean_up()
 
 
-  # exports.setupMaster = ->
+# ### Clean-Up on Exit
+#
+# A little bit dirty hack.
+
 cluster = require 'cluster'
+
 if cluster.isMaster
   for soft_kill_signal in capturable_signals
     do (soft_kill_signal) ->
       process.on soft_kill_signal, ->
-        console.log "FAIRY CORE...", soft_kill_signal
         for id, worker of cluster.workers
-          worker.process.kill(soft_kill_signal)
+          worker.process.kill soft_kill_signal
           worker.suicide = on
-        setImmediate clean_up
-else if cluster.isWorker
+        do wait_workers_exit = ->
+          if Object.keys(cluster.workers).length
+            return setTimeout wait_workers_exit, 100
+          clean_up()
+
+else
   process.on signal, clean_up for signal in capturable_signals
 
 
