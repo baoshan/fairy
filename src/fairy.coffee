@@ -70,9 +70,15 @@ prefix = 'FAIRY'
 #   + `options`, read [node_redis documents] for more detail.
 #
 # [node_redis documents]: https://github.com/mranney/node_redis
-exports.connect = (options = {}) ->
-  new Fairy options
 
+class Module
+
+  connect: (options = {}) ->
+    new Fairy options
+
+  version: require(__dirname + '/../package.json').version
+
+module.exports = new Module
 
 # ### Exception / Interruption Handling
 
@@ -103,7 +109,7 @@ workers = []
 # If there's no registered workers, exit directly.
 first_time = on
 clean_up = ->
-  console.log 'clean up'
+  # console.log 'clean up'
   log_registered_workers() unless first_time
   first_time = off
   return setTimeout((->process.exit()), 100) unless workers.length
@@ -482,12 +488,12 @@ class Queue
       @redis.keys "#{@key('QUEUED')}:*", (err, res) =>
         return callback? err if err
         @redis.multi()
-          .del(@key('GROUPS'), @key('RECENT'), @key('FAILED'), @key('SOURCE'), @key('STATISTICS'), @key('SLOWEST'), @key('BLOCKED'), res...)
-          .hmset(@key('STATISTICS'), 'TOTAL', processing, 'FINISHED', 0, 'TOTAL_PENDING_TIME', 0, 'TOTAL_PROCESS_TIME', 0)
-          .exec (err, res) =>
-            return callback? err if err
-            return @clear callback unless res
-            @statistics callback if callback
+        .del(@key('GROUPS'), @key('RECENT'), @key('FAILED'), @key('SOURCE'), @key('STATISTICS'), @key('SLOWEST'), @key('BLOCKED'), res...)
+        .hmset(@key('STATISTICS'), 'TOTAL', processing, 'FINISHED', 0, 'TOTAL_PENDING_TIME', 0, 'TOTAL_PROCESS_TIME', 0)
+        .exec (err, res) =>
+          return callback? err if err
+          return @clear callback unless res
+          @statistics callback if callback
 
 
   # ##  Read-Only Operations

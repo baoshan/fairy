@@ -6,7 +6,7 @@
   "homepage": "https://github.com/baoshan/fairy",
   "repository": {
     "type": "git",
-    "url": "git@github.com:baoshan/fairy.git"
+    "url": "git://github.com:baoshan/fairy.git"
   },
   "main": "lib/fairy.js",
   "dependencies": {
