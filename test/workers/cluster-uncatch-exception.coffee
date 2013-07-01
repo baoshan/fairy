@@ -1,11 +1,11 @@
+# ""Note"": Even in master process, we **must** require `fairy` in order to
+# handle clean-up on exit properly.
 fairy   = require "#{__dirname}/../.."
 cluster = require "cluster"
 
 if cluster.isMaster
 
-  exiting = off
   cluster.fork() for i in [0...8]
-
   cluster.on 'exit', (worker) ->
     console.log 'worker ' + worker.process.pid + ' died. restart...', worker.suicide
     cluster.fork() unless worker.suicide
