@@ -89,6 +89,8 @@ module.exports = new Module
 # task.
 exiting = off
 
+close_callback = null
+
 # Keep current process's all registered workers an array, rely on this array to
 # count cleaned workers on exiting.
 registered_workers = []
@@ -109,10 +111,9 @@ workers = []
 # If there's no registered workers, exit directly.
 first_time = on
 clean_up = ->
-  # console.log 'clean up'
   log_registered_workers() unless first_time
   first_time = off
-  return setTimeout((->process.exit()), 100) unless workers.length
+  return setTimeout((-> if close_callback then close_callback() else process.exit()), 0) unless workers.length
   exiting = on
   for worker in workers
     worker.unregist() if worker.is_idling
@@ -274,6 +275,9 @@ class Fairy
             result[i] = statistics
             callback null, result if callback unless --total_queues
 
+  close: (callback) ->
+    close_callback = callback
+    clean_up()
 
 # ## Class Queue
 
@@ -1061,7 +1065,11 @@ class Worker
 
   # **Private** method. Wait if there're queues still working, or exit the
   # process immediately.
-  unregist: =>
+  unregist: (callback) =>
     @redis.hdel @key('WORKERS'), @id, (err, res) =>
       workers.splice workers.indexOf(@), 1
-      process.exit() unless workers.length
+      return if workers.length
+      if close_callback
+        close_callback()
+      else
+        process.exit()
