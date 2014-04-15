@@ -110,13 +110,15 @@ workers = []
 #
 # If there's no registered workers, exit directly.
 first_time = on
-clean_up = ->
-  log_registered_workers() unless first_time
-  first_time = off
-  return setTimeout((-> if close_callback then close_callback() else process.exit()), 0) unless workers.length
+clean_up = (callback) ->
+  if not callback
+    log_registered_workers() unless first_time
+    first_time = off
+  return setTimeout((->
+    if callback then callback() else process.exit(if uncaught_exception_happened then 8 else 0)), 0) unless workers.length
   exiting = on
   for worker in workers
-    worker.unregist() if worker.is_idling
+    worker.unregist(callback) if worker.is_idling
 
 # When below signals are captured, gracefully exit the program by notifying all
 # workers entering cleanup mode and exit after all are cleaned up.
@@ -143,7 +145,9 @@ capturable_signals = [
 # When `uncaughtException` is captured, **Fairy** can not tell if this is caught
 # by the handling function, as well as which queue cause the exception.
 # **Fairy** will fail all processing tasks and block the according group.
+uncaught_exception_happened = off
 process.on 'uncaughtException', (err) ->
+  uncaught_exception_happened = on
   console.log 'Exception:', err.stack
   console.log 'Fairy workers will block their processing groups before exit.' if registered_workers.length
   clean_up()
@@ -161,7 +165,7 @@ for soft_kill_signal in capturable_signals
         worker.process.kill soft_kill_signal
         worker.suicide = on
       do wait_workers_exit = ->
-        if Object.keys(cluster.workers).length
+        if cluster.workers and Object.keys(cluster.workers).length
           return setTimeout wait_workers_exit, 100
         clean_up()
 
@@ -275,9 +279,12 @@ class Fairy
             result[i] = statistics
             callback null, result if callback unless --total_queues
 
-  close: (callback) ->
-    close_callback = callback
-    clean_up()
+  close: clean_up
+  # (callback) ->
+  #   close_callback = ->
+  #     close_callback = null
+  #     callback()
+  #   clean_up(callback)
 
 # ## Class Queue
 
@@ -1069,7 +1076,7 @@ class Worker
     @redis.hdel @key('WORKERS'), @id, (err, res) =>
       workers.splice workers.indexOf(@), 1
       return if workers.length
-      if close_callback
-        close_callback()
+      if callback
+        callback()
       else
-        process.exit()
+        process.exit(if uncaught_exception_happened then 8 else 0)

@@ -3,10 +3,10 @@ router      = new express.Router()
 staticCache = express.staticCache()
 static_     = express.static __dirname + '/web'
 
-plural_commands = 
+plural_commands =
   get: ['statistics']
 
-singular_commands = 
+singular_commands =
   get: ['statistics', 'recently_finished_tasks', 'failed_tasks', 'slowest_tasks', 'processing_tasks', 'workers']
   post:['reschedule', 'clear']
 
@@ -42,5 +42,4 @@ class Connect
           req.url = '/fairy.html' if req.url is '/fairy'
           staticCache req, res, ->
             static_ req, res, next
-
 

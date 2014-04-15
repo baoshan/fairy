@@ -79,8 +79,8 @@ events_bind = () ->
 
   for command in ['reschedule', 'clear']
     do (command) ->
-      $("#m_statistics .btn_#{command}").live 'click', (event)-> 
-        event.stopPropagation()  
+      $("#m_statistics .btn_#{command}").live 'click', (event)->
+        event.stopPropagation()
         name = $(@).parent().parent().find('td:first').html()
         that = @
         $.ajax({
