@@ -2,7 +2,7 @@
   "author": "Baoshan Sheng <sheng@icmd.org> (https://github.com/baoshan)",
   "name": "fairy",
   "description": "Queue System Treats Tasks Fairly.",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "homepage": "https://github.com/baoshan/fairy",
   "repository": {
     "type": "git",

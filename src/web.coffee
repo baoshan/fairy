@@ -1,6 +1,5 @@
 express     = require 'express'
 router      = new express.Router()
-staticCache = express.staticCache()
 static_     = express.static __dirname + '/web'
 
 plural_commands =
@@ -40,6 +39,5 @@ class Connect
       (req, res, next) ->
         router.middleware req, res, ->
           req.url = '/fairy.html' if req.url is '/fairy'
-          staticCache req, res, ->
-            static_ req, res, next
+          static_ req, res, next
 

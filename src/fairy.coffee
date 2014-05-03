@@ -378,7 +378,7 @@ class Queue
       callback = undefined
     @redis.multi()
       .rpush(@key('SOURCE'), JSON.stringify([uuid.v4(), group, args..., Date.now()]))
-      .sadd(@key('GROUPS'), group)
+      .sadd(@key('GROUPS'), "#{group}")
       .hincrby(@key('STATISTICS'), 'TOTAL', 1)
       .publish(@key('ENQUEUED'), null)
       .exec(callback)
