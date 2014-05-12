@@ -1,4 +1,4 @@
-{exec} = require 'child_process'
+{exec, spawn} = require 'child_process'
 should = require 'should'
 fairy  = require("..").connect()
 {clear_queue, enqueue_tasks, kill_one, wait_until_done, clean_up, check_result} = require './shared_steps'
@@ -19,13 +19,14 @@ describe "Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_work
   it "Should Enqueue #{total_tasks} Tasks Successfully", (done) ->
     enqueue_tasks queue, total_groups, total_tasks, done
 
+    # return
   it "Should All Be Processed on a Interrupt and Respawn Environment", (done) ->
     exiting = off
     killed = 0
 
     while total_workers-- > 0
       do create_worker = ->
-        exec("coffee #{__dirname}/workers/uncatch-exception.coffee #{task_name}").on 'exit', ->
+        exec("coffee #{__dirname}/workers/uncatch-exception.coffee #{task_name}").on 'exit', (err, res) ->
           return if exiting
           killed++
           create_worker()

@@ -43,10 +43,12 @@
 # [express]:       https://github.com/visionmedia/express
 # [http api]:      fairy_web.html
 # [web front-end]: fairy_web.html
-redis  = require 'redis'
-uuid   = require 'node-uuid'
-os     = require 'os'
-domain = require 'domain'
+redis   = require 'redis'
+uuid    = require 'node-uuid'
+
+os      = require 'os'
+domain  = require 'domain'
+cluster = require 'cluster'
 
 # A constant prefix will be applied to all Redis keys for safety and
 # ease-of-management reasons.
@@ -70,15 +72,12 @@ prefix = 'FAIRY'
 #   + `options`, read [node_redis documents] for more detail.
 #
 # [node_redis documents]: https://github.com/mranney/node_redis
-
-class Module
+module.exports =
 
   connect: (options = {}) ->
     new Fairy options
 
-  version: require(__dirname + '/../package.json').version
-
-module.exports = new Module
+  version: require('../package.json').version
 
 # ### Exception / Interruption Handling
 
@@ -87,19 +86,18 @@ module.exports = new Module
 
 # Module wide variable to instruct all queues exit after processing current
 # task.
-exiting = off
+shutting_down = off
 
-close_callback = null
 
 # Keep current process's all registered workers an array, rely on this array to
 # count cleaned workers on exiting.
-registered_workers = []
+# registered_workers = []
 
 # Log active workers while waiting for all workers to clean-up.
-log_registered_workers = ->
-  console.log "\nFairy is waiting for #{workers.length} workers to clean-up before exit:"
-  for worker in workers
-    console.log "  * Client Id: [#{worker.fairy.id}], Task: [#{worker.name}]"
+# log_registered_workers = ->
+#   console.log "\nFairy is waiting for #{workers.length} workers to clean-up before exit:"
+#   for worker in workers
+#     console.log "  * Client Id: [#{worker.fairy.id}], Task: [#{worker.name}]"
 
 workers = []
 
@@ -109,16 +107,33 @@ workers = []
 #   + `uncaughtException` captured.
 #
 # If there's no registered workers, exit directly.
-first_time = on
-clean_up = (callback) ->
-  if not callback
-    log_registered_workers() unless first_time
-    first_time = off
-  return setTimeout((->
-    if callback then callback() else process.exit(if uncaught_exception_happened then 8 else 0)), 0) unless workers.length
-  exiting = on
-  for worker in workers
-    worker.unregist(callback) if worker.is_idling
+# first_time = on
+shut_down = (soft_kill_signal = 'SIGTERM') ->
+  shutting_down = on
+
+  if cluster.isMaster
+    for id, worker of cluster.workers
+      console.log worker.process.pid, 'killing from master'
+      worker.suicide = on
+      worker.process.kill(soft_kill_signal)
+
+  console.log 'workers', workers.length, workers
+  workers.filter(({is_idling}) -> is_idling).forEach((worker) -> worker.shut_down())
+  # for worker, index in workers
+  #   console.log index, worker
+  #   if worker.is_idling
+  #     worker.shut_down()
+
+  do probe_workers = ->
+    if not workers.length and not (cluster.workers and Object.keys(cluster.workers).length)
+      console.log 'process exit', process.pid
+      process.exit(if uncaught_exception then 1 else 0)
+    else setTimeout(probe_workers, 10)
+
+  # return
+  # return setTimeout((->
+  #   if callback then callback() else process.exit(if uncaught_exception then 8 else 0)), 0) unless workers.length
+    # process.exit(if uncaught_exception then 8 else 0)) unless worker.length
 
 # When below signals are captured, gracefully exit the program by notifying all
 # workers entering cleanup mode and exit after all are cleaned up.
@@ -130,7 +145,7 @@ clean_up = (callback) ->
 # + `SIGUSR2`
 # + `SIGTERM`
 # + `SIGABRT`
-capturable_signals = [
+soft_kill_signals = [
   'SIGINT'
   'SIGHUP'
   'SIGQUIT'
@@ -140,34 +155,32 @@ capturable_signals = [
   'SIGABRT'
 ]
 
+# exit = ->
+
 # process.on 'SIGTERM', -> console.log 'SIGTERM'
 
-# When `uncaughtException` is captured, **Fairy** can not tell if this is caught
-# by the handling function, as well as which queue cause the exception.
-# **Fairy** will fail all processing tasks and block the according group.
-uncaught_exception_happened = off
+# **Fairy** can not tell if an `uncaughtException` is caused by a worker. We
+# will fail all processing tasks and block their groups.
+uncaught_exception = off
+
 process.on 'uncaughtException', (err) ->
-  uncaught_exception_happened = on
-  console.log 'Exception:', err.stack
-  console.log 'Fairy workers will block their processing groups before exit.' if registered_workers.length
-  clean_up()
+  uncaught_exception = on
+  console.log err.stack
+  shut_down()
 
 
-# ### Clean-Up on Exit
+# process.on 'exit', (code) ->
+# for worker in workers
+#   console.log process.pid, 'saver killing'
+#   worker.shut_down()
+
+
+# ### On Soft Kill Signo
 #
-# A little bit dirty hack.
-
-cluster = require 'cluster'
-for soft_kill_signal in capturable_signals
-  do (soft_kill_signal) ->
-    process.on soft_kill_signal, ->
-      for id, worker of cluster.workers
-        worker.process.kill soft_kill_signal
-        worker.suicide = on
-      do wait_workers_exit = ->
-        if cluster.workers and Object.keys(cluster.workers).length
-          return setTimeout wait_workers_exit, 100
-        clean_up()
+# 1. Kill slave processes with the same signal when current process is a master;
+# 2. Shut down current process.
+for soft_kill_signal in soft_kill_signals
+  process.on(soft_kill_signal, shut_down.bind(@, soft_kill_signal))
 
 
 # ## Helper Methods
@@ -180,20 +193,24 @@ for soft_kill_signal in capturable_signals
 server_ip = ->
   for card, addresses of os.networkInterfaces()
     for address in addresses
-      return address.address if not address.internal and address.family is 'IPv4'
-  'UNKNOWN_IP'
+      return address.address if not address.internal and address.family in ['IPv4']
+  'N/A'
+
+
+# Query Host Name
+server_name = -> 'N/A'
 
 
 # ## Create Redis Client
 create_client = (options) ->
   client = redis.createClient options.port, options.host, options.options
-  client.auth options.password if options.password?
+  client.auth options.password if options.password
   client
 
 
 # ## Class Fairy
 
-# Model wide variable used for allocating an increasing integer `id` for each
+# Model scoped  variable used for allocating an increasing integer `id` for each
 # **Fairy** client of current process.
 fairy_id = 0
 
@@ -279,7 +296,7 @@ class Fairy
             result[i] = statistics
             callback null, result if callback unless --total_queues
 
-  close: clean_up
+  close: shut_down
   # (callback) ->
   #   close_callback = ->
   #     close_callback = null
@@ -378,7 +395,7 @@ class Queue
       callback = undefined
     @redis.multi()
       .rpush(@key('SOURCE'), JSON.stringify([uuid.v4(), group, args..., Date.now()]))
-      .sadd(@key('GROUPS'), "#{group}")
+      .sadd(@key('GROUPS'), "#{JSON.stringify(group)}")
       .hincrby(@key('STATISTICS'), 'TOTAL', 1)
       .publish(@key('ENQUEUED'), null)
       .exec(callback)
@@ -863,16 +880,16 @@ class Worker
     @redis.hset @key('WORKERS'), @id, "#{os.hostname()}|#{server_ip()}|#{process.pid}|#{Date.now()}"
 
     process.on 'uncaughtException', (err) =>
-      if @_handler_callback
-        console.log "Worker [#{@id.split('-')[0]}] registered for Task [#{@name}] will block its current processing group"
-        @_handler_callback {do: 'block', message: err.stack}
-      else
-        @unregist()
+      # if @_handler_callback
+      #   console.log "Worker [#{@id.split('-')[0]}] registered for Task [#{@name}] will block its current processing group"
+      #   @_handler_callback {do: 'block', message: err.stack}
+      # else
+      #   @unregist()
 
     @pubsub.subscribe @key('ENQUEUED')
     @pubsub.on 'message', (channel, message) =>
       return unless channel is @key('ENQUEUED')
-      @_new_task = on
+      # @_new_task = on
       @start() if @is_idling
     @start()
     
@@ -895,11 +912,11 @@ class Worker
   #
   # If there's no tasks in the `SOURCE` list, take worker into `idle` state.
   start: =>
-    @is_idling = @_new_task = off
-    return @unregist() if exiting
+    @is_idling = off
+    return @shut_down() if shutting_down or uncaught_exception
     @redis.watch @key('SOURCE')
     @redis.lindex @key('SOURCE'), 0, (err, res) =>
-      if task = JSON.parse res
+      if task = JSON.parse(res)
         @redis.multi()
         .lpop(@key('SOURCE'))
         .rpush("#{@key('QUEUED')}:#{task[1]}", res)
@@ -941,9 +958,7 @@ class Worker
     retry_count = @retry_limit
     errors = []
 
-    @_handler_callback = handler_callback = (err, res) =>
-
-      @_handler_callback = null
+    handler_callback = (err, res) =>
 
       # Error handling routine:
       #
@@ -965,7 +980,7 @@ class Worker
             .exec()
             return @start()
           when 'block-after-retry'
-            return setTimeout call_handler, @retry_delay if retry_count--
+            return setTimeout process_task, @retry_delay if retry_count--
             @redis.multi()
             .rpush(@key('FAILED'), JSON.stringify([task..., Date.now(), errors]))
             .hdel(@key('PROCESSING'), processing)
@@ -1003,20 +1018,18 @@ class Worker
         .exec()
 
       @continue_group task[1]
-    
-    d = domain.create()
 
-    d.on 'error', (error) =>
-      @redis.multi()
-      .rpush(@key('FAILED'), JSON.stringify([task..., Date.now(), errors]))
-      .hdel(@key('PROCESSING'), processing)
-      .sadd(@key('BLOCKED'), task[1])
-      .exec (err, res) =>
-        exiting = on
-        @unregist()
+    do process_task = =>
 
-    d.run call_handler = =>
-      @handler task[1...-1]..., (@_handler_callback = handler_callback)
+      # Create a `domain` to capture exception thrown by handler.
+      d = domain.create()
+
+      d.on 'error', (error) =>
+        uncaught_exception = on
+        console.log error.stack
+        handler_callback (do: 'block', message: error.stack)
+
+      d.run => @handler(task[1...-1]..., handler_callback)
 
 
   # ### Continue Process a Group
@@ -1034,10 +1047,27 @@ class Worker
     @redis.watch "#{@key('QUEUED')}:#{group}"
     @redis.lindex "#{@key('QUEUED')}:#{group}", 1, (err, res) =>
       if task = JSON.parse res
-        @redis.unwatch()
-        @redis.lpop "#{@key('QUEUED')}:#{group}"
-        return @requeue group if exiting
-        @process task
+        if shutting_down
+          @redis.lrange "#{@key('QUEUED')}:#{group}", 1, -1, (err, res) =>
+            @redis.multi()
+            .lpop("#{@key('QUEUED')}:#{group}")
+            .lpush("#{@key('SOURCE')}", res.reverse()...)
+            .del("#{@key('QUEUED')}:#{group}")
+            .exec (multi_err, multi_res) =>
+              return @continue_group(group) unless multi_res
+              @shut_down()
+
+        else
+          @redis.unwatch()
+          @redis.lpop "#{@key('QUEUED')}:#{group}"
+          # return @restore_group_then_shut_down(group) if shutting_down
+          @process task
+        return
+
+      # @redis.unwatch()
+      # @redis.lpop "#{@key('QUEUED')}:#{group}"
+      # return @restore_group_then_shut_down(group) if shutting_down
+      # @process task
       else
         @redis.multi()
         .lpop("#{@key('QUEUED')}:#{group}")
@@ -1057,26 +1087,14 @@ class Worker
   # the `SOURCE` list into `QUEUED` list.
   #
   # When tasks are requeued successfully, the worker `unregist` itself.
-  requeue: (group) =>
-    @redis.watch "#{@key('QUEUED')}:#{group}"
-    @redis.lrange "#{@key('QUEUED')}:#{group}", 0, -1, (err, res) =>
-      @redis.multi()
-      .lpush("#{@key('SOURCE')}", res.reverse()...)
-      .del("#{@key('QUEUED')}:#{group}")
-      .exec (multi_err, multi_res) =>
-        return @requeue group unless multi_res
-        @unregist()
+  # restore_group_then_shut_down: (group) =>
 
 
   # ### Exit When All Queues are Cleaned Up
 
   # **Private** method. Wait if there're queues still working, or exit the
   # process immediately.
-  unregist: (callback) =>
-    @redis.hdel @key('WORKERS'), @id, (err, res) =>
-      workers.splice workers.indexOf(@), 1
-      return if workers.length
-      if callback
-        callback()
-      else
-        process.exit(if uncaught_exception_happened then 8 else 0)
+  shut_down: ->
+    @redis.hdel(@key('WORKERS'), @id)
+    workers.splice(workers.indexOf(@), 1)
+    shut_down()

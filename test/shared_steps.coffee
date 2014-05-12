@@ -56,24 +56,28 @@ exports = module.exports =
   kill_one: (queue, done) ->
     queue.workers (err, workers) ->
       return done() unless workers.length
-      # try
-      process.kill workers.random().pid, soft_kill_signals.random()
+      try
+        process.kill workers.random().pid, soft_kill_signals.random()
       done()
 
   wait_until_done: (queue, total_tasks, done) ->
     success_counter = 0
     do probe = ->
+      # console.log 'probing'
       queue.statistics (err, statistics) ->
+        # console.log 'statistics', err, statistics
         if statistics.finished_tasks is total_tasks
           statistics.pending_tasks.should.equal 0
           statistics.processing_tasks.should.equal 0
+          # console.log success_counter
           return done() if success_counter++ is 3
         setTimeout probe, 100
 
   clean_up: (queue, done) ->
     success_counter = 0
     queue.workers (err, workers) ->
-      process.kill worker.pid, soft_kill_signals.random() for worker in workers
+      for worker in workers
+        process.kill worker.pid, soft_kill_signals.random()
       do get_statistics = ->
         queue.statistics (err, statistics) ->
           return setTimeout get_statistics, 100 unless statistics.workers is 0

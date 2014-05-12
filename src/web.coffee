@@ -21,7 +21,7 @@ class Connect
     @__defineGetter__ 'middleware', =>
       for method, commands of plural_commands
         for command in commands
-          router.route method, "/api/queues/#{command}", @no_cache, do (command) =>
+          router[method] "/api/queues/#{command}", @no_cache, do (command) =>
             (req, res) =>
               @fairy[command] (err, results) ->
                 return res.send 500, err.stack if err
@@ -29,15 +29,14 @@ class Connect
 
       for method, commands of singular_commands
         for command in commands
-          router.route method, "/api/queues/:name/#{command}", @no_cache, do (command) =>
+          router[method] "/api/queues/:name/#{command}", @no_cache, do (command) =>
             (req, res) =>
               queue = @fairy.queue req.params.name
               queue[command] (err, results) ->
                 return res.send 500, err.stack if err
                 res.send results
       
-      (req, res, next) ->
-        router.middleware req, res, ->
-          req.url = '/fairy.html' if req.url is '/fairy'
-          static_ req, res, next
+      router.use (req, res, next) ->
+        req.url = '/fairy.html' if req.url is '/fairy'
+        static_ req, res, next
 

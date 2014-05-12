@@ -2,13 +2,20 @@
 # handle clean-up on exit properly.
 fairy   = require "#{__dirname}/../.."
 cluster = require "cluster"
+console.log cluster.workers?.length
 
 if cluster.isMaster
+  console.log 'master', process.pid
 
   cluster.fork() for i in [0...8]
-  cluster.on 'exit', (worker) ->
+  cluster.on 'exit', (worker, code) ->
     console.log 'worker ' + worker.process.pid + ' died. restart...', worker.suicide
-    cluster.fork() unless worker.suicide
+    cluster.fork() if code # unless worker.suicide
+
+
+  setTimeout ->
+    dsasd()
+  , 5000
 
 else
 

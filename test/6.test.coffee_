@@ -3,7 +3,7 @@ should = require 'should'
 fairy  = require("..").connect()
 {clear_queue, enqueue_tasks, kill_one, wait_until_done, clean_up_without_kill, check_result} = require './shared_steps'
 
-task_name = 'TEST5'
+task_name = 'TEST6'
 queue     = fairy.queue task_name
 
 total_groups = 5
@@ -19,43 +19,32 @@ describe "in cluster, Process #{total_tasks} Tasks of #{total_groups} Groups by 
   it "Should Enqueue #{total_tasks} Tasks Successfully", (done) ->
     enqueue_tasks queue, total_groups, total_tasks, done
 
-    # return
   it "Should All Be Processed on a Interrupt and Respawn Environment", (done) ->
     exiting = off
     killed = 0
 
     while total_workers-- > 0
       do create_worker = ->
-        # console.log 'CREATE CLUSTER'
-        child_processes.push cp = exec("coffee #{__dirname}/workers/cluster-uncatch-exception.coffee #{task_name}", (a, b, c) ->
-          console.log 'exiting'
+        child_processes.push exec("coffee #{__dirname}/workers/cluster-uncatch-exception-master-worker.coffee #{task_name} > 6.out", (a, b, c) ->
           return
           console.log a, b, c).on 'exit', ->
-            # console.log 'exiting_2'
             return if exiting
             # console.log 're creating'
             killed++
             create_worker()
-        console.log cp.pid
 
     do reschedule = ->
       queue.reschedule (err, statistics) ->
         setTimeout reschedule, 100
 
+    console.log 'wait_until_done'
     wait_until_done queue, total_tasks, ->
       exiting = on
       done()
 
   it "Should Cleanup Elegantly on Interruption", (done) ->
     for child_process in child_processes
-      do (child_process) ->
-        # console.log 'kill', child_process.pid
-        # setTimeout ->
-        exec("/bin/bash -c 'kill -SIGINT #{child_process.pid}'")
-        # , 10000
-      # exec "kill #{child_process.pid}"
-      # process.kill child_process.pid
-      # child_process.kill()
+      child_process.kill()
     setTimeout ->
       clean_up_without_kill queue, done
     , 100
