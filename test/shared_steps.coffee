@@ -21,12 +21,15 @@ soft_kill_signals = [
 exports = module.exports =
 
   clear_queue: (queue, done) ->
+    # setTimeout ->
     queue.clear (err, statistics) ->
       should.not.exist err
+      # console.log queue.name, statistics
       statistics.total.groups.should.equal 0
       statistics.total.tasks.should.equal 0
       statistics.pending_tasks.should.equal 0
       done()
+        # , 100
 
   enqueue_tasks: (queue, total_groups, total_tasks, done) ->
     generated = 0
@@ -65,7 +68,7 @@ exports = module.exports =
     do probe = ->
       # console.log 'probing'
       queue.statistics (err, statistics) ->
-        # console.log 'statistics', err, statistics
+        # console.log 'statistics', err, statistics.finished_tasks
         if statistics.finished_tasks is total_tasks
           statistics.pending_tasks.should.equal 0
           statistics.processing_tasks.should.equal 0
@@ -75,15 +78,17 @@ exports = module.exports =
 
   clean_up: (queue, done) ->
     success_counter = 0
-    queue.workers (err, workers) ->
-      for worker in workers
-        process.kill worker.pid, soft_kill_signals.random()
-      do get_statistics = ->
-        queue.statistics (err, statistics) ->
-          return setTimeout get_statistics, 100 unless statistics.workers is 0
-          return setTimeout get_statistics, 100 unless success_counter++ is 3
-          statistics.pending_tasks.should.equal 0
-          done()
+    setTimeout ->
+      queue.workers (err, workers) ->
+        for worker in workers
+          process.kill worker.pid, soft_kill_signals.random()
+        do get_statistics = ->
+          queue.statistics (err, statistics) ->
+            return setTimeout get_statistics, 100 unless statistics.workers is 0
+            return setTimeout get_statistics, 100 unless success_counter++ is 3
+            statistics.pending_tasks.should.equal 0
+            done()
+    , 2000
 
   clean_up_without_kill: (queue, done) ->
     success_counter = 0

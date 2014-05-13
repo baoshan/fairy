@@ -37,19 +37,20 @@ describe "in cluster, Process #{total_tasks} Tasks of #{total_groups} Groups by 
       queue.reschedule (err, statistics) ->
         setTimeout reschedule, 100
 
-    console.log 'wait_until_done'
+    # console.log 'wait_until_done'
     wait_until_done queue, total_tasks, ->
       exiting = on
       done()
 
   it "Should Cleanup Elegantly on Interruption", (done) ->
     for child_process in child_processes
-      console.log 'killing', child_process.pid
-      exec("/bin/bash -c 'kill -SIGINT #{child_process.pid}'", (err, res) -> console.log err, res)
+      # console.log 'killing', child_process.pid
+      exec("/bin/bash -c 'kill -SIGINT #{child_process.pid}'", (err, res) -> ) # console.log err, res)
       # child_process.kill()
     setTimeout ->
       clean_up_without_kill queue, done
     , 100
 
+  return
   it "Should Dump Incremental Numbers", (done) ->
     check_result total_groups, done

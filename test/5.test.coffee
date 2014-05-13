@@ -13,11 +13,18 @@ child_processes = []
 
 describe "in cluster, Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_workers} uncatch-exception Workers, Kill and run normally", ->
 
+  it "Should not exists workers", (done) ->
+    queue.statistics (err, statistics) ->
+      statistics.workers.should.equal(0)
+      done()
+
   it "Should Clear the Queue First", (done) ->
     clear_queue queue, done
 
   it "Should Enqueue #{total_tasks} Tasks Successfully", (done) ->
-    enqueue_tasks queue, total_groups, total_tasks, done
+    setTimeout ->
+      enqueue_tasks queue, total_groups, total_tasks, done
+    , 100
 
     # return
   it "Should All Be Processed on a Interrupt and Respawn Environment", (done) ->
@@ -28,7 +35,7 @@ describe "in cluster, Process #{total_tasks} Tasks of #{total_groups} Groups by 
       do create_worker = ->
         # console.log 'CREATE CLUSTER'
         child_processes.push cp = exec("coffee #{__dirname}/workers/cluster-uncatch-exception.coffee #{task_name}", (a, b, c) ->
-          console.log 'exiting'
+          # console.log 'exiting'
           return
           console.log a, b, c).on 'exit', ->
             # console.log 'exiting_2'
@@ -49,9 +56,9 @@ describe "in cluster, Process #{total_tasks} Tasks of #{total_groups} Groups by 
   it "Should Cleanup Elegantly on Interruption", (done) ->
     for child_process in child_processes
       do (child_process) ->
-        # console.log 'kill', child_process.pid
+        console.log 'kill', child_process.pid
         # setTimeout ->
-        exec("/bin/bash -c 'kill -SIGINT #{child_process.pid}'")
+        exec("/bin/bash -c 'kill -SIGINT #{child_process.pid}'", (err, res) -> )# console.log err, res)
         # , 10000
       # exec "kill #{child_process.pid}"
       # process.kill child_process.pid

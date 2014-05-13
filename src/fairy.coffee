@@ -26,7 +26,7 @@
 #   + Each worker processes tasks sequentially.
 #   + Multiple workers need be instantiated to increase throughput.
 #
-# Copyright © 2012, Baoshan Sheng.
+# Copyright © 2012 - 2014, Baoshan Sheng.
 # Released under the MIT License.
 
 
@@ -46,17 +46,39 @@
 redis   = require 'redis'
 uuid    = require 'node-uuid'
 
+
+# ### Node.js API Dependencies
+#
+# + `os`      : retrieve worker host name and ip;
+# + `domain`  : catch exceptions thrown by workers precisely;
+# + `cluster` : determine `master` / `slave` mode and connected processes.
 os      = require 'os'
 domain  = require 'domain'
 cluster = require 'cluster'
 
-# A constant prefix will be applied to all Redis keys for safety and
+
+# ### Redis Key Prefix
+#
+# A prefix will be applied to all Redis keys for safety and
 # ease-of-management reasons.
-prefix = 'FAIRY'
+prefix  = 'FAIRY'
+
+
+# ### Module Scope Variables
+#
+# + all registered workers;
+# + whether is shutting down;
+# + whether any uncaught exception thrown;
+# + unique fairy clients id counter.
+workers            = []
+shutting_down      = off
+uncaught_exception = off
+fairy_id           = 0
+callbacks          = {}
 
 
 # ### CommonJS Module Definition
-
+#
 # The only exposed object is a `connect` method, which returns a **Fairy**
 # client on invocation. **Usage:**
 #
@@ -73,68 +95,47 @@ prefix = 'FAIRY'
 #
 # [node_redis documents]: https://github.com/mranney/node_redis
 module.exports =
-
+  version: require('../package.json').version
   connect: (options = {}) ->
     new Fairy options
 
-  version: require('../package.json').version
 
-# ### Exception / Interruption Handling
-
-# Use `uncaughtException` and `SIGINT` to provide elegant exception and user
-# interruption handling.
-
-# Module wide variable to instruct all queues exit after processing current
-# task.
-shutting_down = off
-
-
-# Keep current process's all registered workers an array, rely on this array to
-# count cleaned workers on exiting.
-# registered_workers = []
-
-# Log active workers while waiting for all workers to clean-up.
-# log_registered_workers = ->
-#   console.log "\nFairy is waiting for #{workers.length} workers to clean-up before exit:"
-#   for worker in workers
-#     console.log "  * Client Id: [#{worker.fairy.id}], Task: [#{worker.name}]"
-
-workers = []
-
-# Fairy will enter cleanup mode before exit when:
+# ## Exception / Interruption Handling
 #
-#   + Received `SIGINT`, `SIGHUP`, or `SIGUSR2`.
-#   + `uncaughtException` captured.
+# Fairy will shut down the process gracefully when:
 #
-# If there's no registered workers, exit directly.
-# first_time = on
-shut_down = (soft_kill_signal = 'SIGTERM') ->
+#   + Soft kill signal received;
+#   + `uncaughtException` not caused by workers captured.
+
+
+# The shut down process follows:
+#
+#   1. Set `shutting_down` flag. Busy workers depend on `shutting_down` to exit
+#   properly when they finish their tasks in hand;
+#   2. Send soft kill signal to slave processes;
+#   3. Shut down idle workers; 
+#   4. End the process when all workers exit and all slave processes disconnect.
+shut_down_counter = 0
+shut_down = (signo = 'SIGTERM') ->
   shutting_down = on
 
-  if cluster.isMaster
-    for id, worker of cluster.workers
-      console.log worker.process.pid, 'killing from master'
-      worker.suicide = on
-      worker.process.kill(soft_kill_signal)
+  for id, worker of cluster.workers or {}
+    worker.suicide = on
+    worker.process.kill(signo)
 
-  console.log 'workers', workers.length, workers
-  workers.filter(({is_idling}) -> is_idling).forEach((worker) -> worker.shut_down())
-  # for worker, index in workers
-  #   console.log index, worker
-  #   if worker.is_idling
-  #     worker.shut_down()
+  workers
+  .filter(({idle}) -> shut_down_counter or idle)
+  .forEach((worker) -> worker.shut_down())
+  shut_down_counter++
 
-  do probe_workers = ->
-    if not workers.length and not (cluster.workers and Object.keys(cluster.workers).length)
-      console.log 'process exit', process.pid
-      process.exit(if uncaught_exception then 1 else 0)
-    else setTimeout(probe_workers, 10)
+  do waiting_to_exit = ->
+    if workers.length or Object.keys(cluster.workers or {}).length
+      return setTimeout(waiting_to_exit, 10)
+    process.exit(if uncaught_exception then 1 else 0)
 
-  # return
-  # return setTimeout((->
-  #   if callback then callback() else process.exit(if uncaught_exception then 8 else 0)), 0) unless workers.length
-    # process.exit(if uncaught_exception then 8 else 0)) unless worker.length
 
+# ### Soft Kill Signals
+#
 # When below signals are captured, gracefully exit the program by notifying all
 # workers entering cleanup mode and exit after all are cleaned up.
 #
@@ -145,7 +146,7 @@ shut_down = (soft_kill_signal = 'SIGTERM') ->
 # + `SIGUSR2`
 # + `SIGTERM`
 # + `SIGABRT`
-soft_kill_signals = [
+[
   'SIGINT'
   'SIGHUP'
   'SIGQUIT'
@@ -153,34 +154,18 @@ soft_kill_signals = [
   'SIGUSR2'
   'SIGTERM'
   'SIGABRT'
-]
-
-# exit = ->
-
-# process.on 'SIGTERM', -> console.log 'SIGTERM'
-
-# **Fairy** can not tell if an `uncaughtException` is caused by a worker. We
-# will fail all processing tasks and block their groups.
-uncaught_exception = off
-
-process.on 'uncaughtException', (err) ->
-  uncaught_exception = on
-  console.log err.stack
-  shut_down()
+].forEach (signo) ->
+  process.on(signo, shut_down.bind(@, signo))
 
 
-# process.on 'exit', (code) ->
-# for worker in workers
-#   console.log process.pid, 'saver killing'
-#   worker.shut_down()
-
-
-# ### On Soft Kill Signo
+# ### Uncaught Exception
 #
-# 1. Kill slave processes with the same signal when current process is a master;
-# 2. Shut down current process.
-for soft_kill_signal in soft_kill_signals
-  process.on(soft_kill_signal, shut_down.bind(@, soft_kill_signal))
+# **Fairy** CAN tell if an exception is caused by a worker. Here, we only deal
+# with exceptions not thrown by a worker.
+process.on 'uncaughtException', (err) ->
+  console.error err.stack
+  uncaught_exception = on
+  shut_down()
 
 
 # ## Helper Methods
@@ -193,27 +178,35 @@ for soft_kill_signal in soft_kill_signals
 server_ip = ->
   for card, addresses of os.networkInterfaces()
     for address in addresses
-      return address.address if not address.internal and address.family in ['IPv4']
+      return address.address if address.family in ['IPv4'] and not address.internal
   'N/A'
 
 
-# Query Host Name
-server_name = -> 'N/A'
-
-
 # ## Create Redis Client
-create_client = (options) ->
+pubsub_clients = {}
+create_client = (options, pubsub = off, no_cache = off) ->
+  key = "#{options.port}|#{options.host}|#{JSON.stringify(options.options)}|#{pubsub}"
+  # console.log key, pubsub_clients
+  return client if pubsub and client = pubsub_clients[key]
   client = redis.createClient options.port, options.host, options.options
   client.auth options.password if options.password
-  client
+  if pubsub
+    client.subscribe 'FAIRY:COMPLETE'
+    client.subscribe 'FAIRY:PROGRESS'
+    client.on 'message', (topic, message) ->
+      return unless topic in ['FAIRY:COMPLETE', 'FAIRY:PROGRESS']
+      message = JSON.parse("#{message}")
+      [task_id, message] = message
+      if topic in ['FAIRY:COMPLETE']
+        callbacks[task_id]?.complete?(message)
+        delete callbacks[task_id]
+      else if topic in ['FAIRY:PROGRESS']
+        callbacks[task_id]?.progress?(message)
+  pubsub_clients[key] = client
 
 
 # ## Class Fairy
-
-# Model scoped  variable used for allocating an increasing integer `id` for each
-# **Fairy** client of current process.
-fairy_id = 0
-
+#
 # Object of class `Fairy` keeps a Redis connection and a pool of named queues
 # (objects of class `Queue`) responsible for enqueuing and dispatching tasks,
 # etc.
@@ -227,15 +220,15 @@ class Fairy
   # **Usage:**
   #
   #     fairy = require('fairy').connect()
-  
+  #
   # The constructor of class `Fairy` stores the passed-in Redis client as an
   # instance property.
   #
   # A `queue_pool` caches named queued as a hashtable. Keys are names of queues,
   # values are according objects of class `Queue`.
   constructor: (@options) ->
-    @redis = create_client options
-    @pubsub = create_client options
+    @redis = create_client options, off, on
+    @pubsub = create_client options, on
     @id = fairy_id++
     @queue_pool = {}
 
@@ -389,16 +382,33 @@ class Queue
   #     queue.enqueue 'group_id', 'param2', (err, res) -> # YOUR CODE
   # 
   # A transaction ensures the atomicity.
-  enqueue: (group, args..., callback) =>
-    if typeof callback isnt 'function'
-      args.push callback
-      callback = undefined
+  enqueue: (group) =>
+    original_arguments = Array.prototype.slice.call(arguments)
+    for i in [0...arguments.length]
+      break if typeof arguments[i] in ['function']
+    if typeof arguments[i + 0] in ['function']
+      callback_enqueued = arguments[i + 0]
+      args = original_arguments[1...i]
+    else
+      args = original_arguments[1...arguments.length]
+    if typeof arguments[i + 1] in ['function']
+      callback_complete = arguments[i + 1]
+    if typeof arguments[i + 2] in ['function']
+      callback_progress = arguments[i + 2]
+    task_id = uuid.v4()
+    callbacks[task_id] =
+      complete: callback_complete
+      progress: callback_progress
+
+      # if typeof callback not in ['function']
+      # args.push callback
+      # callback = undefined
     @redis.multi()
-      .rpush(@key('SOURCE'), JSON.stringify([uuid.v4(), group, args..., Date.now()]))
+      .rpush(@key('SOURCE'), JSON.stringify([task_id, group, args..., Date.now()]))
       .sadd(@key('GROUPS'), "#{JSON.stringify(group)}")
       .hincrby(@key('STATISTICS'), 'TOTAL', 1)
       .publish(@key('ENQUEUED'), null)
-      .exec(callback)
+      .exec(callback_enqueued)
 
   # ### Register Handler
 
@@ -439,7 +449,7 @@ class Queue
   #     queue.reschedule (err, statistics) -> # YOUR CODE
   reschedule: (callback) =>
 
-    client = create_client @fairy.options
+    client = create_client @fairy.options, off, on
 
     do reschedule = =>
       # Make sure `FAILED` list and `BLOCKED` set are not touched during the
@@ -876,6 +886,7 @@ class Worker
 
   constructor: (@queue, @handler) ->
     {@name, @fairy, @redis, @pubsub} = queue
+    # @redis = create_client queue.fairy.options
     @id = uuid.v4()
     @redis.hset @key('WORKERS'), @id, "#{os.hostname()}|#{server_ip()}|#{process.pid}|#{Date.now()}"
 
@@ -888,9 +899,9 @@ class Worker
 
     @pubsub.subscribe @key('ENQUEUED')
     @pubsub.on 'message', (channel, message) =>
-      return unless channel is @key('ENQUEUED')
+      return unless channel in [@key('ENQUEUED')]
       # @_new_task = on
-      @start() if @is_idling
+      @start() if @idle
     @start()
     
   key: (key) -> "#{prefix}:#{key}:#{@name}"
@@ -912,8 +923,9 @@ class Worker
   #
   # If there's no tasks in the `SOURCE` list, take worker into `idle` state.
   start: =>
-    @is_idling = off
+    @idle = on
     return @shut_down() if shutting_down or uncaught_exception
+    @idle = off
     @redis.watch @key('SOURCE')
     @redis.lindex @key('SOURCE'), 0, (err, res) =>
       if task = JSON.parse(res)
@@ -921,15 +933,12 @@ class Worker
         .lpop(@key('SOURCE'))
         .rpush("#{@key('QUEUED')}:#{task[1]}", res)
         .exec (multi_err, multi_res) =>
-          return @start() unless multi_res and multi_res[1] is 1
+          return @start() unless multi_res?[1] is 1
           @process task
       else
         @redis.unwatch()
-        @is_idling = on
-        # return @start() if @_new_task
-        # @redis.llen @key('SOURCE'), (err, a, b) =>
-        # return @start() if b
-        # @is_idling = on
+        @idle = on
+
 
   # ### Process Each Group's First Task
 
@@ -947,18 +956,22 @@ class Worker
   # `Fairy` will stop dispatching tasks.
   process: (task) =>
     # console.log 'process'
-    @redis.hset @key('PROCESSING'), task[0], JSON.stringify([task..., start_time = Date.now()])
+    # @redis.hset @key('PROCESSING'), task[0], JSON.stringify([task..., start_time = Date.now()])
+    @redis.hset @key('PROCESSING'), @id, JSON.stringify([task..., start_time = Date.now()])
 
     # Before Processing the Task:
     #
     #   1. Keep start time of processing.
     #   2. Set `PROCESSING` hash in Redis.
     #   3. Allow `retry_limit` times of retries.
-    processing = task[0]
+    # processing = task[0]
+    @processing = processing = @id
+    @task = task
     retry_count = @retry_limit
     errors = []
 
     handler_callback = (err, res) =>
+      return if @shutting_down
 
       # Error handling routine:
       #
@@ -988,6 +1001,7 @@ class Worker
             .exec()
             return @start()
           else
+            # TODO: EXPLAIN THIS.
             return setTimeout call_handler, @retry_delay if retry_count--
             @redis.multi()
             .rpush(@key('FAILED'), JSON.stringify([task..., Date.now(), errors]))
@@ -1004,6 +1018,7 @@ class Worker
       #   4. Track tasks take the longest processing time in `SLOWEST` sorted
       #   set.
       else
+        # console.log 'FAIRY:COMPLETE', task[0]
         finish_time  = Date.now()
         process_time = finish_time - start_time
         @redis.multi()
@@ -1015,21 +1030,24 @@ class Worker
         .ltrim(@key('RECENT'), 0, @recent_size - 1)
         .zadd(@key('SLOWEST'), process_time, JSON.stringify([task..., start_time]))
         .zremrangebyrank(@key('SLOWEST'), 0, - @slowest_size - 1)
+        .publish('FAIRY:COMPLETE', JSON.stringify([task[0], res]))
         .exec()
 
+      delete @task
       @continue_group task[1]
 
     do process_task = =>
 
+      # console.log 'processing'
       # Create a `domain` to capture exception thrown by handler.
       d = domain.create()
 
       d.on 'error', (error) =>
         uncaught_exception = on
-        console.log error.stack
+        console.error error.stack
         handler_callback (do: 'block', message: error.stack)
 
-      d.run => @handler(task[1...-1]..., handler_callback)
+      d.run => @handler(task[1...-1]..., handler_callback, (progress) => @redis.publish 'FAIRY:PROGRESS', JSON.stringify [task[0], progress])
 
 
   # ### Continue Process a Group
@@ -1046,7 +1064,7 @@ class Worker
   continue_group: (group) =>
     @redis.watch "#{@key('QUEUED')}:#{group}"
     @redis.lindex "#{@key('QUEUED')}:#{group}", 1, (err, res) =>
-      if task = JSON.parse res
+      if task = JSON.parse(res)
         if shutting_down
           @redis.lrange "#{@key('QUEUED')}:#{group}", 1, -1, (err, res) =>
             @redis.multi()
@@ -1055,14 +1073,12 @@ class Worker
             .del("#{@key('QUEUED')}:#{group}")
             .exec (multi_err, multi_res) =>
               return @continue_group(group) unless multi_res
-              @shut_down()
+              @start()
 
         else
           @redis.unwatch()
           @redis.lpop "#{@key('QUEUED')}:#{group}"
-          # return @restore_group_then_shut_down(group) if shutting_down
-          @process task
-        return
+          @process(task)
 
       # @redis.unwatch()
       # @redis.lpop "#{@key('QUEUED')}:#{group}"
@@ -1072,7 +1088,7 @@ class Worker
         @redis.multi()
         .lpop("#{@key('QUEUED')}:#{group}")
         .exec (multi_err, multi_res) =>
-          return @continue_group group unless multi_res
+          return @continue_group(group) unless multi_res
           @start()
 
 
@@ -1095,6 +1111,23 @@ class Worker
   # **Private** method. Wait if there're queues still working, or exit the
   # process immediately.
   shut_down: ->
-    @redis.hdel(@key('WORKERS'), @id)
-    workers.splice(workers.indexOf(@), 1)
-    shut_down()
+    return if @shutting_down
+    @shutting_down = on
+
+    if @idle or not @task
+      @redis.multi()
+      .hdel(@key('WORKERS'), @id)
+      .exec (err, res) =>
+        workers.splice(workers.indexOf(@), 1)
+        shut_down()
+    else
+        # else
+        #   return
+      @redis.multi()
+      .hdel(@key('WORKERS'), @id)
+      .rpush(@key('FAILED'), JSON.stringify([@task..., Date.now(), ['Force Shut Down']]))
+      .hdel(@key('PROCESSING'), @processing)
+      .sadd(@key('BLOCKED'), @task[1])
+      .exec (err, res) =>
+        workers.splice(workers.indexOf(@), 1)
+        shut_down()
