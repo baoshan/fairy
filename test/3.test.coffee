@@ -47,7 +47,7 @@ describe "Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_work
     #      create_worker()
 
     do reschedule = ->
-      queue.reschedule (err, statistics) ->
+      queue.retry (err, statistics) ->
         setTimeout reschedule, 100
 
     do kill_one_periodically = ->

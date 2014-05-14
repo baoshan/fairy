@@ -8,20 +8,19 @@ describe ["Enqueuer should receive progress notification"], ->
   it "Should Clear the Queue First", ->
     queue.regist (group, nonsense, callback, progress) ->
       progress('progress')
+      progress('progress')
       callback(null, 'result')
 
   it 'Should Enqueue Successfully', (done) ->
-    progressed = off
+    progressed = 0
     enqueued = off
     queue.enqueue uuid.v4(), 'nonsense', (->
       enqueued.should.equal(off)
       enqueued = on
     ), ((result) ->
       result.should.equal('result')
-      progressed.should.equal(on)
+      progressed.should.equal(2)
       done()
     ), (progress) ->
-      enqueued.should.equal(on)
+      progressed++
       progress.should.equal('progress')
-      progressed.should.equal(off)
-      progressed = on

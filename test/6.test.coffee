@@ -34,7 +34,7 @@ describe "in cluster, Process #{total_tasks} Tasks of #{total_groups} Groups by 
             create_worker()
 
     do reschedule = ->
-      queue.reschedule (err, statistics) ->
+      queue.retry (err, statistics) ->
         setTimeout reschedule, 100
 
     # console.log 'wait_until_done'

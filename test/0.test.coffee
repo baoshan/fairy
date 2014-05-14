@@ -18,7 +18,6 @@ describe ["Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_wor
   it "Should Enqueue Successfully", (done) ->
     enqueue_tasks queue, total_groups, total_tasks, done
 
-  # return
   it "Should All Be Processed", (done) ->
       while total_workers--
         exec "coffee #{__dirname}/workers/perfect.coffee #{task_name}"

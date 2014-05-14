@@ -23,7 +23,7 @@ describe ["Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_wor
       exec "coffee #{__dirname}/workers/fail-and-block.coffee #{task_name}"
 
     do reschedule = ->
-      queue.reschedule (err, statistics) ->
+      queue.retry (err, statistics) ->
         setTimeout reschedule, 100
 
     wait_until_done queue, total_tasks, done

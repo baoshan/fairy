@@ -43,10 +43,10 @@ describe "in cluster, Process #{total_tasks} Tasks of #{total_groups} Groups by 
             # console.log 're creating'
             killed++
             create_worker()
-        console.log cp.pid
+        # console.log cp.pid
 
     do reschedule = ->
-      queue.reschedule (err, statistics) ->
+      queue.retry (err, statistics) ->
         setTimeout reschedule, 100
 
     wait_until_done queue, total_tasks, ->
@@ -56,7 +56,7 @@ describe "in cluster, Process #{total_tasks} Tasks of #{total_groups} Groups by 
   it "Should Cleanup Elegantly on Interruption", (done) ->
     for child_process in child_processes
       do (child_process) ->
-        console.log 'kill', child_process.pid
+        # console.log 'kill', child_process.pid
         # setTimeout ->
         exec("/bin/bash -c 'kill -SIGINT #{child_process.pid}'", (err, res) -> )# console.log err, res)
         # , 10000

@@ -67,12 +67,13 @@ prefix  = 'FAIRY'
 # ### Module Scope Variables
 #
 # + all registered workers;
-# + whether is shutting down;
-# + whether any uncaught exception thrown;
-workers            = []
-shutting_down      = off
-uncaught_exception = off
-callbacks          = {}
+# + `complete` and `progress` callbacks for unfinished tasks;
+# + whether the process is shutting down;
+# + whether any uncaught error thrown.
+workers       = []
+callbacks     = {}
+shutting_down = off
+error         = off
 
 
 # ### CommonJS Module Definition
@@ -103,14 +104,15 @@ module.exports =
 # Fairy will shut down the process gracefully when:
 #
 #   + Soft kill signal received;
-#   + `uncaughtException` captured.
+#   + `uncaughtException` captured;
+#   + `error` captured from worker `domain`.
 
 
 # ### Shut Down Procedure
 #
 #   1. Send soft kill signal to slave processes;
-#   2. Shut down idle workers;
-#   3. When `shut down` multiple times (force shut down), shut down busy worers;
+#   2. When `shut down` multiple times (force shut down), shut down busy worers;
+#   3. Shut down idle workers;
 #   4. End the process when all workers and all slave processes shut down.
 shut_down = (signo = 'SIGTERM') ->
 
@@ -118,21 +120,21 @@ shut_down = (signo = 'SIGTERM') ->
     worker.suicide = on
     worker.process.kill(signo)
 
+  if shutting_down
+    return workers
+    .filter(({task}) -> task)
+    .forEach((worker) -> worker.shut_down(on))
+    
+  shutting_down = on
+
   workers
   .filter(({idle}) -> idle)
-  .forEach((worker) -> worker.shut_down())
-
-  if shutting_down
-    workers
-    .filter(({busy}) -> busy)
-    .forEach((worker) -> worker.shut_down())
+  .forEach((worker) -> worker.shut_down(on))
 
   do waiting_to_exit = ->
     if workers.length or Object.keys(cluster.workers or {}).length
       return setTimeout(waiting_to_exit, 10)
-    process.exit(if uncaught_exception then 1 else 0)
-
-  shutting_down = on
+    process.exit(if error then 1 else 0)
 
 
 # ### Soft Kill Signals
@@ -155,8 +157,7 @@ shut_down = (signo = 'SIGTERM') ->
   'SIGUSR2'
   'SIGTERM'
   'SIGABRT'
-].forEach (signo) ->
-  process.on(signo, shut_down.bind(@, signo))
+].forEach (signo) -> process.on(signo, shut_down.bind(@, signo))
 
 
 # ### Uncaught Exception
@@ -165,7 +166,7 @@ shut_down = (signo = 'SIGTERM') ->
 # with exceptions not thrown by a worker.
 process.on 'uncaughtException', (err) ->
   console.error err.stack
-  uncaught_exception = on
+  error = on
   shut_down()
 
 
@@ -300,7 +301,7 @@ class Fairy
 #
 #   + Placing tasks -- `enqueue`
 #   + Regist handlers -- `regist`
-#   + Reschedule tasks -- `reschedule`
+#   + Retry failed tasks -- `retry`
 #   + Query status --
 #     - `recently_finished_tasks`
 #     - `failed_tasks`
@@ -398,9 +399,6 @@ class Queue
       complete: callback_complete
       progress: callback_progress
 
-      # if typeof callback not in ['function']
-      # args.push callback
-      # callback = undefined
     @redis.multi()
       .rpush(@key('SOURCE'), JSON.stringify([task_id, group, args..., Date.now()]))
       .sadd(@key('GROUPS'), "#{JSON.stringify(group)}")
@@ -429,7 +427,7 @@ class Queue
   # ### Re-Schedule Failed and Blocked Tasks
 
   # Requeue the failed and blocked tasks into `SOURCE` list. Useful for failure
-  # recovery. `reschedule` will:
+  # recovery. `retry` will:
   #
   #   1. Requeue tasks in the `FAILED` list into `SOURCE` list, and,
   #   2. Pop all blocked tasks (`QUEUED` lists listed in the `BLOCKED` set,
@@ -437,19 +435,19 @@ class Queue
   #   who blocked the queue which is already requeued in step 1) into `SOURCE`
   #   list.
   #
-  # Above commands should be protected by a transaction. `reschedule` is an
+  # Above commands should be protected by a transaction. `retry` is an
   # asynchronous method. Arguments of the callback function follow node.js error
   # handling convention: `err` and `res`. On success, the `res` object will be
   # the same as the `res` object of `statistics` method.
   #
   # **Usage:**
   #
-  #     queue.reschedule (err, statistics) -> # YOUR CODE
-  reschedule: (callback) =>
+  #     queue.retry (err, statistics) -> # YOUR CODE
+  retry: (callback) =>
 
     client = create_client @fairy.options
 
-    do reschedule = =>
+    do retry = =>
       # Make sure `FAILED` list and `BLOCKED` set are not touched during the
       # transaction.
       client.watch @key('FAILED')
@@ -459,10 +457,10 @@ class Queue
       client.hlen @key('PROCESSING'), (err, res) =>
         if res
           client.unwatch()
-          return reschedule()
+          return retry()
 
         # Push all failed tasks (without last two parameters: error message and
-        # failure time) into a temporary task array storing tasks to be rescheduled.
+        # failure time) into a temporary task array storing tasks to be retryd.
         # Then, get all blocked groups.
         @failed_tasks (err, tasks) =>
           requeued_tasks = []
@@ -470,7 +468,7 @@ class Queue
 
           @blocked_groups (err, groups) =>
             # Make sure all blocked `QUEUED` list are not touched when you
-            # reschedule tasks in them. Then, start the transaction as:
+            # retry tasks in them. Then, start the transaction as:
             #
             #   1. Push tasks in the temporary task array into `SOURCE` list.
             #   2. Delete `FAILED` list.
@@ -478,7 +476,7 @@ class Queue
             #   4. Delete `BLOCKED` set.
             #
             # Commit the transaction, re-initiate the transaction when concurrency
-            # occurred, otherwise the reschedule is finished.
+            # occurred, otherwise the retry is finished.
             client.watch groups.map((group) => "#{@key('QUEUED')}:#{group}")... if groups.length
             start_transaction = =>
               multi = client.multi()
@@ -495,7 +493,7 @@ class Queue
                   @redis.publish(@key('ENQUEUED'), "")
                   @statistics callback
                 else
-                  reschedule callback
+                  retry callback
 
             # If there're blocked task groups, then:
             # 
@@ -884,7 +882,6 @@ class Worker
 
   constructor: (@queue, @handler) ->
     {@name, @fairy, @redis, @pubsub} = queue
-    # @redis = create_client queue.fairy.options
     @id = uuid.v4()
     @redis.hset @key('WORKERS'), @id, "#{os.hostname()}|#{server_ip()}|#{process.pid}|#{Date.now()}"
 
@@ -892,6 +889,7 @@ class Worker
     @pubsub.on 'message', (channel, message) =>
       return unless channel in [@key('ENQUEUED')]
       @start() if @idle
+    @idle = on
     @start()
     
   key: (key) -> "#{prefix}:#{key}:#{@name}"
@@ -913,8 +911,7 @@ class Worker
   #
   # If there's no tasks in the `SOURCE` list, take worker into `idle` state.
   start: =>
-    @idle = on
-    return @shut_down() if shutting_down or uncaught_exception
+    return @shut_down() if shutting_down or error
     @idle = off
     @redis.watch @key('SOURCE')
     @redis.lindex @key('SOURCE'), 0, (err, res) =>
@@ -957,7 +954,7 @@ class Worker
     errors = []
 
     handler_callback = (err, res) =>
-      @busy = off
+      delete @task
       return if @shutting_down
 
       # Error handling routine:
@@ -1004,7 +1001,6 @@ class Worker
       #   4. Track tasks take the longest processing time in `SLOWEST` sorted
       #   set.
       else
-        # console.log 'FAIRY:COMPLETE', task[0]
         finish_time  = Date.now()
         process_time = finish_time - start_time
         @redis.multi()
@@ -1027,12 +1023,11 @@ class Worker
       d = domain.create()
 
       d.on 'error', (error) =>
-        uncaught_exception = on
+        error = on
         console.error error.stack
         handler_callback (do: 'block', message: error.stack)
 
       d.run =>
-        @busy = on
         @handler(task[1...-1]..., handler_callback, (progress) => @redis.publish 'FAIRY:PROGRESS', JSON.stringify [task[0], progress])
 
 
@@ -1086,16 +1081,20 @@ class Worker
           @start()
 
 
-  # ### Exit When All Queues are Cleaned Up
+  # ### Shut Down Worker
   #
-  # **Private** method. Wait if there're queues still working, or exit the
-  # process immediately.
-  shut_down: ->
-    if @busy
-      @redis.rpush(@key('FAILED'), JSON.stringify([@task..., Date.now(), ['Force exiting.']]))
+  # + If the worker is busy, `fail` and `block` the current task, clear `processing`;
+  # + Unregist the worker;
+  # + Remove the worker from registered workers array.
+  # + Request the process to be shut down.
+  shut_down: (do_not_bubble) ->
+    return if @shutting_down
+    @shutting_down = on
+    if @task
       @redis.hdel(@key('PROCESSING'), @id)
+      @redis.rpush(@key('FAILED'), JSON.stringify([@task..., Date.now(), ['Force shut down manually.']]))
       @redis.sadd(@key('BLOCKED'), @task[1])
+      delete @task
     @redis.hdel(@key('WORKERS'), @id)
     workers.splice(workers.indexOf(@), 1)
-    shut_down() unless shutting_down
-    @shutting_down = on
+    shut_down() unless shutting_down or do_not_bubble
