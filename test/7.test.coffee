@@ -13,11 +13,15 @@ describe ["Enqueuer should receive progress notification"], ->
   it 'Should Enqueue Successfully', (done) ->
     progressed = off
     enqueued = off
-    queue.enqueue uuid.v4(), 'nonsense', (-> enqueued = on), ((result) ->
+    queue.enqueue uuid.v4(), 'nonsense', (->
+      enqueued.should.equal(off)
+      enqueued = on
+    ), ((result) ->
       result.should.equal('result')
       progressed.should.equal(on)
       done()
     ), (progress) ->
       enqueued.should.equal(on)
       progress.should.equal('progress')
+      progressed.should.equal(off)
       progressed = on

@@ -1,4 +1,4 @@
-TESTS = test/*.test.coffee
+TESTS = test/*.test.coffee # test/6.test.coffee
 REPORTER = spec
 NAME    := $(shell node -e "console.log(JSON.parse(require(\
   'fs').readFileSync('package.json', 'utf8')).name)")
