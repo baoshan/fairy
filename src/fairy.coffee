@@ -303,6 +303,7 @@ class Fairy
 #   + Regist handlers -- `regist`
 #   + Retry failed tasks -- `retry`
 #   + Query status --
+#     - `pending_tasks`
 #     - `recently_finished_tasks`
 #     - `failed_tasks`
 #     - `blocked_groups`
@@ -347,20 +348,6 @@ class Queue
   key: (key) -> "#{prefix}:#{key}:#{@name}"
 
 
-  # ### Configurable Parameters
-  #
-  # Prototypal inherited parameters which can be overriden by instance
-  # properties include:
-
-  #   + Polling interval in milliseconds
-  #   + Maximum times of retries
-  #   + Retry interval in milliseconds
-  #   + Storage capacity for newly finished tasks 
-  #   + Storage capacity for slowest tasks
-  retry_limit      : 2
-  retry_delay      : 0.1 * 1000
-  recent_size      : 10
-  slowest_size     : 10
   
 
   # ### Placing Tasks
@@ -532,6 +519,30 @@ class Queue
 
   # ##  Read-Only Operations
 
+  pending_tasks: (callback) =>
+
+    @redis.multi()
+      .smembers(@key('GROUPS'))
+      .lrange(@key('SOURCE'), 0, -1)
+      .exec (multi_err, multi_res) =>
+        return callback multi_err if multi_err
+
+        pending_tasks = multi_res[1].map (entry) ->
+          entry = JSON.parse entry
+          id     : entry[0]
+          params : entry[1...-1]
+          queued : new Date entry.pop()
+
+        multi2 = @redis.multi()
+        multi2.lrange("#{@key('QUEUED')}:#{group}", 1, -1) for group in multi_res[0]
+        multi2.exec (multi2_err, multi2_res) ->
+          return callback multi2_err if multi2_err
+          callback null, pending_tasks.concat multi2_res.reduce(((memo, queued) -> memo.concat queued), []).map((entry) ->
+            entry    = JSON.parse entry
+            id     : entry[0]
+            params : entry[1...-1]
+            queued : new Date entry.pop())
+
   # ### Get Recently Finished Tasks Asynchronously
 
   # Recently finished tasks are tasks stored in the `RECENT` list (in the
@@ -552,15 +563,20 @@ class Queue
   # **Usage:**
   #
   #     queue.recently_finished_tasks (err, tasks) -> YOUR CODE
-  recently_finished_tasks: (callback) =>
+  recently_finished_tasks: (after, callback) =>
+    if typeof after in ['function']
+      callback = after
+      after = undefined
     @redis.lrange @key('RECENT'), 0, -1, (err, res) ->
       return callback err if err
-      callback null, res.map (entry) ->
+      callback null, res.map((entry) ->
         entry = JSON.parse entry
-        id: entry[0]
-        params: entry[1..-3]
-        finished: new Date entry.pop()
-        queued: new Date entry.pop()
+        id       : entry[0]
+        params   : entry[1...-4]
+        finished : new Date entry.pop()
+        start    : new Date entry.pop()
+        queued   : new Date entry.pop()
+      ).filter ({finished}) -> not after or finished >= after
 
 
   # ### Get Failed Tasks Asynchronously
@@ -582,16 +598,21 @@ class Queue
   # **Usage:**
   #
   #     queue.failed_tasks (err, tasks) -> YOUR CODE
-  failed_tasks: (callback) =>
+  failed_tasks: (after, callback) =>
+    if typeof after in ['function']
+      callback = after
+      after = undefined
     @redis.lrange @key('FAILED'), 0, -1, (err, res) ->
       return callback err if err
-      callback null, res.map (entry) ->
+      callback null, res.map((entry) ->
         entry = JSON.parse entry
-        id: entry[0]
-        params: entry[1..-4]
-        reason: entry.pop()
-        failed: new Date entry.pop()
-        queued: new Date entry.pop()
+        id     : entry[0]
+        params : entry[1...-4]
+        reason : entry.pop()
+        failed : new Date entry.pop()
+        start  : new Date entry.pop()
+        queued : new Date entry.pop()
+      ).filter ({failed}) -> not after or failed >= after
 
 
   # ### Get Blocked Groups Asynchronously
@@ -880,6 +901,21 @@ class Queue
 
 class Worker
 
+  # ### Configurable Parameters
+  #
+  # Prototypal inherited parameters which can be overriden by instance
+  # properties include:
+
+  #   + Polling interval in milliseconds
+  #   + Maximum times of retries
+  #   + Retry interval in milliseconds
+  #   + Storage capacity for newly finished tasks 
+  #   + Storage capacity for slowest tasks
+  retry_limit      : 2
+  retry_delay      : 0
+  recent_size      : 100000
+  slowest_size     :  10000
+
   constructor: (@queue, @handler) ->
     {@name, @fairy, @redis, @pubsub} = queue
     @id = uuid.v4()
@@ -942,7 +978,7 @@ class Worker
   # Calling the callback function is the responsibility of you. Otherwise
   # `Fairy` will stop dispatching tasks.
   process: (@task) =>
-    @redis.hset @key('PROCESSING'), @id, JSON.stringify([task..., start_time = Date.now()])
+    @redis.hset @key('PROCESSING'), @id, JSON.stringify([task..., task.start_time = Date.now()])
 
     # Before Processing the Task:
     #
@@ -971,7 +1007,7 @@ class Worker
         switch err.do
           when 'block'
             @redis.multi()
-            .rpush(@key('FAILED'), JSON.stringify([task..., Date.now(), errors]))
+            .rpush(@key('FAILED'), JSON.stringify([task..., task.start_time, Date.now(), errors]))
             .hdel(@key('PROCESSING'), @id)
             .sadd(@key('BLOCKED'), task[1])
             .exec()
@@ -979,7 +1015,7 @@ class Worker
           when 'block-after-retry'
             return setTimeout process_task, @retry_delay if retry_count--
             @redis.multi()
-            .rpush(@key('FAILED'), JSON.stringify([task..., Date.now(), errors]))
+            .rpush(@key('FAILED'), JSON.stringify([task..., task.start_time, Date.now(), errors]))
             .hdel(@key('PROCESSING'), @id)
             .sadd(@key('BLOCKED'), task[1])
             .exec()
@@ -987,7 +1023,7 @@ class Worker
           else
             return setTimeout process_task, @retry_delay if retry_count--
             @redis.multi()
-            .rpush(@key('FAILED'), JSON.stringify([task..., Date.now(), errors]))
+            .rpush(@key('FAILED'), JSON.stringify([task..., task.start_time, Date.now(), errors]))
             .hdel(@key('PROCESSING'), @id)
             .exec()
 
@@ -1002,15 +1038,15 @@ class Worker
       #   set.
       else
         finish_time  = Date.now()
-        process_time = finish_time - start_time
+        process_time = finish_time - task.start_time
         @redis.multi()
         .hdel(@key('PROCESSING'), @id)
         .hincrby(@key('STATISTICS'), 'FINISHED', 1)
-        .hincrby(@key('STATISTICS'), 'TOTAL_PENDING_TIME', start_time - task[task.length - 1])
+        .hincrby(@key('STATISTICS'), 'TOTAL_PENDING_TIME', task.start_time - task[task.length - 1])
         .hincrby(@key('STATISTICS'), 'TOTAL_PROCESS_TIME', process_time)
-        .lpush(@key('RECENT'), JSON.stringify([task..., finish_time]))
+        .lpush(@key('RECENT'), JSON.stringify([task..., task.start_time, finish_time]))
         .ltrim(@key('RECENT'), 0, @recent_size - 1)
-        .zadd(@key('SLOWEST'), process_time, JSON.stringify([task..., start_time]))
+        .zadd(@key('SLOWEST'), process_time, JSON.stringify([task..., task.start_time]))
         .zremrangebyrank(@key('SLOWEST'), 0, - @slowest_size - 1)
         .publish('FAIRY:COMPLETE', JSON.stringify([task[0], res]))
         .exec()
@@ -1092,7 +1128,7 @@ class Worker
     @shutting_down = on
     if @task
       @redis.hdel(@key('PROCESSING'), @id)
-      @redis.rpush(@key('FAILED'), JSON.stringify([@task..., Date.now(), ['Force shut down manually.']]))
+      @redis.rpush(@key('FAILED'), JSON.stringify([@task..., @task.start_time, Date.now(), ['Force shut down manually.']]))
       @redis.sadd(@key('BLOCKED'), @task[1])
       delete @task
     @redis.hdel(@key('WORKERS'), @id)
