@@ -13,7 +13,7 @@ build:
 	@coffee -c$(opt) -o lib src  
 test:
 	@rm -f test/workers/*.dmp
-	@NODE_ENV=test ./node_modules/.bin/mocha  --compilers coffee:coffee-script \
+	@NODE_ENV=test ./node_modules/.bin/mocha  --compilers coffee:coffee-script/register \
 		--reporter $(REPORTER) \
 		--timeout 0 \
 		--slow 50000 \
