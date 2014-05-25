@@ -517,6 +517,78 @@ class Queue
           @statistics callback if callback
 
 
+  # ### Ignore Failed Tasks
+  
+  # Remove **all** tasks of the queue, and reset statistics. Set `TOTAL` to
+  # `PROCESSING` tasks to prevent negative pending tasks being calculated.
+  ignore_failed_tasks: (callback) =>
+
+    client = create_client @fairy.options
+
+    do retry = =>
+      # Make sure `FAILED` list and `BLOCKED` set are not touched during the
+      # transaction.
+      client.watch @key('FAILED')
+      client.watch @key('SOURCE')
+      client.watch @key('BLOCKED')
+      client.watch @key('PROCESSING')
+      client.hlen @key('PROCESSING'), (err, res) =>
+        if res
+          client.unwatch()
+          return retry()
+
+        # Push all failed tasks (without last two parameters: error message and
+        # failure time) into a temporary task array storing tasks to be retryd.
+        # Then, get all blocked groups.
+        @failed_tasks (err, tasks) =>
+          requeued_tasks = []
+          # requeued_tasks.push tasks.map((task) -> JSON.stringify [task.id, task.params..., task.queued.valueOf()])...
+
+          @blocked_groups (err, groups) =>
+            # Make sure all blocked `QUEUED` list are not touched when you
+            # retry tasks in them. Then, start the transaction as:
+            #
+            #   1. Push tasks in the temporary task array into `SOURCE` list.
+            #   2. Delete `FAILED` list.
+            #   3. Delete all blocked `QUEUED` list.
+            #   4. Delete `BLOCKED` set.
+            #
+            # Commit the transaction, re-initiate the transaction when concurrency
+            # occurred, otherwise the retry is finished.
+            client.watch groups.map((group) => "#{@key('QUEUED')}:#{group}")... if groups.length
+            start_transaction = =>
+              multi = client.multi()
+              multi.lpush @key('SOURCE'), requeued_tasks.reverse()... if requeued_tasks.length
+              multi.del @key 'FAILED'
+              multi.del @key 'GROUPS:FAILED'
+              multi.del groups.map((group) => "#{@key('QUEUED')}:#{group}")... if groups.length
+              multi.del @key 'BLOCKED'
+              multi.exec (multi_err, multi_res) =>
+                if multi_err
+                  client.quit()
+                  return callback multi_err
+                if multi_res
+                  client.quit()
+                  @redis.publish(@key('ENQUEUED'), "")
+                  @statistics callback
+                else
+                  retry callback
+
+            # If there're blocked task groups, then:
+            # 
+            #   1. Find all blocked tasks, and:
+            #   2. Push them into the temporary tasks array, finally:
+            #   3. Start the transaction when this is done for all blocked groups.
+            #
+            # Otherwise, start the transaction immediately.
+            if total_groups = groups.length
+              for group in groups
+                client.lrange "#{@key('QUEUED')}:#{group}", 1, -1, (err, res) =>
+                  requeued_tasks.push res...
+                  start_transaction() unless --total_groups
+            else start_transaction()
+
+
   # ##  Read-Only Operations
 
   pending_tasks: (callback) =>
