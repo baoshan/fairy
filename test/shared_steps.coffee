@@ -69,7 +69,7 @@ exports = module.exports =
       # console.log 'probing'
       queue.statistics (err, statistics) ->
         # console.log 'statistics', err, statistics.finished_tasks
-        if statistics.finished_tasks is total_tasks
+        if statistics.finished.tasks is total_tasks
           statistics.pending_tasks.should.equal 0
           statistics.processing_tasks.should.equal 0
           # console.log success_counter

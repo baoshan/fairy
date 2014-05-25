@@ -509,7 +509,7 @@ class Queue
       @redis.keys "#{@key('QUEUED')}:*", (err, res) =>
         return callback? err if err
         @redis.multi()
-        .del(@key('GROUPS'), @key('RECENT'), @key('FAILED'), @key('SOURCE'), @key('STATISTICS'), @key('SLOWEST'), @key('BLOCKED'), res...)
+        .del(@key('GROUPS'), @key('RECENT'), @key('FAILED'), @key('SOURCE'), @key('STATISTICS'), @key('SLOWEST'), @key('BLOCKED'), @key('GROUPS:FINISHED'), @key('GROUPS:FAILED'), res...)
         .hmset(@key('STATISTICS'), 'TOTAL', processing, 'FINISHED', 0, 'TOTAL_PENDING_TIME', 0, 'TOTAL_PROCESS_TIME', 0)
         .exec (err, res) =>
           return callback? err if err
@@ -849,6 +849,8 @@ class Queue
       .llen(@key('FAILED'))
       .smembers(@key('BLOCKED'))
       .hlen(@key('WORKERS'))
+      .scard(@key('GROUPS:FINISHED'))
+      .scard(@key('GROUPS:FAILED'))
       .exec (multi_err, multi_res) =>
         return callback multi_err if multi_err
 
@@ -865,15 +867,19 @@ class Queue
           total:
             groups: multi_res[0]
             tasks: parseInt(statistics.TOTAL) or 0
-          finished_tasks: parseInt(statistics.FINISHED) or 0
+          finished:
+            groups: multi_res[6]
+            tasks: parseInt(statistics.FINISHED) or 0
           average_pending_time: Math.round(statistics.TOTAL_PENDING_TIME * 100 / statistics.FINISHED) / 100
           averageprocess_time: Math.round(statistics.TOTAL_PROCESS_TIME * 100 / statistics.FINISHED) / 100
           blocked:
             groups: multi_res[4].length
           processing_tasks: multi_res[2]
-          failed_tasks: multi_res[3]
+          failed:
+            groups: multi_res[7]
+            tasks: multi_res[3]
           workers: multi_res[5]
-        if result.finished_tasks is 0
+        if result.finished.tasks is 0
           result.average_pending_time = '-'
           result.averageprocess_time = '-'
 
@@ -893,7 +899,7 @@ class Queue
         multi2.exec (multi2_err, multi2_res) ->
           return callback multi2_err if multi2_err
           result.blocked.tasks = multi2_res.reduce(((a, b) -> a + b), - result.blocked.groups)
-          result.pending_tasks = result.total.tasks - result.finished_tasks - result.processing_tasks - result.failed_tasks - result.blocked.tasks
+          result.pending_tasks = result.total.tasks - result.finished.tasks - result.processing_tasks - result.failed.tasks - result.blocked.tasks
           callback null, result
 
 
@@ -1008,6 +1014,7 @@ class Worker
           when 'block'
             @redis.multi()
             .rpush(@key('FAILED'), JSON.stringify([task..., task.start_time, Date.now(), errors]))
+            .sadd(@key('GROUPS:FAILED'), task[1])
             .hdel(@key('PROCESSING'), @id)
             .sadd(@key('BLOCKED'), task[1])
             .exec()
@@ -1016,6 +1023,7 @@ class Worker
             return setTimeout process_task, @retry_delay if retry_count--
             @redis.multi()
             .rpush(@key('FAILED'), JSON.stringify([task..., task.start_time, Date.now(), errors]))
+            .sadd(@key('GROUPS:FAILED'), task[1])
             .hdel(@key('PROCESSING'), @id)
             .sadd(@key('BLOCKED'), task[1])
             .exec()
@@ -1024,6 +1032,7 @@ class Worker
             return setTimeout process_task, @retry_delay if retry_count--
             @redis.multi()
             .rpush(@key('FAILED'), JSON.stringify([task..., task.start_time, Date.now(), errors]))
+            .sadd(@key('GROUPS:FAILED'), task[1])
             .hdel(@key('PROCESSING'), @id)
             .exec()
 
@@ -1042,6 +1051,7 @@ class Worker
         @redis.multi()
         .hdel(@key('PROCESSING'), @id)
         .hincrby(@key('STATISTICS'), 'FINISHED', 1)
+        .sadd(@key('GROUPS:FINISHED'), task[1])
         .hincrby(@key('STATISTICS'), 'TOTAL_PENDING_TIME', task.start_time - task[task.length - 1])
         .hincrby(@key('STATISTICS'), 'TOTAL_PROCESS_TIME', process_time)
         .lpush(@key('RECENT'), JSON.stringify([task..., task.start_time, finish_time]))
@@ -1129,6 +1139,7 @@ class Worker
     if @task
       @redis.hdel(@key('PROCESSING'), @id)
       @redis.rpush(@key('FAILED'), JSON.stringify([@task..., @task.start_time, Date.now(), ['Force shut down manually.']]))
+      @redis.sadd(@key('GROUPS:FAILED'), @task[1])
       @redis.sadd(@key('BLOCKED'), @task[1])
       delete @task
     @redis.hdel(@key('WORKERS'), @id)
