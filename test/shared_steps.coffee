@@ -27,7 +27,7 @@ exports = module.exports =
       # console.log queue.name, statistics
       statistics.total.groups.should.equal 0
       statistics.total.tasks.should.equal 0
-      statistics.pending_tasks.should.equal 0
+      statistics.pending.tasks.should.equal 0
       done()
         # , 100
 
@@ -40,7 +40,7 @@ exports = module.exports =
           should.not.exist err
           statistics.total.groups.should.equal total_groups
           statistics.total.tasks.should.equal total_tasks
-          statistics.pending_tasks.should.equal total_tasks
+          statistics.pending.tasks.should.equal total_tasks
           done()
       group = parseInt Math.random() * total_groups
       sequence = group_sequence[group]++
@@ -70,7 +70,7 @@ exports = module.exports =
       queue.statistics (err, statistics) ->
         # console.log 'statistics', err, statistics.finished_tasks
         if statistics.finished.tasks is total_tasks
-          statistics.pending_tasks.should.equal 0
+          statistics.pending.tasks.should.equal 0
           statistics.processing_tasks.should.equal 0
           # console.log success_counter
           return done() if success_counter++ is 3
@@ -86,7 +86,7 @@ exports = module.exports =
           queue.statistics (err, statistics) ->
             return setTimeout get_statistics, 100 unless statistics.workers is 0
             return setTimeout get_statistics, 100 unless success_counter++ is 3
-            statistics.pending_tasks.should.equal 0
+            statistics.pending.tasks.should.equal 0
             done()
     , 2000
 
@@ -96,7 +96,7 @@ exports = module.exports =
       queue.statistics (err, statistics) ->
         return setTimeout get_statistics, 100 unless statistics.workers is 0
         return setTimeout get_statistics, 100 unless success_counter++ is 3
-        statistics.pending_tasks.should.equal 0
+        statistics.pending.tasks.should.equal 0
         done()
 
   check_result: (total_groups, done) ->

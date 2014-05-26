@@ -591,6 +591,17 @@ class Queue
 
   # ##  Read-Only Operations
 
+  pending_groups: (callback) =>
+
+    @pending_tasks (err, pending_tasks) =>
+      return callback err if err
+      groups = {}
+      for pending_task in pending_tasks
+        groups[JSON.stringify(pending_task.params[0])] = 1
+      callback null, Object.keys(groups)
+
+  # ##  Read-Only Operations
+
   pending_tasks: (callback) =>
 
     @redis.multi()
@@ -950,6 +961,7 @@ class Queue
           failed:
             groups: multi_res[7]
             tasks: multi_res[3]
+          pending: {}
           workers: multi_res[5]
         if result.finished.tasks is 0
           result.average_pending_time = '-'
@@ -968,11 +980,14 @@ class Queue
         #      pending = total - finished - processing - failed - blocked
         multi2 = @redis.multi()
         multi2.llen "#{@key('QUEUED')}:#{group}" for group in multi_res[4]
-        multi2.exec (multi2_err, multi2_res) ->
+        multi2.exec (multi2_err, multi2_res) =>
           return callback multi2_err if multi2_err
           result.blocked.tasks = multi2_res.reduce(((a, b) -> a + b), - result.blocked.groups)
-          result.pending_tasks = result.total.tasks - result.finished.tasks - result.processing_tasks - result.failed.tasks - result.blocked.tasks
-          callback null, result
+          result.pending.tasks = result.total.tasks - result.finished.tasks - result.processing_tasks - result.failed.tasks - result.blocked.tasks
+          @pending_groups (err, pending_groups) ->
+            return callback err if err
+            result.pending.groups = pending_groups.length
+            callback null, result
 
 
 # ### Worker Definition
