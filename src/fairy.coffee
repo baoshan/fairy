@@ -442,9 +442,9 @@ class Queue
       client.watch @key('BLOCKED')
       client.watch @key('PROCESSING')
       client.hlen @key('PROCESSING'), (err, res) =>
-        if res
-          client.unwatch()
-          return retry()
+        # if res
+        #   client.unwatch()
+        #   return retry()
 
         # Push all failed tasks (without last two parameters: error message and
         # failure time) into a temporary task array storing tasks to be retryd.
@@ -464,6 +464,7 @@ class Queue
             #
             # Commit the transaction, re-initiate the transaction when concurrency
             # occurred, otherwise the retry is finished.
+            
             client.watch groups.map((group) => "#{@key('QUEUED')}:#{group}")... if groups.length
             start_transaction = =>
               multi = client.multi()
@@ -533,9 +534,9 @@ class Queue
       client.watch @key('BLOCKED')
       client.watch @key('PROCESSING')
       client.hlen @key('PROCESSING'), (err, res) =>
-        if res
-          client.unwatch()
-          return retry()
+        # if res
+        #   client.unwatch()
+        #   return retry()
 
         # Push all failed tasks (without last two parameters: error message and
         # failure time) into a temporary task array storing tasks to be retryd.
