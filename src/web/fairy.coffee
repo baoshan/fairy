@@ -1,133 +1,140 @@
+# 为页面绑定详细列表弹出事件
+bind_detail_table = (name, item_id, is_load) ->
+  ['recently_finished_tasks', 'failed_tasks', 'processing_tasks', 'workers'].forEach (value) ->
+    $("#ctx#{item_id}").append "<div id='#{value}_#{item_id}' class='error_list' ></div>" if is_load
+    $("#btn_#{value}_#{item_id}").on 'click', {name: name, value: value, item_id: item_id}, render_detail
 
-# 统计列表的模板数组
-statistics_template = [
-  '<table class="table table-bordered overview">',
-  '<thead><tr><th>Queue</th><th>Workers</th><th>Avg. Time</th><th>Total</th><th>Finished</th><th>Processing</th><th>Pending</th><th>Failed</th><th>Blocked</th><th>Schedule</th><th>Clear</th></tr></thead>',
-  '<tbody>',
-  '<% _.each(data, function(item){ %>',
-  '<tr>',
-  '<td><%= item.name %></td><td><%= item.workers%></td><td><%= parse_avgtime(parseFloat(item.average_pending_time + item.average_process_time).toFixed(2))%></td><td><span><%= item.total.tasks%></span><span>/</span><span><%= item.total.groups%><span></td><td><%= item.finished_tasks%></td><td><%= item.processing_tasks%></td><td><%= item.pending_tasks%></td><td><%= item.failed_tasks%></td><td><span><%= item.blocked.tasks%></span><span>/</span><span><%= item.blocked.groups%><span></td><td><button class="btn_reschedule">Schedule</button></td><td><button class="btn_clear">Clear</button></td>',
-  '</tr>',
-  '<%})%>',
-  '</tbody>',
-  '<tfoot>',
-  '<tr>',
-  '<td>Total</td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.workers); }, 0)%></td><td>-</td><td><span><%= _.reduce(data, function(memo, item){ return memo + Number(item.total.tasks); }, 0)%></span><span>/</span><span><%= _.reduce(data, function(memo, item){ return memo + Number(item.total.groups); }, 0) %></span></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.finished_tasks); }, 0)%></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.processing_tasks); }, 0)%></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.pending_tasks); }, 0)%></td><td><%= _.reduce(data, function(memo, item){ return memo + Number(item.failed_tasks); }, 0)%></td><td><span><%= _.reduce(data, function(memo, item){ return memo + Number(item.blocked.tasks); }, 0)%></span><span>/</span><span><%= _.reduce(data, function(memo, item){ return memo + Number(item.blocked.groups); }, 0)%></span></td><td>&nbsp;</td><td>&nbsp;</td>',
-  '</tr>',
-  '</tfoot>',
-  '</table>'
-]
+# 渲染详细页面数据
+render_detail = (event) ->
+		{name, value, item_id} = event.data
+		a = new Date().getTime()
+		$.get "/fairy/detail/#{name}/#{value}", (result) ->
+		  console.log new Date().getTime() - a, 'dd'
+				param = {}
+		  param[value] =
+				  data: result
+				  _id: "#{value}_#{item_id}"
+				$("##{value}_#{item_id}").html _.template($("#tb_#{value}_template").html(), param)
+    $("##{value}_#{item_id}").show()
+				$("##{value}_#{item_id}").find("button[type='button']").on 'click', -> $(@).parent().hide()
+				$("##{value}_#{item_id}").find("button[type='action']").each () ->
+						$(@).on 'click', -> $.get("/fairy/#{name}/#{$(@).attr('data-fuc')}", ->
+								$("##{value}_#{item_id}").find('button[type=button]').trigger 'click'
+								render_master(off, on)
+						)
 
-# 用以当队列信息发生变化，更新统计列表的total行
-statistics = []
+# 声明d3使用变量
+margin = {top: 20, right: 20, bottom: 30, left: 50}
+width = 381 - margin.left - margin.right
+height = 102 - margin.top - margin.bottom
+y = d3.scale.linear().range([height, 0])
+x = d3.scale.linear().range([0, width])
+yAxis = d3.svg.axis()
+		.scale(y)
+		.orient("left")
+		.tickSize(-width)
+		.ticks(2)
+		.tickFormat((d) -> d)
 
-# 下拉列表选中索引
-select_index = 0
+# 设置x轴显示坐标
+set_xAxis = (draw_data) ->
+		_(draw_data)
+		  .chain()
+				.groupBy((task) -> ~~(task.time / 12))
+				.map((task, key) -> key * 12)
+				.filter((time, index) -> moment(time*5*60*1000).format('HH') in ['00', '06', '12', '18'])
+				.value()
 
-# 刷新时间间隔
-interval = $("select option:selected").val()
+# 根据数据绘制图形
+draw = (draw_data) ->
+		x_arr = set_xAxis(draw_data)
+  xAxis = d3.svg.axis()
+				.scale(x)
+				.orient("bottom")
+				.tickValues(x_arr)
+				.tickFormat((d) -> moment(d*5*60*1000).format('HH:mm'))
+		line = d3.svg.line()
+		  .x((d) -> x(d.time))
+		  .y((d) -> y(d.value))
+		svg = d3.select(document.createElement('svg'))
+		svg_g = svg.attr("width", width + margin.left + margin.right)
+				.attr("height", height + margin.top + margin.bottom)
+				.append('g')
+				.attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+		x.domain(d3.extent(draw_data, (d) -> d.time ))
+		y.domain(d3.extent(draw_data, (d) -> d.value))
+		svg_g.append("g")
+		  .attr("class", "x axis")
+				.attr("transform", "translate(0," + height + ")")
+				.call(xAxis)
+		gy = svg_g.append("g")
+				.attr("class", "y axis")
+				.call(yAxis)
+		gy.selectAll("g").filter((d) -> d)
+    .classed("minor", true)
+  gy.selectAll("text")
+    .attr("x", 4)
+    .attr("dy", -4)
+		svg_g.append("path")
+		  .datum(draw_data)
+				.attr("class", "line")
+				.attr("d", line(draw_data))
+  svg
+
+# 创建页面dom节点
+# 为最外侧容器context设置宽度
+create_dom = (render_data, is_load, fetch_time) ->
+		#render_data = render_data.concat(render_data)
+		#render_data = render_data.concat(render_data)
+		#render_data = _.initial render_data
+		render_data.forEach (item_data, index) ->
+				[
+						'draw_processing_num_avg',
+				  'draw_processing_time_avg',
+						'draw_processing_percent_avg',
+						'draw_work_avg'
+				].forEach (value) ->
+      item_data[value] = draw(item_data[value]).node().outerHTML
+				item_data.id = index
+				if is_load
+      $('#context_template').append("<div id='ctx#{item_data.id}' class='graphs'></div>")
+						$("#ctx#{item_data.id}").append("<div id='tb_#{item_data.id}'></div>")
+				  $('#context_template').width $('#context_template >').outerWidth() * render_data.length
+				timer() if fetch_time
+				$("#tb_#{item_data.id}").html _.template($('#dashboard_template').html().toString(), item_data)
+				bind_detail_table(item_data.name, item_data.id, is_load)
+		scroll_to current_index()
+
+# 渲染页面统计数据
+# 清空模板
+render_master = (is_load, fetch_timer) ->
+		$.get '/fairy/statistics', (render_data) ->
+				create_dom render_data, is_load, fetch_timer
 
 # 页面加载事件
 $ ->
-  $('select').find("option:nth-child(1)").attr("selected","true")
-  render_master()
-  events_bind()
+  console.log 'web'
+		render_master(on, on)
 
-# 渲染队列统计列表信息
-render_master = () ->
-  console.log (new Date).toString()
-  $('button').die("click")
-  $.get('/api/queues/statistics', (data) ->
-    $('#m_statistics').html _.template(statistics_template.join(''), { data : data})
-    if $('#queque_detail').is(":visible")
-      $($('#m_statistics tbody tr')[select_index]).attr("class","active")
-      name = $($($('#m_statistics tbody tr')[select_index]).find('td:first')).html()
-      render_slave name
-    setTimeout render_master, interval*1000
-  )
+# 定时刷新页面
+timer = ->
+  clearInterval timer
+		setInterval render_master, 20000
 
-# 对指定队列的所有相关明细（统计信息、最近处理任务、失败任务汇总、用时最长任务、处理中任务、工人）数据的渲染
-render_slave = (name) ->
-  commands = [
-    'statistics'
-    'recently_finished_tasks'
-    'failed_tasks'
-    'slowest_tasks'
-    'processing_tasks'
-    'workers'
-  ]
-  for command in commands
-    do (command) ->
-      $.get('/api/queues/' + name + "/#{command}", (results) ->
-        param = {}
-        param[command] = results
-        $("#s_#{command}").html _.template($("#tb_#{command}_template").html(), param)
-        if command is 'failed_tasks'
-          $(".failed_popover").find(".nav-tabs>li:first").addClass("active")
-          $(".failed_popover").find(".tab-content>div:first").addClass("active")
-      )
+# 获得当前展示为第几个仪表盘
+current_index = -> $('#context_template').position().left / task_property().context_width
 
-# 注册reschedule和clear事件
-events_bind = () ->
-  $('#m_statistics').find('tbody tr').live 'click', () ->
-    $('#m_statistics tr').removeAttr('class')
-    $(this).attr("class","active")
-    select_index = $(this).index()
-    name = $($(this).find('td')[0]).html()
-    render_slave name
-    $('#queque_detail').show()
+# 获得当前单个仪表盘宽度和仪表盘数量
+task_property = ->
+  context_width:0 - $('#context_template >').outerWidth()
+  task_total: $('#context_template >').length
 
-  for command in ['reschedule', 'clear']
-    do (command) ->
-      $("#m_statistics .btn_#{command}").live 'click', (event)->
-        event.stopPropagation()
-        name = $(@).parent().parent().find('td:first').html()
-        that = @
-        $.ajax({
-          type: 'POST'
-          url: '/api/queues/' + name + "/#{command}"
-          success: (result) ->
-            $(that).parent().parent().html _.template(statistics_template[5], { item: result })
-            index = $(that).parent().parent().index()
-            statistics[index] = result
-            $('#m_statistics tr:last').html _.template(statistics_template[11], { data: statistics })
-        })
+# 控制内容在可视窗口内移动
+scroll_to = (index) ->
+  $('#context_template').css('left', task_property().context_width * index )
+		$('#button_prev')[if index > 0 then 'show' else 'hide']()
+		$('#button_next')[if index < task_property().task_total - 2 then 'show' else 'hide']()
 
-
-# 下拉列表改变事件
-$("select").change () ->
-  interval = $(@).val()
-
-# 点击图标切换 统计 下显示表格的方式
-$('.icon-th').click () ->
-  $('#s_workers + .tabbable').addClass('xz')
-  $(this).addClass('active')
-  $('.icon-th-large').removeClass('active')
-
-$('.icon-th-large').click () ->
-  $('#s_workers + .tabbable').removeClass('xz')
-  $(this).addClass('active')
-  $('.icon-th').removeClass('active')
-
-#顶部阴影
-$(document).scroll () ->
-  scroll_top = $(document).scrollTop()
-  if scroll_top > 40
-    $('h1').addClass("h1_shadow")
-  else
-    $('h1').removeClass("h1_shadow")
-
-# 转化毫秒形式
-@parse_milliseconds = (milli) ->
-  second = milli/1000
-  return milli+'ms' if second < 1
-  return Math.floor(second)+'s' if(1<second<60)
-  Math.floor(second/60)+'m'+':'+Math.floor(second%60)+'s' if second > 60
-
-# 提供页面产生唯一编号
-@id_factory = () ->
-  i = 0
-  return {new: () -> return i++ }
-
-@parse_avgtime = (avgtime) ->
-  if(!isNaN(avgtime)) then avgtime else '-'
+# 左右按钮事件
+$('#button_prev').click(-> scroll_to(current_index() - 1))
+$('#button_next').click(-> scroll_to(current_index() + 1))
