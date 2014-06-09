@@ -79,7 +79,7 @@
         </div>
       </div> 
       <div class="graph row">
-								<div class="data arrows" data-page= <%= "processing_tasks_"+id %> id= <%= "btn_processing_tasks_"+id %> >
+								<div class="data arrows" data-page= <%= "blocked_groups_"+id %> id= <%= "btn_blocked_groups_"+id %> >
 										<h2>Blocked
 												<a> 〉</a> 
 										</h2>
@@ -201,8 +201,8 @@
 				  <% }) %>
 		</table>	
 </div>
-				<button type="reset">clear</button>
-				<button type="submit">schedule</button>
+  <button type='action' data-fuc='clear' >clear</button>
+  <button type='action' data-fuc='retry' >schedule</button>
 </script>
 
 <script id="tb_failed_tasks_template" class="error_list"  type = "template/underscore">
@@ -250,7 +250,7 @@
 
 </script>
 
-<script id="tb_processing_tasks_template" class="error_list"  type = "template/underscore">
+<script id="tb_blocked_groups_template" class="error_list"  type = "template/underscore">
 		<button type="button" class="close" >×</button>
 		<h1>
 				<%= name%>
@@ -264,7 +264,7 @@
 								<th>Queued</th>
 								<th>Started</th>
 						</tr>
-						<% _.each(processing_tasks.data, function(item) { %>
+						<% _.each(blocked_groups.data, function(item) { %>
 				  <tr class="items_content">
 								<td><%= item.id.substring(0,8) %></td>
 								<td>
@@ -278,8 +278,8 @@
 						<% }) %>
 		</table>
 </div>
-				<button type="reset">clear</button>
-				<button type="submit">schedule</button>
+    <button type='action' data-fuc='clear' >clear</button>
+    <button type='action' data-fuc='retry' >schedule</button>
 </script>
 
 <script id="tb_workers_template" class="error_list"  type = "template/underscore">

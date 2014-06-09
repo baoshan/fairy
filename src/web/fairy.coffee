@@ -1,15 +1,13 @@
 # 为页面绑定详细列表弹出事件
 bind_detail_table = (name, item_id, is_load) ->
-  ['recently_finished_tasks', 'failed_tasks', 'processing_tasks', 'workers'].forEach (value) ->
+  ['recently_finished_tasks', 'failed_tasks', 'blocked_groups', 'workers'].forEach (value) ->
     $("#ctx#{item_id}").append "<div id='#{value}_#{item_id}' class='error_list' ></div>" if is_load
-    $("#btn_#{value}_#{item_id}").on 'click', {name: name, value: value, item_id: item_id}, render_detail
+				$("#btn_#{value}_#{item_id}").on 'click', {name: name, value: value, item_id: item_id}, render_detail
 
 # 渲染详细页面数据
 render_detail = (event) ->
 		{name, value, item_id} = event.data
-		a = new Date().getTime()
 		$.get "/fairy/detail/#{name}/#{value}", (result) ->
-		  console.log new Date().getTime() - a, 'dd'
 				param = {}
 		  param[value] =
 				  data: result
@@ -112,9 +110,7 @@ render_master = (is_load, fetch_timer) ->
 				create_dom render_data, is_load, fetch_timer
 
 # 页面加载事件
-$ ->
-  console.log 'web'
-		render_master(on, on)
+$ -> render_master(on, on)
 
 # 定时刷新页面
 timer = ->

@@ -9,7 +9,7 @@ TARBALL := $(NAME)-$(VERSION).tgz
 build:
 	@NODE_ENV=build mkdir -p lib/web
 	@cp src/web/fairy.html lib/web/fairy.html
-	@cp src/web/fairy.css  lib/web/fairy.css
+	@cp src/web/fairy.css lib/web/fairy_dashboard.css
 	@coffee -c$(opt) -o lib src  
 test:
 	@rm -f test/workers/*.dmp

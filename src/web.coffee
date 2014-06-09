@@ -159,7 +159,7 @@ router.use '/statistics', (req, res, next) ->
 										draw_work_avg: work_data.draw_data
 								res.send result if index is statistics.length - 1
 
-['recently_finished_tasks', 'failed_tasks', 'processing_tasks', 'workers'].forEach (command)->
+['recently_finished_tasks', 'failed_tasks', 'blocked_groups', 'workers'].forEach (command)->
   router.use "/detail/:name/#{command}", (req, res, next) ->
 		  connect.fairy.queue(req.params.name)[command] (err, statistics) -> res.send statistics
 
