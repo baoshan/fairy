@@ -2,11 +2,14 @@ express     = require 'express'
 router      = new express.Router()
 _           = require 'underscore'
 static_     = express.static __dirname + '/web'
-module.exports.connect = (options = {}) -> router
+connect = null
+module.exports.connect = (options = {}) ->
+  connect = new Connect(options)
+  router
 
 class Connect
-		constructor: ->
-    @fairy = require('../.').connect({host: '10.162.196.27', password: 'bEGGA-55376'})
+		constructor: (options)->
+    @fairy = require('../.').connect(options)
   
 		# 按5分钟格式化
   format_date: (time) -> time.valueOf() / (5 * 60 * 1000)
@@ -134,9 +137,9 @@ math_ceil = (number) -> (Math.ceil(number*100))/100
 
 router.use '/', (req, res, next) -> static_ req, res, next
 
-connect = new Connect()
 router.use '/statistics', (req, res, next) ->
 		connect.fairy.statistics (err, statistics) ->
+				console.log statistics
 				result = []
 				statistics.forEach (value, index) ->
 				  connect.fairy.queue(value.name).recently_finished_tasks new Date().getTime() - 1000*60*60*24, (err, tasks) ->

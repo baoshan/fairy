@@ -98,7 +98,7 @@ create_dom = (render_data, is_load, fetch_time) ->
       $('#context_template').append("<div id='ctx#{item_data.id}' class='graphs'></div>")
 						$("#ctx#{item_data.id}").append("<div id='tb_#{item_data.id}'></div>")
 				  $('#context_template').width $('#context_template >').outerWidth() * render_data.length
-				timer() if fetch_time
+				#timer() if fetch_time
 				$("#tb_#{item_data.id}").html _.template($('#dashboard_template').html().toString(), item_data)
 				bind_detail_table(item_data.name, item_data.id, is_load)
 		scroll_to current_index()
@@ -122,11 +122,12 @@ current_index = -> $('#context_template').position().left / task_property().cont
 
 # 获得当前单个仪表盘宽度和仪表盘数量
 task_property = ->
-  context_width:0 - $('#context_template >').outerWidth()
+  context_width:0 - $('#context_template >').outerWidth(true)
   task_total: $('#context_template >').length
 
 # 控制内容在可视窗口内移动
 scroll_to = (index) ->
+		a = task_property()
   $('#context_template').css('left', task_property().context_width * index )
 		$('#button_prev')[if index > 0 then 'show' else 'hide']()
 		$('#button_next')[if index < task_property().task_total - 2 then 'show' else 'hide']()
