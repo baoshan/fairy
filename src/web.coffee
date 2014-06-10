@@ -76,14 +76,25 @@ class Connect
   time_draw_data: (draw_data, barrels) ->
 				@merge_draw_data _(draw_data).map(({time, value, count}) -> time: time, value: value / count), barrels
 
+  # 处理单位秒和毫秒自适应
+  magic_num = (data) ->
+    if data.avg_data / 1000 > 1
+      data.avg_data = data.avg_data / 1000
+      data.draw_data?.forEach (value) -> value = value / 1000
+      _.extend data, {unit: 's'}
+    else
+      _.extend data, {unit: 'ms'}
+
   # 平均处理、完成时间
   # 参数：1、tasks 需要处理的数据，2、minuend_date 任务起始时，3、percent 去除百分比
 		# 当数值个数等于1的时候去百分比为0，避免出现只有1个值的情况他的百分之98为空
   task_avg: (tasks, minuend_date, percent, barrels) ->
 				percent = 0 if tasks.length is 1
-				avg_data: (_(draw_data = @task_time(tasks, minuend_date, percent)).reduce ((memo, task)->
-				  memo + task.value), 0) / Math.ceil(tasks.length *( 1 - percent))
-				draw_data: if barrels then @time_draw_data draw_data, barrels else barrels
+				magic_num(
+				  avg_data: (_(draw_data = @task_time(tasks, minuend_date, percent)).reduce ((memo, task)->
+				    memo + task.value), 0) / Math.ceil(tasks.length *( 1 - percent))
+				  draw_data: if barrels then @time_draw_data draw_data, barrels else barrels
+    )
 
   # 恢复日期正常毫秒格式
   repair_date: (time) -> parseInt(time) * 5 * 60 * 1000
@@ -137,28 +148,36 @@ math_ceil = (number) -> (Math.ceil(number*100))/100
 
 router.use '/', (req, res, next) -> static_ req, res, next
 
+
+
+
 router.use '/statistics', (req, res, next) ->
 		connect.fairy.statistics (err, statistics) ->
-				console.log statistics
 				result = []
 				statistics.forEach (value, index) ->
 				  connect.fairy.queue(value.name).recently_finished_tasks new Date().getTime() - 1000*60*60*24, (err, tasks) ->
 								barrels = connect.range_time()
 								processing_num_data = connect.processing_avg_num(tasks, barrels)
 						  processing_time_data = connect.task_avg(tasks, 'start', 0, barrels)
-								processing_time_perent_data = connect.task_avg(tasks, 'start', 0.02, barrels)
+								finished_time_data = connect.task_avg(tasks, 'queued', 0)
+								processing_time_percent_data = connect.task_avg(tasks, 'start', 0.02, barrels)
+								finished_time_percent_data = connect.task_avg(tasks, 'queued', 0.02)
 								work_data = connect.busy_avg_work(tasks, barrels)
 								result.push  _.extend statistics[index],
-								  processing_num_avg: math_ceil processing_num_data.avg_data
+								  processing_num_avg: (math_ceil processing_num_data.avg_data) || '-'
 										draw_processing_num_avg: processing_num_data.draw_data
-										processing_group_avg: math_ceil connect.processing_avg_group(tasks)
-										processing_time_avg: math_ceil processing_time_data.avg_data
+										processing_group_avg: (math_ceil connect.processing_avg_group(tasks)) || '-'
+										processing_time_avg: (math_ceil processing_time_data.avg_data) || '-'
 										draw_processing_time_avg: processing_time_data.draw_data
-										finished_time_avg: math_ceil connect.task_avg(tasks, 'queued', 0)['avg_data']
-										processing_time_percent_avg: math_ceil processing_time_perent_data.avg_data
-										draw_processing_percent_avg: processing_time_perent_data.draw_data
-										finished_time_percent_avg: math_ceil connect.task_avg(tasks, 'queued', 0.02)['avg_data']
-										busy_work_num_avg: math_ceil work_data.avg_value
+										processing_time_unit: processing_time_data.unit
+										finished_time_avg: (math_ceil finished_time_data.avg_data) || '-'
+										finished_time_unit: finished_time_data.unit
+										processing_time_percent_avg: (math_ceil processing_time_percent_data.avg_data) || '-'
+										processing_percent_unit: processing_time_percent_data.unit
+										draw_processing_percent_avg: processing_time_percent_data.draw_data
+										finished_time_percent_avg: (math_ceil finished_time_percent_data.avg_data) || '-'
+										finished_time_percent_unit: finished_time_percent_data.unit
+										busy_work_num_avg: (math_ceil work_data.avg_value) || '-'
 										draw_work_avg: work_data.draw_data
 								res.send result if index is statistics.length - 1
 

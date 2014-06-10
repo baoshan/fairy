@@ -136,12 +136,12 @@
           <h2>平均处理时间 / 平均完成时间</h2>
           <span class="number">
 												<label><%= processing_time_avg %>
-														<span>毫秒</span>
+														<span><%= processing_time_unit %></span>
 														<span>Avg. Processing In </span>
 												</label>
 												<span>/</span>
 												<label><%= finished_time_avg %>
-														<span>毫秒</span>
+														<span><%= finished_time_unit %></span>
 														<span>Avg. Finished In </span>
 												</label>
           </span>
@@ -153,12 +153,12 @@
           <h2>98%的平均处理时间、平均完成时间</h2>
           <span class="number">
 												<label><%= processing_time_percent_avg %>
-														<span>毫秒</span>
+														<span><%= processing_percent_unit %></span>
 														<span>Avg. Processing In </span>
 												</label>
 												<span>/</span>
 												<label><%= finished_time_percent_avg %>
-														<span>毫秒</span>
+														<span><%= finished_time_percent_unit  %></span>
 														<span>Avg. Finished In </span>
 												</label>
           </span>
