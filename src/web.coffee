@@ -146,10 +146,9 @@ class Connect
 # 保留小数四舍五入
 math_ceil = (number) -> (Math.ceil(number*100))/100
 
-router.use '/', (req, res, next) -> static_ req, res, next
-
-
-
+router.use '/', (req, res, next) ->
+  req.url = '/fairy.html' if req.url is '/'
+		static_ req, res, next
 
 router.use '/statistics', (req, res, next) ->
 		connect.fairy.statistics (err, statistics) ->
