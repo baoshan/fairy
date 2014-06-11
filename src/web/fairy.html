@@ -192,10 +192,12 @@
 						<% _.each(recently_finished_tasks.data, function(item) { %>
 				    <tr class="items_content">
 								  <td><%= item.id.substring(0,8) %></td>
-								  <%_.each( item.params, function(value){ %>
-										  <%= JSON.stringify(value, null, "  ") %>
-			       <% })%>				
-							  	<td><%= moment.duration((new Date).valueOf()-(new Date(item.queued)).valueOf()).humanize()%></td>
+										<td>
+												<%_.each(item.params, function(value){ %>
+														<%= JSON.stringify(value, null, "  ") %>     
+												<% })%>
+										</td>
+										<td><%= moment.duration((new Date).valueOf()-(new Date(item.queued)).valueOf()).humanize()%></td>
 								  <td><%= moment.duration((new Date).valueOf()-(new Date(item.started)).valueOf()).humanize()%></td>
 						  </tr>
 				  <% }) %>
