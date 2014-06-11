@@ -390,7 +390,7 @@ class Queue
       .rpush(@key('SOURCE'), JSON.stringify([task_id, group, args..., Date.now()]))
       .sadd(@key('GROUPS'), "#{JSON.stringify(group)}")
       .hincrby(@key('STATISTICS'), 'TOTAL', 1)
-      .publish(@key('ENQUEUED'), null)
+      .publish(@key('ENQUEUED'), '')
       .exec(callback_enqueued)
 
   # ### Register Handler
@@ -559,6 +559,7 @@ class Queue
           client.watch groups.map((group) => "#{@key('QUEUED')}:#{group}")... if groups.length
           start_transaction = =>
             multi = client.multi()
+            multi.llen @key 'FAILED'
             multi.lpush @key('SOURCE'), requeued_tasks.reverse()... if requeued_tasks.length
             multi.del @key 'FAILED'
             multi.del @key 'GROUPS:FAILED'
@@ -569,6 +570,7 @@ class Queue
                 client.quit()
                 return callback multi_err
               if multi_res
+                client.hincrby(@key('STATISTICS'), 'TOTAL', -multi_res[0])
                 client.quit()
                 @redis.publish(@key('ENQUEUED'), "")
                 @statistics callback
@@ -717,7 +719,8 @@ class Queue
     @redis.smembers @key('BLOCKED'), (err, res) ->
       return callback err if err
       callback null, res.map (entry) ->
-        entry = JSON.parse entry
+        # entry = JSON.parse entry
+        entry
 
 
   # ### Get Slowest Tasks Asynchronously
