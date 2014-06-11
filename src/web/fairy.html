@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
 		<title>Fairy Dashboard</title>
-		<link href="fairy_dashboard.css" rel="stylesheet" />
+		<link href="/fairy/fairy.css" rel="stylesheet" />
 		<style>
 				@-o-viewport,
 				@-moz-viewport,
@@ -136,12 +136,12 @@
           <h2>平均处理时间 / 平均完成时间</h2>
           <span class="number">
 												<label><%= processing_time_avg %>
-														<span>毫秒</span>
+														<span><%= processing_time_unit %></span>
 														<span>Avg. Processing In </span>
 												</label>
 												<span>/</span>
 												<label><%= finished_time_avg %>
-														<span>毫秒</span>
+														<span><%= finished_time_unit %></span>
 														<span>Avg. Finished In </span>
 												</label>
           </span>
@@ -153,12 +153,12 @@
           <h2>98%的平均处理时间、平均完成时间</h2>
           <span class="number">
 												<label><%= processing_time_percent_avg %>
-														<span>毫秒</span>
+														<span><%= processing_percent_unit %></span>
 														<span>Avg. Processing In </span>
 												</label>
 												<span>/</span>
 												<label><%= finished_time_percent_avg %>
-														<span>毫秒</span>
+														<span><%= finished_time_percent_unit  %></span>
 														<span>Avg. Finished In </span>
 												</label>
           </span>
@@ -192,10 +192,12 @@
 						<% _.each(recently_finished_tasks.data, function(item) { %>
 				    <tr class="items_content">
 								  <td><%= item.id.substring(0,8) %></td>
-								  <%_.each( item.params, function(value){ %>
-										  <td><%= JSON.stringify(value, null, "  ") %></td>
-			       <% })%>				
-							  	<td><%= moment.duration((new Date).valueOf()-(new Date(item.queued)).valueOf()).humanize()%></td>
+										<td>
+												<%_.each(item.params, function(value){ %>
+														<%= JSON.stringify(value, null, "  ") %>     
+												<% })%>
+										</td>
+										<td><%= moment.duration((new Date).valueOf()-(new Date(item.queued)).valueOf()).humanize()%></td>
 								  <td><%= moment.duration((new Date).valueOf()-(new Date(item.started)).valueOf()).humanize()%></td>
 						  </tr>
 				  <% }) %>
@@ -308,10 +310,10 @@
 </div>
 </script>
 
-<script src="http://ajax.aspnetcdn.com/ajax/jQuery/jquery-2.1.1.min.js"></script>
-<script src="http://documentcloud.github.com/underscore/underscore-min.js" type="text/javascript"></script>
-<script src="https://rawgithub.com/timrwood/moment/1.6.2/moment.js" type="text/javascript"></script>
-<script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
-<script src="fairy.js" type="text/javascript"></script>
+<script src="/fairy/vendor/jquery.min.js"></script>
+<script src="/fairy/vendor/underscore.min.js"></script>
+<script src="/fairy/vendor/moment.min.js"></script>
+<script src="/fairy/vendor/d3.min.js"></script>
+<script src="/fairy/fairy.js"></script>
 </body>
 </html>
