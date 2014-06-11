@@ -193,7 +193,7 @@
 				    <tr class="items_content">
 								  <td><%= item.id.substring(0,8) %></td>
 								  <%_.each( item.params, function(value){ %>
-										  <td><%= JSON.stringify(value, null, "  ") %></td>
+										  <%= JSON.stringify(value, null, "  ") %>
 			       <% })%>				
 							  	<td><%= moment.duration((new Date).valueOf()-(new Date(item.queued)).valueOf()).humanize()%></td>
 								  <td><%= moment.duration((new Date).valueOf()-(new Date(item.started)).valueOf()).humanize()%></td>
@@ -308,10 +308,10 @@
 </div>
 </script>
 
-<script src="http://ajax.aspnetcdn.com/ajax/jQuery/jquery-2.1.1.min.js"></script>
-<script src="http://documentcloud.github.com/underscore/underscore-min.js" type="text/javascript"></script>
-<script src="https://rawgithub.com/timrwood/moment/1.6.2/moment.js" type="text/javascript"></script>
-<script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
-<script src="/fairy/fairy.js" type="text/javascript"></script>
+<script src="/fairy/vendor/jquery.min.js"></script>
+<script src="/fairy/vendor/underscore.min.js"></script>
+<script src="/fairy/vendor/moment.min.js"></script>
+<script src="/fairy/vendor/d3.min.js"></script>
+<script src="/fairy/fairy.js"></script>
 </body>
 </html>
