@@ -10,6 +10,7 @@ build:
 	@NODE_ENV=build mkdir -p lib/web
 	@cp src/web/fairy.html lib/web/fairy.html
 	@cp src/web/fairy.css lib/web/fairy.css
+	@cp -r src/web/vendor lib/web/vendor
 	@coffee -c$(opt) -o lib src  
 test:
 	@rm -f test/workers/*.dmp
