@@ -294,6 +294,7 @@
 		  <table border="0" cellpadding="0" cellspacing="0">
 				  <tr>
 						  <th>Host Name</th>
+								<th>Worker Version</th>
 								<th>IP</th>
 								<th>Process ID</th>
 								<th>Start</th>
@@ -301,6 +302,7 @@
 						<% _.each(workers.data, function(item) { %>
 				  <tr class="items_content">
 								<td><%= item.host %></td>
+								<td><%= item.version %></td>
 								<td><%= item.ip %></td>
 						  <td><%= item.pid %></td>
 								<td><%= moment.duration((new Date).valueOf()-(new Date(item.since)).valueOf()).humanize()%></td>
