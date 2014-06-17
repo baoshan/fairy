@@ -93,8 +93,9 @@ error         = off
 #   + `options`, read [node_redis documents] for more detail.
 #
 # [node_redis documents]: https://github.com/mranney/node_redis
+version = require('../package.json').version
 module.exports =
-  version: require('../package.json').version
+  version: version
   connect: (options = {}) ->
     new Fairy options
 
@@ -570,7 +571,7 @@ class Queue
                 client.quit()
                 return callback multi_err
               if multi_res
-                client.hincrby(@key('STATISTICS'), 'TOTAL', -multi_res[0])
+                client.hincrby(@key('STATISTICS'), 'IGNORED', multi_res[0])
                 client.quit()
                 @redis.publish(@key('ENQUEUED'), "")
                 @statistics callback
@@ -658,7 +659,7 @@ class Queue
       callback null, res.map((entry) ->
         entry = JSON.parse entry
         id       : entry[0]
-        params   : entry[1...-4]
+        params   : entry[1..-4]
         finished : new Date entry.pop()
         start    : new Date entry.pop()
         queued   : new Date entry.pop()
@@ -693,7 +694,7 @@ class Queue
       callback null, res.map((entry) ->
         entry = JSON.parse entry
         id     : entry[0]
-        params : entry[1...-4]
+        params : entry[1..-5]
         reason : entry.pop()
         failed : new Date entry.pop()
         start  : new Date entry.pop()
@@ -861,10 +862,11 @@ class Queue
       return callback err if err
       callback null, res.map((entry) ->
         entry = entry.split '|'
-        host: entry[0]
-        ip: entry[1]
-        pid: parseInt entry[2]
-        since: new Date parseInt entry[3]
+        version: entry[0]
+        host: entry[1]
+        ip: entry[2]
+        pid: parseInt entry[3]
+        since: new Date parseInt entry[4]
       ).sort (a, b) ->
         return  1 if a.ip  > b.ip
         return -1 if a.ip  < b.ip
@@ -957,6 +959,9 @@ class Queue
           finished:
             groups: multi_res[6]
             tasks: parseInt(statistics.FINISHED) or 0
+          ignored:
+            groups : 0
+            tasks  : parseInt(statistics.IGNORED) or 0
           average_pending_time: Math.round(statistics.TOTAL_PENDING_TIME * 100 / statistics.FINISHED) / 100
           averageprocess_time: Math.round(statistics.TOTAL_PROCESS_TIME * 100 / statistics.FINISHED) / 100
           blocked:
@@ -987,7 +992,7 @@ class Queue
         multi2.exec (multi2_err, multi2_res) =>
           return callback multi2_err if multi2_err
           result.blocked.tasks = multi2_res.reduce(((a, b) -> a + b), - result.blocked.groups)
-          result.pending.tasks = result.total.tasks - result.finished.tasks - result.processing_tasks - result.failed.tasks - result.blocked.tasks
+          result.pending.tasks = result.total.tasks - result.finished.tasks - result.processing_tasks - result.failed.tasks - result.blocked.tasks - result.ignored.tasks
           @pending_groups (err, pending_groups) ->
             return callback err if err
             result.pending.groups = pending_groups.length
@@ -1016,7 +1021,7 @@ class Worker
   constructor: (@queue, @handler) ->
     {@name, @fairy, @redis, @pubsub} = queue
     @id = uuid.v4()
-    @redis.hset @key('WORKERS'), @id, "#{os.hostname()}|#{server_ip()}|#{process.pid}|#{Date.now()}"
+    @redis.hset @key('WORKERS'), @id, "#{version}|#{os.hostname()}|#{server_ip()}|#{process.pid}|#{Date.now()}"
 
     @pubsub.subscribe @key('ENQUEUED')
     @pubsub.on 'message', (channel, message) =>
