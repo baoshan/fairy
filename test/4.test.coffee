@@ -13,6 +13,8 @@ child_processes = []
 
 describe "Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_workers} uncatch-exception Workers, Kill and run normally", ->
 
+  @timeout(200000)
+
   it "Should Clear the Queue First", (done) ->
     clear_queue queue, done
 

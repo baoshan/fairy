@@ -192,7 +192,7 @@ create_client = (options, pubsub) ->
   if pubsub
     index = "#{options.port}|#{options.host}"
     return client if client = pubsub_clients[index]
-  client = redis.createClient options.port, options.host, options.options
+  client = redis.createClient (options.port | 6379), options.host, options.options
   client.auth options.password if options.password
   if pubsub
     pubsub_clients[index] = client

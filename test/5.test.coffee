@@ -13,6 +13,8 @@ child_processes = []
 
 describe "in cluster, Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_workers} uncatch-exception Workers, Kill and run normally", ->
 
+  @timeout(200000)
+
   it "Should not exists workers", (done) ->
     queue.statistics (err, statistics) ->
       statistics.workers.should.equal(0)

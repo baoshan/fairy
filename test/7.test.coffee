@@ -5,6 +5,8 @@ should = require 'should'
 
 describe ["Enqueuer should receive progress notification"], ->
 
+  @timeout(200000)
+
   it "Should Clear the Queue First", ->
     queue.regist (group, nonsense, callback, progress) ->
       progress('progress')
