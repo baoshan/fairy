@@ -7,7 +7,7 @@ bind_detail_table = (name, item_id, is_load) ->
 # 渲染详细页面数据
 render_detail = (event) ->
 		{name, value, item_id} = event.data
-		$.get "./detail/#{name}/#{value}", (result) ->
+		$.get "/fairy/detail/#{name}/#{value}", (result) ->
 				param = {}
 		  param[value] =
 				  data: result
@@ -16,7 +16,7 @@ render_detail = (event) ->
     $("##{value}_#{item_id}").show()
 				$("##{value}_#{item_id}").find("button[type='button']").on 'click', -> $(@).parent().hide()
 				$("##{value}_#{item_id}").find("button[type='action']").each () ->
-						$(@).on 'click', -> $.get("./#{name}/#{$(@).attr('data-fuc')}", ->
+						$(@).on 'click', -> $.get("/fairy/#{name}/#{$(@).attr('data-fuc')}", ->
 								$("##{value}_#{item_id}").find('button[type=button]').trigger 'click'
 								render_master(off, on)
 						)
@@ -103,7 +103,7 @@ create_dom = (render_data, is_load, fetch_time) ->
 # 渲染页面统计数据
 # 清空模板
 render_master = (is_load, fetch_timer) ->
-		$.get './statistics', (render_data) -> create_dom render_data, is_load, fetch_timer
+		$.get '/fairy/statistics', (render_data) -> create_dom render_data, is_load, fetch_timer
 
 # 页面加载事件
 $ -> render_master(on, on)
