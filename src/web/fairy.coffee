@@ -124,8 +124,8 @@ task_property = ->
 # 控制内容在可视窗口内移动
 scroll_to = (index) ->
   $('#context_template').css('left', task_property().context_width * index )
-		$('#button_prev')[if index > 0 then 'show' else 'hide']()
-		$('#button_next')[if index < task_property().task_total - 2 then 'show' else 'hide']()
+  $('#button_prev')[if index > 0 then 'show' else 'hide']()
+  $('#button_next')[if index < task_property().task_total - 2 then 'show' else 'hide']()
 
 # 左右按钮事件
 $('#button_prev').click(-> scroll_to(current_index() - 1))
