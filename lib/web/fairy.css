@@ -1,0 +1,375 @@
+﻿* {		
+		margin: 0;
+		padding: 0;
+		border: 0;
+		font: inherit;
+		font-size: 100%;
+		vertical-align: baseline;
+}
+
+@-webkit-viewport{
+  height:device-height;
+		zoom:2;
+}
+
+
+html, body {
+		color:#727272;
+		font: 13px/1.5 "HelveticaNeue-CondensedBold","Helvetica Neue",Helvetica,Arial,sans-serif,"Microsoft YaHei UI";
+		height:100%;
+}
+
+ul li{
+  list-style: none;
+}
+
+h1{
+		font-size: 30px;
+		margin:0 0 30px 0;
+}
+h1 span{
+		color:#999;
+  font:30px "Helvetica Neue";
+}
+
+/* 按钮 */
+button {
+		background: #000;
+		border: none;
+		color: #FFF;
+		cursor: pointer;
+		float: right;
+		padding: 5px 20px;
+		margin: 50px 0 0 20px;
+		text-transform: capitalize;
+		transition:background,color, 0.2s ease 0;
+}
+#button_prev:hover, 
+#button_next:hover,
+button:hover {
+		background: rgba(0,0,0,0.8);
+		border: none;
+		color:#FFF;
+}
+#button_prev:active, 
+#button_next:active,
+button:active,
+button:hover:active {
+		background: rgba(0,0,0,0.5);
+		border: none;
+		color:#FFF;
+}
+/*切换按钮*/
+#button_prev,
+#button_next {
+		display: none;
+		background: rgba(0,0,0,0.3);
+		font-size:50px;
+		padding:0;
+		position:fixed;
+		top: 50%;
+		-webkit-transform: translateY(-50%);
+		transform: translateY(-50%);
+		width:60px;
+		z-index: 2;
+}
+#button_prev {
+		left:-20px;
+		text-align:left;
+}
+#button_next {
+		right:0;
+		text-align:right;
+}
+/*仪表盘视窗*/
+.scroll {
+		position:relative;
+		overflow-y: auto;
+	 overflow-x:hidden;
+		min-height: 1080px;
+		min-width:1920px;
+  width:1920px;
+}
+/*仪表盘容器*/
+#context_template{
+		position: relative;
+		left: 0;
+		top: 0;
+}
+h2, .number label {
+		font-family: "HelveticaNeue-CondensedBold","Helvetica Neue","Arial Narrow",Arial,sans-serif;
+		font-weight: bold;
+		font-stretch: condensed;
+		-webkit-font-smoothing: antialiased;
+}
+h2 {
+		margin: 0 0 6px;
+		line-height: 1.5;
+  text-transform: capitalize;
+		font-size: 15px;
+		color: #999;
+}
+.graph .data h2 {
+ line-height:0;
+}
+/*仪表盘*/
+.graphs {
+		display:inline-block;
+		position: relative;
+		padding:30px 0 0 30px;
+  width:930px;/*960-30*/
+}
+.graphs .arrows h2 a {
+		font-size: 18px;
+		font-weight:bold;
+}
+.graphs .arrows >span label,
+.graphs .arrows{
+ cursor:pointer;
+}
+.graphs .arrows:hover h2 a {
+		color: rgba(0,0,0,1);
+		font-weight:bold;
+}
+
+.graphs .data {
+		width: 1px;
+		padding-right: 20px;
+		white-space: nowrap;
+}
+
+.graphs .graph {
+		position: relative;
+		display: table-row;
+}
+.graphs .graph .data,
+.graphs .graph .graph {
+		padding-bottom: 36px;
+		display: table-cell;
+		vertical-align: top;
+}
+.graphs .graph-container {
+		height: 80px;
+}
+
+.number {
+		display:-moz-box;
+		display:-ms-flexbox;
+		display:-webkit-flex;
+		line-height: 0.7;
+		color: #aaa;
+		font-size: 52px;
+}
+.number >span{
+  margin:0px 5px;
+		float:left;
+		font:60px Arial;
+}
+.number label {
+		color: #000;
+		float:left;
+}
+.number label span{
+		display:block;
+		color:#999;
+		font:14px "Helvetica Neue";
+		line-height: 0;
+		text-transform: capitalize;
+}
+.number .number_span,
+.number label span:first-of-type { 
+  display:inline-block;
+		color:#000;
+  font:52px "HelveticaNeue-CondensedBold";
+		margin-left:-10px;
+		text-transform: lowercase;
+}
+.number label:only-of-type{
+  line-height:1.2;
+}
+.number .number_span{ 
+		margin-left:5px;
+}
+.row {
+		float:left;
+		margin-right:30px;
+}
+.clear {
+		clear:both;
+		display:block;
+}
+
+/* svg  */
+.graph .axis {
+		fill: #aaa;
+		font-size: 10px;
+}
+.graph .axis line, .graph .axis path {
+		stroke-width: hairline;
+		fill: none;
+		stroke: #eee;
+		shape-rendering: crispEdges;
+}
+.graph path.path {
+		stroke: #333;
+		stroke-width: 2px;
+		stroke-opacity: 1;
+		fill: none;
+}
+.axis path,
+.axis line {
+  fill: none;
+		stroke: #000;
+		shape-rendering: crispEdges;
+}
+.line {
+  fill: none;
+		stroke: #000;
+		stroke-width: 1.5px;
+}
+/*增加渲染速度*/
+/*提高页面渲染速度，在dom节点特别多时，他会启动gpu一起帮忙渲染页面*/
+.wk{
+		-webkit-transform: translate3d(0px,0px,0px);
+}
+
+/*异常情况信息列表*/
+.error_list {
+		display:none;
+		background: #DEDEE3;
+		padding: 50px;
+		overflow: hidden;
+		position:absolute;
+		top:0;
+		left:0;
+		height:calc(100% - 100px);
+		width:850px;
+		z-index:1;
+}
+.scroll_detail{
+		overflow-x:hidden;
+		overflow-y:auto;
+		height:85%;
+}
+table tr th,
+table tr td {
+		padding:5px 10px;
+		text-align: right;
+		vertical-align:top;
+}
+table tr th {
+		border-bottom: 1px solid rgba(0,0,0,0.5);
+		color:#000;
+		font-size: 16px;
+		white-space: nowrap;
+}
+table tr td {
+		border-bottom: 1px solid rgba(0,0,0,0.1);
+		color:#333;
+		font-family:Courier New;
+}
+table tr th:first-of-type,
+table tr td:first-of-type {
+		padding-left:0;
+}
+table tr th:last-of-type,
+table tr td:last-of-type { 
+		padding-right:0;
+}
+table tr:hover{
+		background: rgba(255,255,255,0.4);
+}
+table tr:first-of-type:hover,
+table .morearrow:hover,
+table .error_content:hover{
+		background:none;
+}
+div[id^="failed_tasks"] table {   
+		margin-right:20px;
+}
+
+/*更多箭头*/
+table .morearrow td:last-of-type div:after {
+		content:"▼";
+		font-size: 13px;
+		padding-left:10px;
+}
+/*更多内容*/
+table .error_content td ul{
+		border-right:3px solid rgba(137, 137, 142, 0.5);
+		padding-right:10px;
+}
+/* 表格横线 */
+table tr:first-of-type + .morearrow td,
+.error_content + .items_content td {
+		border: none;
+}
+.error_content + .items_content + .items_content td {
+		border-top: 1px solid rgba(0,0,0,0.1);
+}
+/*关闭按钮*/
+.close {
+		background:none;
+		border-radius: 50%;
+		color:rgba(255,255,255,0.5);
+		font-size:40px;
+		text-align: left;
+		margin:0;
+		padding:30px;
+		position:absolute;
+		right:-30px;
+		top:-40px;
+		height:100px;
+		width:100px;
+}
+.close:hover {
+		background:rgba(0,0,0,0.1);
+}
+.close:active {
+		background:rgba(0,0,0,0.15);
+}
+
+/*隐藏图形y轴*/
+.y.axis path {
+  display: none;
+}
+.axis .minor line {
+  stroke: #777;
+		stroke-dasharray: 2,2;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

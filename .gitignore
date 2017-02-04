@@ -3,6 +3,5 @@
 *.dmp
 *.rdb
 node_modules
-lib
 *.tgz
 *.log
