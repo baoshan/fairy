@@ -3,7 +3,7 @@ queue = fairy.queue('TEST7')
 uuid  = require('node-uuid')
 should = require 'should'
 
-describe ["Enqueuer should receive progress notification"], ->
+describe "Enqueuer should receive progress notification", ->
 
   @timeout(200000)
 

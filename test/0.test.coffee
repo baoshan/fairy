@@ -10,7 +10,7 @@ total_groups  = 5
 total_tasks   = 200
 total_workers = require('os').cpus().length
 
-describe ["Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_workers} Perfect Workers"], ->
+describe "Process #{total_tasks} Tasks of #{total_groups} Groups by #{total_workers} Perfect Workers", ->
 
   @timeout(200000)
 
